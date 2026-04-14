@@ -54,8 +54,15 @@ export default function LoginPage() {
       }
       await afterAuth();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message.replace("Firebase: ", "").replace(/\s*\(auth\/.*\)/, ""));
+        if (err instanceof Error) {
+          setError(
+            err.message
+              .replace("Firebase: ", "")
+              .replace(/\s*\(auth\/.*\)/, "")
+          );
+        } else {
+          setError("Something went wrong");
+        }
     } finally {
       setLoading(false);
     }
