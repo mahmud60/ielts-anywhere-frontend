@@ -75,7 +75,15 @@ export default function LoginPage() {
       await signInWithPopup(auth, googleProvider);
       await afterAuth();
     } catch (err) {
-      setError(err.message.replace("Firebase: ", "").replace(/\s*\(auth\/.*\)/, ""));
+        if (err instanceof Error) {
+          setError(
+            err.message
+              .replace("Firebase: ", "")
+              .replace(/\s*\(auth\/.*\)/, "")
+          );
+        } else {
+          setError("Something went wrong");
+        }
     } finally {
       setLoading(false);
     }
