@@ -1,0 +1,138 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.heading {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* ── Plans grid ── */
+.plansGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.planCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.planHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.planName {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.planPrice {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.planBilling {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.planFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.planFeature {
+  font-size: 13px;
+  color: #64748b;
+  display: flex;
+  gap: 6px;
+}
+
+.featureCheck {
+  color: #059669;
+}
+
+.variantId {
+  margin-top: 12px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.badge {
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ── Time limits ── */
+.limitsCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.limitsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.limitTile {
+  text-align: center;
+}
+
+.limitLabel {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+
+.limitValue {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.limitSub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* ── Notice banner ── */
+.notice {
+  padding: 10px 14px;
+  background: #fef3c7;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #d97706;
+  border: 1px solid #d9770633;
+}
+
+/* ── Loading ── */
+.loading {
+  color: #64748b;
+  padding: 20px;
+}
