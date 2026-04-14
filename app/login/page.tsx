@@ -42,7 +42,7 @@ export default function LoginPage() {
     router.push("/tests");
   };
 
-  const submit = async (e) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -54,7 +54,15 @@ export default function LoginPage() {
       }
       await afterAuth();
     } catch (err) {
-      setError(err.message.replace("Firebase: ", "").replace(/\s*\(auth\/.*\)/, ""));
+      if (err instanceof Error) {
+        setError(
+          err.message
+            .replace("Firebase: ", "")
+            .replace(/\s*\(auth\/.*\)/, "")
+        );
+      } else {
+        setError("Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
