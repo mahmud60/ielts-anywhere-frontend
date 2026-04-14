@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { QuestionsTab } from "./QuestionsTab";
 import { TestsTab } from "./TestsTab";
-import { OverviewTab } from "@/components/admin/OverviewTab";
+import { OverviewTab } from "@/components/Admin/OverviewTab";
 import { UsersTab } from "@/components/Admin/UsersTab";
 import { logout } from "@/lib/auth";
 import { PricingTab } from "@/components/Admin/PricingTab";
