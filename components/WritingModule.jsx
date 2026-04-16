@@ -423,7 +423,7 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
       }
     }
     if (apiBase && sessionId) load();
-  }, [apiBase, sessionId, getToken]);
+  }, [apiBase, sessionId]);
 
   // Polling loop — runs after submit until grading completes
   const startPolling = useCallback((aid) => {
