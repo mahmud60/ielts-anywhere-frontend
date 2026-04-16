@@ -387,20 +387,17 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // responses keyed by task UUID
   const [responses, setResponses] = useState({});
-
+  const responsesRef = useRef({});   // ← survives all re-renders
   const [activeTask, setActiveTask] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [attemptId, setAttemptId] = useState(null);
-  const [grading, setGrading] = useState(false);   // polling in progress
+  const [grading, setGrading] = useState(false);
   const [result, setResult] = useState(null);
-  const [view, setView] = useState("write");        // "write" | "grading" | "results"
-
+  const [view, setView] = useState("write");
   const pollRef = useRef(null);
+  const testIdRef = useRef(null);    // ← prevents duplicate loads
 
-  // Load writing test
   useEffect(() => {
     async function load() {
       try {
@@ -411,11 +408,25 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
         );
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
+
+        // Skip if we already loaded this exact test
+        if (testIdRef.current === data.id) return;
+        testIdRef.current = data.id;
+
         setTest(data);
-        // Initialise response state keyed by task id
-        const init = {};
-        data.tasks.forEach(t => { init[String(t.id)] = ""; });
-        setResponses(init);
+
+        // Initialise only missing keys — never overwrite existing answers
+        setResponses(prev => {
+          const updated = { ...prev };
+          data.tasks.forEach(t => {
+            const key = String(t.id);
+            if (!(key in updated)) {
+              updated[key] = "";
+            }
+          });
+          return updated;
+        });
+
       } catch (e) {
         setError(e.message);
       } finally {
@@ -469,7 +480,6 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
     if (!test) return;
     setSubmitting(true);
     setError(null);
-
     try {
       const token = await getToken();
       const res = await fetch(`${apiBase}/writing/submit`, {
@@ -480,14 +490,11 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
         },
         body: JSON.stringify({
           test_id: test.id,
-          responses,
+          responses: responsesRef.current,  // ← use ref, not state
         }),
       });
-
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-
-      // Submit succeeded — start polling for grading result
       setAttemptId(data.attempt_id);
       startPolling(data.attempt_id);
     } catch (e) {
@@ -641,7 +648,11 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
           <TaskEditor
             task={task}
             value={responses[String(task.id)] || ""}
-            onChange={val => setResponses(r => ({ ...r, [String(task.id)]: val }))}
+            onChange={val => {
+              // Update both the ref (instant, never lost) and state (triggers re-render for word count)
+              responsesRef.current[String(task.id)] = val;
+              setResponses(prev => ({ ...prev, [String(task.id)]: val }));
+            }}
             submitted={submitting}
           />
         </div>
