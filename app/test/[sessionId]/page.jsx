@@ -466,6 +466,7 @@ export default function SessionPage() {
     sessionId,
     currentModule: current,
     enabled: !!session && current !== "complete",
+    resetKey,
   });
 
   if (authLoading || pageLoading) {
