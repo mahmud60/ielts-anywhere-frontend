@@ -93,6 +93,7 @@ const CSS = `
   @keyframes sm-spin { to { transform: rotate(360deg); } }
   @keyframes sm-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
   @keyframes sm-typing { 0%{opacity:0} 50%{opacity:1} 100%{opacity:0} }
+  @keyframes sm-record-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.18);opacity:.65} }
   .sm-fadeup { animation: sm-fadeup .25s ease both; }
   .sm-card { background:${C.card}; border:1px solid ${C.border}; border-radius:12px; }
   .sm-spinner { width:18px; height:18px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:sm-spin .7s linear infinite; display:inline-block; }
@@ -187,7 +188,7 @@ function TypingIndicator() {
 }
 
 // ─── Part intro screen ────────────────────────────────────────────────────────
-function PartIntro({ part, partData, onStart }) {
+function PartIntro({ part, onStart }) {
   const info = PART_INFO[part.part_number];
   return (
     <div className="sm-fadeup" style={{ maxWidth: 540, margin: "0 auto", padding: "48px 24px", textAlign: "center" }}>
@@ -267,15 +268,143 @@ function PrepScreen({ part, onDone }) {
   );
 }
 
+// ─── Voice + text answer input ────────────────────────────────────────────────
+function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
+  const [recState, setRecState] = useState("idle"); // idle | recording | transcribing
+  const [canRecord, setCanRecord] = useState(true);
+  const mrRef = useRef(null);
+  const chunksRef = useRef([]);
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (!navigator.mediaDevices || typeof MediaRecorder === "undefined") setCanRecord(false);
+  }, []);
+
+  useEffect(() => {
+    if (recState === "idle") setTimeout(() => textareaRef.current?.focus(), 80);
+  }, [recState]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mrRef.current = mr;
+      chunksRef.current = [];
+
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setRecState("transcribing");
+        try {
+          const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+          const fd = new FormData();
+          fd.append("audio", blob, "recording.webm");
+          const token = await getToken();
+          const res = await fetch(`${apiBase}/speaking/transcribe`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            onChange(data.transcript || "");
+          }
+        } catch (e) {
+          console.warn("Transcription failed:", e.message);
+        } finally {
+          setRecState("idle");
+        }
+      };
+
+      mr.start(200);
+      setRecState("recording");
+    } catch {
+      setCanRecord(false);
+    }
+  };
+
+  const stopRecording = () => mrRef.current?.stop();
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+  };
+
+  if (recState === "recording") {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 16,
+        padding: "18px 20px", background: C.redDim,
+        border: `1px solid ${C.red}44`, borderRadius: 10,
+      }}>
+        <div style={{
+          width: 14, height: 14, borderRadius: "50%", background: C.red,
+          animation: "sm-record-pulse 1s ease-in-out infinite", flexShrink: 0,
+        }} />
+        <span style={{ flex: 1, fontSize: 14, color: C.red }}>Recording… speak now</span>
+        <button className="sm-btn sm-btn-primary" onClick={stopRecording}
+          style={{ background: C.red, padding: "8px 18px" }}>
+          Stop
+        </button>
+      </div>
+    );
+  }
+
+  if (recState === "transcribing") {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "18px 20px", background: C.surface,
+        border: `1px solid ${C.border}`, borderRadius: 10,
+      }}>
+        <Spinner />
+        <span style={{ fontSize: 14, color: C.muted }}>Transcribing your response…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <textarea
+        ref={textareaRef}
+        className="sm-textarea"
+        rows={3}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={handleKey}
+        placeholder="Type your response… (Enter to submit, Shift+Enter for new line)"
+      />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+        <span style={{ fontSize: 11, color: C.muted }}>Enter to send · Shift+Enter for new line</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          {canRecord && (
+            <button className="sm-btn sm-btn-outline" onClick={startRecording}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+              </svg>
+              Record
+            </button>
+          )}
+          <button className="sm-btn sm-btn-primary" disabled={!value.trim()} onClick={onSend}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {isLast ? "Finish part" : "Send"}
+            <span style={{ opacity: 0.7, fontSize: 11 }}>{isLast ? "→" : "↵"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Conversation UI ──────────────────────────────────────────────────────────
-function ConversationView({ part, onPartComplete }) {
+function ConversationView({ part, onPartComplete, apiBase, getToken }) {
   const [questionIdx, setQuestionIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [exchanges, setExchanges] = useState([]);
   const [showTyping, setShowTyping] = useState(true);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const chatEndRef = useRef(null);
-  const textareaRef = useRef(null);
 
   const info = PART_INFO[part.part_number];
   const currentQuestion = part.questions[questionIdx];
@@ -293,13 +422,6 @@ function ConversationView({ part, onPartComplete }) {
     const t = setTimeout(() => setShowTyping(false), 900);
     return () => clearTimeout(t);
   }, [questionIdx]);
-
-  // Focus textarea after typing indicator disappears
-  useEffect(() => {
-    if (!showTyping) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
-  }, [showTyping]);
 
   const handleSend = useCallback(() => {
     if (!answer.trim() || showTyping) return;
@@ -319,14 +441,6 @@ function ConversationView({ part, onPartComplete }) {
       }
     }, 400);
   }, [answer, currentQuestion, exchanges, isLast, onPartComplete, showTyping]);
-
-  // Enter to submit (Shift+Enter for newline)
-  const handleKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", maxWidth: 680, margin: "0 auto" }}>
@@ -394,32 +508,14 @@ function ConversationView({ part, onPartComplete }) {
       {/* Input area */}
       {!showTyping && !submittingAnswer && (
         <div className="sm-fadeup" style={{ paddingTop: 14, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <textarea
-            ref={textareaRef}
-            className="sm-textarea"
-            rows={3}
+          <AnswerInput
             value={answer}
-            onChange={e => setAnswer(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={
-              part.part_number === 2 && questionIdx === 0
-                ? "Speak about the topic for 1–2 minutes. Type your full response here… (Enter to submit)"
-                : "Type your response… (Enter to submit, Shift+Enter for new line)"
-            }
+            onChange={setAnswer}
+            onSend={handleSend}
+            isLast={isLast}
+            apiBase={apiBase}
+            getToken={getToken}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-            <span style={{ fontSize: 11, color: C.muted }}>
-              Shift+Enter for new line · Enter to send
-            </span>
-            <button
-              className="sm-btn sm-btn-primary"
-              disabled={!answer.trim()}
-              onClick={handleSend}
-              style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {isLast ? "Finish part" : "Send"}
-              <span style={{ opacity: 0.7, fontSize: 11 }}>{isLast ? "→" : "↵"}</span>
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -643,7 +739,7 @@ export default function SpeakingModule({ apiBase, getToken, sessionId, onComplet
   const [partExchanges, setPartExchanges] = useState({});
 
   // Grading state
-  const [attemptId, setAttemptId] = useState(null);
+  const [, setAttemptId] = useState(null);
   const [result, setResult] = useState(null);
   const pollRef = useRef(null);
 
@@ -849,6 +945,8 @@ export default function SpeakingModule({ apiBase, getToken, sessionId, onComplet
           key={`part-${currentPart.part_number}`}
           part={currentPart}
           onPartComplete={handlePartComplete}
+          apiBase={apiBase}
+          getToken={getToken}
         />
       )}
 

@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   const afterAuth = async () => {
     await api.getMe();
-    router.push("/tests");
+    router.push("/dashboard");
   };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
