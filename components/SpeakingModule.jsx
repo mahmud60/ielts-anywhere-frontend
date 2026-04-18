@@ -272,6 +272,7 @@ function PrepScreen({ part, onDone }) {
 function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
   const [recState, setRecState] = useState("idle"); // idle | recording | transcribing
   const [canRecord, setCanRecord] = useState(true);
+  const [hint, setHint] = useState("");
   const mrRef = useRef(null);
   const chunksRef = useRef([]);
   const textareaRef = useRef(null);
@@ -285,6 +286,7 @@ function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
   }, [recState]);
 
   const startRecording = async () => {
+    setHint("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
@@ -295,6 +297,7 @@ function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         setRecState("transcribing");
+        let transcribed = false;
         try {
           const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
           const fd = new FormData();
@@ -307,11 +310,15 @@ function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
           });
           if (res.ok) {
             const data = await res.json();
-            onChange(data.transcript || "");
+            if (data.transcript) {
+              onChange(data.transcript);
+              transcribed = true;
+            }
           }
         } catch (e) {
-          console.warn("Transcription failed:", e.message);
+          console.warn("Transcription error:", e.message);
         } finally {
+          if (!transcribed) setHint("Transcription unavailable — please type your answer below.");
           setRecState("idle");
         }
       };
@@ -364,6 +371,11 @@ function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
 
   return (
     <div>
+      {hint && (
+        <div style={{ fontSize: 12, color: C.gold, marginBottom: 8, paddingLeft: 2 }}>
+          {hint}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         className="sm-textarea"
