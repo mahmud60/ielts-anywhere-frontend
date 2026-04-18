@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 const MOD_COLOR = {
   listening: "#0ea5e9",
@@ -53,7 +55,7 @@ function SectionTitle({ children }) {
   );
 }
 
-function ModuleBar({ module, avg, best }) {
+function ModuleBar({ module, avg }) {
   const pct = avg != null ? Math.min(100, (avg / 9) * 100) : 0;
   return (
     <div style={{ marginBottom: 14 }}>
@@ -208,21 +210,38 @@ export default function DashboardPage() {
             {isPro ? "Pro account" : "Free account"} · {data.total_tests} test{data.total_tests !== 1 ? "s" : ""} completed
           </p>
         </div>
-        <button
-          onClick={() => router.push("/tests")}
-          style={{
-            background: "#0ea5e9",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            padding: "9px 18px",
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          Take a test
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => router.push("/tests")}
+            style={{
+              background: "#0ea5e9",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Take a test
+          </button>
+          <button
+            onClick={() => signOut(auth).then(() => router.push("/login"))}
+            style={{
+              background: "#fff",
+              color: "#6b7280",
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Log out
+          </button>
+        </div>
       </div>
 
       {/* Stat cards */}
