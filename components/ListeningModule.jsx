@@ -4,39 +4,46 @@
  * Full IELTS listening module — fetches from FastAPI backend,
  * authenticates via Firebase, handles all 4 question types.
  *
- * Props:
- *   apiBase  — your FastAPI URL, e.g. "http://localhost:8000"
- *   getToken — async function that returns a Firebase ID token string
- *              e.g. () => auth.currentUser.getIdToken(true)
- *
- * Standalone demo: if no props are passed, uses built-in mock data
- * so you can preview it here without a running backend.
+ * Backend calls go through lib/api.js so Firebase auth headers and
+ * API error handling stay consistent with the rest of the frontend.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { api } from "@/lib/api";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg: "#080c18",
-  surface: "#0f1623",
-  card: "#131d2e",
-  cardHover: "#172034",
-  border: "#1c2d47",
-  borderHover: "#2a4060",
-  accent: "#00c8f8",
-  accentDim: "#003d4d",
-  accentHover: "#00e0ff",
-  gold: "#f0b429",
-  goldDim: "#352800",
-  green: "#00df76",
-  greenDim: "#00210f",
-  red: "#ff4d4d",
-  redDim: "#2a0000",
-  purple: "#a78bfa",
-  purpleDim: "#1e1040",
-  text: "#dce8fc",
-  muted: "#4e6a8a",
-  mutedLight: "#7a96b4",
+  bg: "#ffffff",
+  surface: "#f8fafc",
+  card: "#ffffff",
+  cardHover: "#f9fafb",
+  border: "#e2e8f0",
+  borderHover: "#cbd5e1",
+  accent: "#0080ff",
+  accentDim: "#e6f2ff",
+  accentHover: "#006bd6",
+  gold: "#d97706",
+  goldDim: "#fef3c7",
+  green: "#059669",
+  greenDim: "#dcfce7",
+  red: "#dc2626",
+  redDim: "#fee2e2",
+  purple: "#7c3aed",
+  purpleDim: "#ede9fe",
+  text: "#0f172a",
+  muted: "#64748b",
+  mutedLight: "#475569",
 };
 
 const SECTION_COLORS = {
@@ -47,46 +54,21 @@ const SECTION_COLORS = {
 };
 
 
-// ─── CSS injected once ────────────────────────────────────────────────────────
+// ─── CSS injected once (animations + spinner only; layout uses Tailwind) ───────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  .lm-root *, .lm-root *::before, .lm-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .lm-root { font-family: 'Sora', sans-serif; background: ${C.bg}; color: ${C.text}; min-height: 100vh; }
-  .lm-root ::-webkit-scrollbar { width: 3px; height: 3px; }
-  .lm-root ::-webkit-scrollbar-track { background: ${C.surface}; }
-  .lm-root ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 3px; }
-  @keyframes lm-fadeup { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes lm-fadeup { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
   @keyframes lm-spin { to { transform:rotate(360deg); } }
-  @keyframes lm-wave { 0%,100%{transform:scaleY(.35)} 50%{transform:scaleY(1)} }
-  @keyframes lm-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-  .lm-fadeup { animation: lm-fadeup .35s ease both; }
-  .lm-card { background:${C.card}; border:1px solid ${C.border}; border-radius:12px; }
-  .lm-card-hover:hover { background:${C.cardHover}; border-color:${C.borderHover}; cursor:pointer; transition:all .15s; }
-  .lm-btn { font-family:'Sora',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 20px; transition:all .15s; }
-  .lm-btn-primary { background:${C.accent}; color:#000; }
-  .lm-btn-primary:hover { background:${C.accentHover}; }
-  .lm-btn-primary:disabled { opacity:.45; cursor:not-allowed; }
-  .lm-btn-outline { background:transparent; color:${C.accent}; border:1px solid ${C.accent}44; }
-  .lm-btn-outline:hover { background:${C.accent}12; border-color:${C.accent}88; }
-  .lm-btn-ghost { background:transparent; color:${C.muted}; }
-  .lm-btn-ghost:hover { color:${C.text}; }
-  .lm-radio { display:flex; align-items:center; gap:10px; padding:9px 14px; border-radius:9px; border:1px solid ${C.border}; cursor:pointer; transition:all .15s; font-size:13.5px; }
-  .lm-radio:hover { border-color:${C.borderHover}; background:${C.surface}; }
-  .lm-radio-selected { background:${C.accentDim}; border-color:${C.accent}55; color:${C.accent}; }
-  .lm-radio-correct { background:${C.greenDim}; border-color:${C.green}55; color:${C.green}; }
-  .lm-radio-wrong { background:${C.redDim}; border-color:${C.red}55; color:${C.red}; }
-  .lm-input { background:${C.surface}; border:1px solid ${C.border}; border-radius:8px; color:${C.text}; font-family:'Sora',sans-serif; font-size:13.5px; padding:9px 13px; transition:border-color .15s; width:100%; }
-  .lm-input:focus { outline:none; border-color:${C.accent}66; }
-  .lm-input-correct { border-color:${C.green}55; background:${C.greenDim}; }
-  .lm-input-wrong { border-color:${C.red}55; background:${C.redDim}; }
-  .lm-badge { border-radius:99px; font-size:11px; font-weight:600; letter-spacing:.06em; padding:2px 10px; text-transform:uppercase; display:inline-block; }
-  .lm-spinner { width:18px; height:18px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:lm-spin .7s linear infinite; display:inline-block; }
+  .lm-fadeup { animation: lm-fadeup .3s ease both; }
+  .lm-spinner { width:18px; height:18px; border:2px solid #e2e8f0; border-top-color:#0080ff; border-radius:50%; animation:lm-spin .7s linear infinite; display:inline-block; }
 `;
 
 // ─── Tiny helpers ─────────────────────────────────────────────────────────────
 function Badge({ children, color = C.accent }) {
   return (
-    <span className="lm-badge" style={{ background: color + "22", color, border: `1px solid ${color}44` }}>
+    <span
+      className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      style={{ background: `${color}18`, color, border: `1px solid ${color}33` }}
+    >
       {children}
     </span>
   );
@@ -98,14 +80,153 @@ function Spinner() {
 
 function ProgressBar({ value, color = C.accent, height = 4 }) {
   return (
-    <div style={{ background: C.border, borderRadius: 4, height, overflow: "hidden" }}>
+    <div style={{ background: "#e5e7eb", borderRadius: 999, height, overflow: "hidden" }}>
       <div style={{ width: `${Math.min(100, value)}%`, height: "100%", background: color, borderRadius: 4, transition: "width .4s ease" }} />
     </div>
   );
 }
 
-// ─── Audio Player ─────────────────────────────────────────────────────────────
-function AudioPlayer({ section }) {
+function formatTime(seconds = 0) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function getQuestionType(question) {
+  return question.question_type || question.type || "fill";
+}
+
+function isAnswerComplete(question, value) {
+  if (value === undefined || value === null || value === "") return false;
+  if (getQuestionType(question) === "matching") {
+    const items = question.options || [];
+    return items.length > 0 && items.every((_, idx) => {
+      const answer = value?.[idx];
+      return answer !== undefined && answer !== null && String(answer).trim() !== "";
+    });
+  }
+  if (typeof value === "object") return Object.values(value).some(v => String(v ?? "").trim() !== "");
+  return String(value).trim() !== "";
+}
+
+function getSectionAnswered(section, answers) {
+  return section.questions.filter(q => isAnswerComplete(q, answers[q.id])).length;
+}
+
+function getPartLabel(section, fallbackIndex) {
+  return `Part ${section?.section_number || fallbackIndex + 1}`;
+}
+
+// ─── Exam header ──────────────────────────────────────────────────────────────
+function ListeningExamHeader({
+  testTitle,
+  partLabel,
+  formatted,
+  isWarning,
+  isDanger,
+  submitting,
+  canSubmit,
+  onSubmit,
+  answered,
+  total,
+  partAnswered,
+  partTotal,
+}) {
+  const timerTone = isDanger
+    ? "border-red-200 bg-red-50 text-red-700"
+    : isWarning
+    ? "border-amber-200 bg-amber-50 text-amber-700"
+    : "border-emerald-200 bg-emerald-50 text-emerald-700";
+  const overallPct = total ? (answered / total) * 100 : 0;
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-white/85 shadow-sm backdrop-blur-md">
+      <div className="mx-auto max-w-3xl px-4 py-3 md:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-sm">
+            IA
+          </div>
+          <div className="leading-tight">
+            <div className="text-base font-bold text-primary md:text-lg">
+              IELTS<span className="text-foreground">Anywhere</span>
+            </div>
+            <div className="text-xs font-medium text-muted-foreground">Listening exam mode</div>
+          </div>
+        </div>
+
+        <div className="min-w-[180px] flex-1 md:pl-6">
+          <div className="truncate text-sm font-semibold text-foreground sm:text-base">
+            {testTitle || "Listening Practice Test"}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{partLabel}</span>
+            <span className="hidden h-1 w-1 rounded-full bg-muted-foreground/40 sm:inline-block" />
+            <span>{answered}/{total} answered</span>
+            {partTotal > 0 && <span>· this part {partAnswered}/{partTotal}</span>}
+          </div>
+        </div>
+
+        <div className="ml-auto flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 font-mono text-sm font-semibold ${timerTone}`}>
+            <Clock className="h-4 w-4" />
+            {formatted || "--:--"}
+          </div>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!canSubmit || submitting}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            title={canSubmit ? "Finish and submit listening answers" : "Answer all questions before finishing"}
+          >
+            {submitting ? "Submitting…" : "Finish"}
+          </button>
+        </div>
+        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${overallPct}%` }}
+          />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ListeningProgressSummary({ sections, answers, activeSection, totalAnswered, totalQuestions }) {
+  const section = sections[activeSection];
+  const currentAnswered = section ? getSectionAnswered(section, answers) : 0;
+  const currentTotal = section?.questions.length || 0;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="lm-card p-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Overall Progress</div>
+        <div className="mt-2 flex items-end gap-2">
+          <div className="text-2xl font-semibold text-foreground">{totalAnswered}/{totalQuestions}</div>
+          <div className="pb-1 text-sm text-muted-foreground">questions answered</div>
+        </div>
+        <div className="mt-4">
+          <ProgressBar value={totalQuestions ? (totalAnswered / totalQuestions) * 100 : 0} />
+        </div>
+      </div>
+      <div className="lm-card p-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current Part</div>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <div className="text-2xl font-semibold text-foreground">
+            {getPartLabel(section, activeSection)}: {currentAnswered}/{currentTotal}
+          </div>
+          <div className="pb-1 text-sm text-muted-foreground">answered in this part</div>
+        </div>
+        <div className="mt-4">
+          <ProgressBar value={currentTotal ? (currentAnswered / currentTotal) * 100 : 0} color={SECTION_COLORS[section?.section_number] || C.accent} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Compact audio bar ────────────────────────────────────────────────────────
+function ListeningAudioBar({ section }) {
   const audioRef = useRef(null);
   const mockTimerRef = useRef(null);
 
@@ -115,11 +236,11 @@ function AudioPlayer({ section }) {
   // Playback state
   const [playing, setPlaying]   = useState(false);
   const [time, setTime]         = useState(0);
-  const [duration, setDuration] = useState(
-    section.audio_duration_seconds || 120
-  );
+  const [duration, setDuration] = useState(section.audio_duration_seconds || 0);
   const [audioReady, setAudioReady] = useState(!hasRealAudio); // mock is always ready
   const [audioError, setAudioError] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
 
   // ── Real audio event wiring ───────────────────────────────────────────────
   useEffect(() => {
@@ -173,9 +294,11 @@ function AudioPlayer({ section }) {
   const togglePlay = () => {
     if (audioError) return;
     if (hasRealAudio && audioRef.current) {
-      playing
-        ? audioRef.current.pause()
-        : audioRef.current.play().catch(() => setAudioError(true));
+      if (playing) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(() => setAudioError(true));
+      }
     }
     setPlaying(p => !p);
   };
@@ -200,19 +323,20 @@ function AudioPlayer({ section }) {
     }
   };
 
-  const pct = duration > 0 ? (time / duration) * 100 : 0;
-  const fmt = s =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const handleVolume = (e) => {
+    const next = Number(e.target.value);
+    setVolume(next);
+    setMuted(next === 0);
+    if (audioRef.current) audioRef.current.volume = next;
+  };
 
-  // Stable waveform bar heights derived from section number so they
-  // look different per section but never change on re-render
-  const bars = Array.from({ length: 72 }, (_, i) => {
-    const h =
-      28 +
-      Math.sin(i * 0.9) * 22 +
-      Math.cos(i * 1.7 + section.section_number) * 14;
-    return Math.max(10, Math.round(h));
-  });
+  const toggleMute = () => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    if (audioRef.current) audioRef.current.volume = nextMuted ? 0 : volume || 1;
+  };
+
+  const pct = duration > 0 ? (time / duration) * 100 : 0;
 
   // Status badge
   const statusBadge = audioError
@@ -224,145 +348,95 @@ function AudioPlayer({ section }) {
     : { label: "Demo — no audio", color: C.muted };
 
   return (
-    <div className="lm-card" style={{ padding: "18px 20px", marginBottom: 20 }}>
+    <div className="glass-card overflow-hidden p-4">
+      {hasRealAudio && <audio ref={audioRef} src={section.audio_url} preload="metadata" />}
 
-      {/* Hidden real audio element — all controls are custom */}
-      {hasRealAudio && (
-        <audio
-          ref={audioRef}
-          src={section.audio_url}
-          preload="metadata"
-          style={{ display: "none" }}
-        />
-      )}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge color={color}>{getPartLabel(section, 0)}</Badge>
+            <Badge color={statusBadge.color}>{statusBadge.label}</Badge>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">Listen carefully, then answer the questions below.</p>
+          {section.context && (
+            <div className="mt-1 text-sm leading-6 text-muted-foreground">{section.context}</div>
+          )}
+        </div>
 
-      {/* Header */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        gap: 10, marginBottom: 14,
-      }}>
-        <Badge color={color}>Section {section.section_number}</Badge>
-        <span style={{ color: C.mutedLight, fontSize: 13 }}>
-          {section.title}
-        </span>
-        <Badge color={statusBadge.color}>{statusBadge.label}</Badge>
-        <span style={{
-          marginLeft: "auto", fontSize: 12,
-          color: C.muted, fontFamily: "'JetBrains Mono'",
-        }}>
-          {fmt(time)} / {fmt(duration)}
-        </span>
-      </div>
+        <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-background/80 p-3 lg:max-w-[22rem]">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={audioError || (!audioReady && hasRealAudio)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: audioError ? C.red : color }}
+            aria-label={playing ? "Pause audio" : "Play audio"}
+          >
+            {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
+          </button>
 
-      {/* Waveform — bars turn active colour as audio progresses */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        gap: 2, height: 48, marginBottom: 14,
-      }}>
-        {bars.map((h, i) => {
-          const active = (i / bars.length) * 100 <= pct;
-          return (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: `${h}%`,
-                borderRadius: 2,
-                background: active ? color : C.border,
-                animation:
-                  playing && active
-                    ? `lm-wave ${0.4 + (i % 7) * 0.08}s ease-in-out infinite`
-                    : "none",
-                animationDelay: `${(i % 5) * 0.06}s`,
-                transition: "background .15s",
-              }}
+          <span className="w-11 shrink-0 text-right font-mono text-xs font-semibold text-muted-foreground">
+            {formatTime(time)}
+          </span>
+          <button
+            type="button"
+            onClick={handleScrub}
+            className="relative h-3 min-w-0 flex-1 rounded-full bg-secondary"
+            aria-label="Seek audio"
+          >
+            <span
+              className="absolute left-0 top-0 h-3 rounded-full"
+              style={{ width: `${pct}%`, background: color }}
             />
-          );
-        })}
+            <span
+              className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow ring-2"
+              style={{ left: `calc(${pct}% - 8px)`, borderColor: color }}
+            />
+          </button>
+          <span className="w-11 shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+            {duration ? formatTime(duration) : "--:--"}
+          </span>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            className="hidden shrink-0 rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground sm:inline-flex"
+            aria-label="Restart audio"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+
+          </div>
+
+          {hasRealAudio && (
+            <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-border/50 pt-2.5">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="shrink-0 rounded-full p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                aria-label={muted ? "Unmute audio" : "Mute audio"}
+              >
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={muted ? 0 : volume}
+                onChange={handleVolume}
+                className="h-1.5 w-20 max-w-[5rem] shrink-0 accent-primary"
+                aria-label="Audio volume"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Transport bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-
-        {/* Play / pause button */}
-        <button
-          className="lm-btn"
-          onClick={togglePlay}
-          disabled={!audioReady && hasRealAudio}
-          style={{
-            width: 38, height: 38, borderRadius: "50%",
-            background: audioError ? C.red : color,
-            padding: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 15, flexShrink: 0,
-            opacity: !audioReady && hasRealAudio ? 0.45 : 1,
-            border: "none", cursor: "pointer",
-          }}
-        >
-          {audioError ? "!" : playing ? "⏸" : "▶"}
-        </button>
-
-        {/* Scrub track */}
-        <div
-          style={{
-            flex: 1, height: 5, background: C.border,
-            borderRadius: 5, position: "relative",
-            cursor: "pointer",
-          }}
-          onClick={handleScrub}
-        >
-          {/* Filled portion */}
-          <div style={{
-            width: `${pct}%`, height: "100%",
-            background: color, borderRadius: 5,
-          }} />
-          {/* Thumb */}
-          <div style={{
-            position: "absolute",
-            top: -4,
-            left: `${pct}%`,
-            width: 13, height: 13,
-            borderRadius: "50%",
-            background: color,
-            transform: "translateX(-50%)",
-            boxShadow: `0 0 0 3px ${color}33`,
-            transition: "left .1s",
-          }} />
-        </div>
-
-        {/* Reset */}
-        <button
-          className="lm-btn lm-btn-ghost"
-          onClick={handleReset}
-          style={{ padding: "4px 8px", fontSize: 12, border: "none", cursor: "pointer" }}
-        >
-          ↺
-        </button>
-      </div>
-
-      {/* Section context shown below controls */}
-      {section.context && (
-        <div style={{
-          marginTop: 14, padding: "10px 14px",
-          background: C.surface, borderRadius: 8,
-          fontSize: 12.5, color: C.mutedLight, lineHeight: 1.65,
-          borderLeft: `2px solid ${color}55`,
-        }}>
-          {section.context}
-        </div>
-      )}
-
-      {/* Error message */}
       {audioError && (
-        <div style={{
-          marginTop: 10, padding: "9px 13px",
-          background: C.redDim, borderRadius: 8,
-          fontSize: 12.5, color: C.red,
-          border: `1px solid ${C.red}33`,
-          lineHeight: 1.6,
-        }}>
-          Could not load audio. Check that the file was uploaded in the admin
-          panel and that your R2 bucket has public access enabled.
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Could not load audio. Check that the file was uploaded in the admin panel and that your R2 bucket has public access enabled.
         </div>
       )}
     </div>
@@ -372,30 +446,33 @@ function AudioPlayer({ section }) {
 // ─── Question components ──────────────────────────────────────────────────────
 function MCQQuestion({ question, value, onChange, result, color }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="flex flex-col gap-2">
       {question.options.map((opt, oi) => {
         const selected = value === oi;
         const isCorrect = result && oi === result.correct_answer;
         const isWrong = result && selected && !result.is_correct;
-        let cls = "lm-radio";
-        if (result) {
-          if (isCorrect) cls += " lm-radio-correct";
-          else if (isWrong) cls += " lm-radio-wrong";
-          else if (selected) cls += " lm-radio-selected";
-        } else if (selected) {
-          cls += " lm-radio-selected";
-        }
+        const state = result
+          ? isCorrect
+            ? "border-emerald-300 bg-emerald-50"
+            : isWrong
+            ? "border-red-300 bg-red-50"
+            : selected
+            ? "border-primary bg-primary/5"
+            : "border-border bg-background"
+          : selected
+          ? "border-primary bg-primary/5 ring-1 ring-primary/15"
+          : "border-border bg-background hover:border-primary/25 hover:bg-secondary/40";
         return (
-          <label key={oi} className={cls} style={{ userSelect: "none" }}>
+          <label key={oi} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 text-sm transition ${state}`}>
             <input type="radio" style={{ display: "none" }} checked={selected}
               disabled={!!result} onChange={() => !result && onChange(oi)} />
             <span style={{
-              width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+              width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
               border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : selected ? color : C.border}`,
               background: selected || isCorrect ? (isCorrect ? C.green : isWrong ? C.red : color) : "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {selected && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#000" }} />}
+              {selected && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
             </span>
             <span style={{ flex: 1 }}>{opt}</span>
             {isCorrect && <span style={{ fontSize: 11, color: C.green, marginLeft: "auto" }}>✓ correct</span>}
@@ -407,22 +484,64 @@ function MCQQuestion({ question, value, onChange, result, color }) {
   );
 }
 
+function hasBlankInText(text) {
+  return /_{2,}/.test(text || "");
+}
+
 function FillQuestion({ question, value, onChange, result }) {
+  const text = question?.question_text || "";
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
+  const inputCls = [
+    "inline-block align-baseline rounded-lg border bg-background px-3 py-1.5 text-[15px] leading-normal text-foreground transition",
+    "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:opacity-70",
+    result ? (isCorrect ? "border-emerald-300 bg-emerald-50" : "border-red-300 bg-red-50") : "border-input",
+  ].join(" ");
+
+  if (hasBlankInText(text)) {
+    const parts = text.split(/(_{2,})/).filter(Boolean);
+    return (
+      <div className="text-[15px] leading-relaxed text-foreground">
+        {parts.map((part, i) =>
+          /_{2,}/.test(part) ? (
+            <input
+              key={`b-${i}`}
+              type="text"
+              className={`${inputCls} mx-0.5 min-w-[8.5rem] max-w-[13rem]`}
+              value={value || ""}
+              disabled={!!result}
+              onChange={e => !result && onChange(e.target.value)}
+              placeholder="answer"
+              aria-label="Your answer"
+            />
+          ) : (
+            <span key={`t-${i}`}>{part}</span>
+          )
+        )}
+        {isWrong && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Correct: <span className="font-medium text-emerald-700">{result.correct_answer}</span>
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="mt-1">
       <input
-        className={`lm-input ${result ? (isCorrect ? "lm-input-correct" : "lm-input-wrong") : ""}`}
+        type="text"
+        className={`h-11 w-full max-w-sm rounded-xl border bg-background px-4 text-[15px] text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:opacity-70 ${result ? (isCorrect ? "border-emerald-300 bg-emerald-50" : "border-red-300 bg-red-50") : "border-input"}`}
         value={value || ""}
         disabled={!!result}
         onChange={e => !result && onChange(e.target.value)}
-        placeholder="Type your answer…"
+        placeholder="Type your answer"
+        aria-label="Your answer"
       />
       {isWrong && (
-        <div style={{ marginTop: 6, fontSize: 12, color: C.mutedLight }}>
-          Correct answer: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>{result.correct_answer}</span>
-        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Correct: <span className="font-medium text-emerald-700">{result.correct_answer}</span>
+        </p>
       )}
     </div>
   );
@@ -436,32 +555,30 @@ function TFNGQuestion({ question, value, onChange, result, color }) {
 function MatchingQuestion({ question, value = {}, onChange, result }) {
   const pool = question.matching_pool || [];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="flex flex-col gap-3">
       {question.options.map((item, idx) => {
         const userAns = value[idx];
         const correctAns = result?.correct_answer?.[idx];
         const isCorrect = result && String(userAns || "").toLowerCase() === String(correctAns || "").toLowerCase();
         const isWrong = result && !isCorrect;
         return (
-          <div key={idx} style={{
-            display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-            background: result ? (isCorrect ? C.greenDim : isWrong ? C.redDim : C.surface) : C.surface,
-            border: `1px solid ${result ? (isCorrect ? C.green + "44" : isWrong ? C.red + "44" : C.border) : C.border}`,
-            borderRadius: 9,
-          }}>
+          <div
+            key={idx}
+            className="flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center"
+            style={{
+              background: result ? (isCorrect ? C.greenDim : isWrong ? C.redDim : "#fff") : "#fff",
+              borderColor: result ? (isCorrect ? C.green + "55" : isWrong ? C.red + "55" : C.border) : C.border,
+            }}
+          >
             {/* Item label */}
-            <span style={{ fontSize: 13, flex: 1, color: C.text }}>{item}</span>
-            <span style={{ color: C.muted, fontSize: 18, flexShrink: 0 }}>→</span>
+            <span className="flex-1 text-sm text-foreground">{item}</span>
+            <span className="hidden shrink-0 text-lg text-muted-foreground sm:inline">→</span>
             {/* Dropdown selector */}
             <select
               disabled={!!result}
               value={userAns || ""}
               onChange={e => !result && onChange({ ...value, [idx]: e.target.value })}
-              style={{
-                background: C.card, border: `1px solid ${C.border}`, color: C.text,
-                borderRadius: 7, padding: "6px 10px", fontSize: 13, fontFamily: "'Sora'",
-                cursor: result ? "default" : "pointer", minWidth: 140,
-              }}
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 sm:w-44"
             >
               <option value="">— Select —</option>
               {pool.map((p, pi) => (
@@ -480,45 +597,82 @@ function MatchingQuestion({ question, value = {}, onChange, result }) {
   );
 }
 
-function Question({ question, answers, setAnswers, results, color, index }) {
+function Question({
+  question,
+  answers,
+  setAnswers,
+  results,
+  color,
+  index,
+  questionNumber,
+  isActive,
+  onActivate,
+}) {
   const value = answers[question.id];
   const result = results?.[question.id];
 
   const onChange = useCallback(val => {
     setAnswers(a => ({ ...a, [question.id]: val }));
-  }, [question.id, setAnswers]);
+    onActivate?.();
+  }, [onActivate, question.id, setAnswers]);
 
-  const typeLabelMap = { mcq: "Multiple choice", fill: "Fill in the blank", tfng: "True / False / Not Given", matching: "Matching" };
+  const type = getQuestionType(question);
+  const typeLabelMap = {
+    mcq: "Multiple choice",
+    multiple_choice: "Multiple choice",
+    fill: "Fill in the blank",
+    short_answer: "Short answer",
+    table_completion: "Table completion",
+    tfng: "True / False / Not Given",
+    matching: "Matching",
+  };
   const typeColorMap = { mcq: C.accent, fill: C.gold, tfng: C.purple, matching: C.green };
-  const typeColor = typeColorMap[question.question_type] || C.accent;
+  const typeColor = typeColorMap[type] || C.accent;
+  const label = typeLabelMap[type] || "Question";
+  const isFillType = ["fill", "short_answer", "table_completion"].includes(type);
 
   return (
-    <div className="lm-card lm-fadeup" style={{ padding: "18px 20px", animationDelay: `${index * 0.04}s` }}>
-      {/* Question header */}
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14 }}>
-        <span style={{
-          background: color + "22", color, border: `1px solid ${color}44`,
-          borderRadius: 6, padding: "2px 9px", fontSize: 12,
-          fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
-        }}>Q{index + 1}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, lineHeight: 1.65, marginBottom: 6 }}>{question.question_text}</div>
-          <Badge color={typeColor}>{typeLabelMap[question.question_type]}</Badge>
+    <div
+      id={`listening-question-${question.id}`}
+      className={`glass-card lm-fadeup scroll-mt-32 p-5 transition-shadow ${isActive ? "ring-2 ring-primary/20 shadow-md" : ""}`}
+      onClick={onActivate}
+      style={{ animationDelay: `${index * 0.04}s` }}
+    >
+      <div className="mb-4 flex items-start gap-3">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          style={{ background: color }}
+        >
+          {questionNumber ?? index + 1}
+        </span>
+        <div className="min-w-0 flex-1 space-y-2">
+          {question.instruction && (
+            <p className="rounded-lg bg-secondary/60 px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+              {question.instruction}
+            </p>
+          )}
+          {!isFillType && (
+            <p className="text-[15px] font-medium leading-relaxed text-foreground">{question.question_text}</p>
+          )}
+          <Badge color={typeColor}>{label}</Badge>
         </div>
       </div>
 
       {/* Input */}
-      {question.question_type === "mcq" && (
+      {(type === "mcq" || type === "multiple_choice") && (
         <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
-      {question.question_type === "fill" && (
+      {(type === "fill" || type === "short_answer" || type === "table_completion") && (
         <FillQuestion question={question} value={value} onChange={onChange} result={result} />
       )}
-      {question.question_type === "tfng" && (
+      {type === "tfng" && (
         <TFNGQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
-      {question.question_type === "matching" && (
+      {type === "matching" && (
         <MatchingQuestion question={question} value={value} onChange={onChange} result={result} />
+      )}
+      {!["mcq", "multiple_choice", "fill", "short_answer", "table_completion", "tfng", "matching"].includes(type) && (
+        <FillQuestion question={question} value={value} onChange={onChange} result={result} />
       )}
 
       {/* Tip */}
@@ -527,6 +681,98 @@ function Question({ question, answers, setAnswers, results, color, index }) {
           <span style={{ color: C.gold }}>Tip: </span>{result.tip}
         </div>
       )}
+    </div>
+  );
+}
+
+function ListeningBottomNavigator({
+  sections,
+  answers,
+  activeSection,
+  setActiveSection,
+  activeQuestionId,
+  setActiveQuestionId,
+  questionNumbers,
+}) {
+  const section = sections[activeSection];
+
+  const goToQuestion = (sectionIndex, question) => {
+    setActiveSection(sectionIndex);
+    setActiveQuestionId(question.id);
+    window.setTimeout(() => {
+      document
+        .getElementById(`listening-question-${question.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/90 shadow-[0_-12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md">
+      <div className="container mx-auto max-w-3xl px-4 py-3 md:px-6">
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {sections.map((sec, si) => {
+            const answered = getSectionAnswered(sec, answers);
+            const total = sec.questions.length;
+            const isActive = si === activeSection;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => {
+                  setActiveSection(si);
+                  if (sec.questions[0]) goToQuestion(si, sec.questions[0]);
+                }}
+                className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <span>{getPartLabel(sec, si)}</span>
+                <span className={`rounded-full px-2 py-0.5 font-mono text-xs ${isActive ? "bg-white/20 text-white" : "bg-secondary text-muted-foreground"}`}>
+                  {answered}/{total}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {section && (
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {getPartLabel(section, activeSection)}
+            </div>
+            <div className="flex gap-2">
+              {section.questions.map(question => {
+                const answered = isAnswerComplete(question, answers[question.id]);
+                const current = activeQuestionId === question.id;
+                return (
+                  <button
+                    key={question.id}
+                    type="button"
+                    onClick={() => goToQuestion(activeSection, question)}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border font-mono text-sm font-semibold transition ${
+                      current
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : answered
+                        ? "border-primary/20 bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:bg-primary/5"
+                    }`}
+                    aria-label={`Question ${questionNumbers[question.id]} ${answered ? "answered" : "unanswered"}`}
+                  >
+                    {questionNumbers[question.id]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="ml-auto hidden shrink-0 items-center gap-3 text-xs text-muted-foreground md:flex">
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border border-border bg-background" /> Unanswered</span>
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border border-primary/20 bg-primary/10" /> Answered</span>
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-primary" /> Current</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -542,7 +788,7 @@ function ResultsPanel({ result }) {
       <div className="lm-card" style={{ padding: 24, borderColor: bc + "55", display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Overall Band</div>
-          <div style={{ fontSize: 56, fontWeight: 600, color: bc, fontFamily: "'JetBrains Mono'", lineHeight: 1 }}>
+          <div style={{ fontSize: 56, fontWeight: 600, color: bc, fontFamily: "monospace", lineHeight: 1 }}>
             {result.overall_band.toFixed(1)}
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{result.correct} / {result.total} correct</div>
@@ -558,7 +804,7 @@ function ResultsPanel({ result }) {
                 <div key={secNum}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                     <span style={{ fontSize: 12, color: C.mutedLight }}>Section {secNum}</span>
-                    <span style={{ fontSize: 12, color: sc, fontFamily: "'JetBrains Mono'" }}>
+                    <span style={{ fontSize: 12, color: sc, fontFamily: "monospace" }}>
                       {data.correct}/{data.total} — Band {data.band.toFixed(1)}
                     </span>
                   </div>
@@ -589,7 +835,14 @@ function ResultsPanel({ result }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function ListeningModule({ apiBase, getToken, sessionId, onComplete, autoSubmitRef }) {
+export default function ListeningModule({
+  sessionId,
+  onComplete,
+  autoSubmitRef,
+  formatted,
+  isWarning,
+  isDanger,
+}) {
   // Inject CSS once
   useEffect(() => {
     const id = "lm-styles";
@@ -601,13 +854,12 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
     }
   }, []);
 
-  const isMock = !apiBase;
-
   // State
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState(0);
+  const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
@@ -616,21 +868,9 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
   // Load test
   useEffect(() => {
     async function load() {
-      if (!apiBase || !sessionId) {
-        // Demo mode — use mock data
-        await new Promise(r => setTimeout(r, 600));
-        setTest(MOCK_TEST);
-        setLoading(false);
-        return;
-      }
+      if (!sessionId) return;
       try {
-        const token = await getToken();
-        const res = await fetch(
-          `${apiBase}/listening/for-session/${sessionId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) throw new Error(await res.text());
-        setTest(await res.json());
+        setTest(await api.getListeningForSession(sessionId));
       } catch (e) {
         setError(e.message);
       } finally {
@@ -638,15 +878,15 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
       }
     }
     load();
-  }, [apiBase, sessionId]);
+  }, [sessionId]);
 
   // Answer completion tracking
   const section = test?.sections[activeSection];
   const answeredInSection = section
-    ? section.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length
+    ? getSectionAnswered(section, answers)
     : 0;
   const totalAnswered = test
-    ? test.sections.reduce((acc, s) => acc + s.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length, 0)
+    ? test.sections.reduce((acc, s) => acc + getSectionAnswered(s, answers), 0)
     : 0;
   const totalQuestions = test
     ? test.sections.reduce((acc, s) => acc + s.questions.length, 0)
@@ -657,32 +897,29 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
     ? Object.fromEntries(result.question_results.map(r => [r.question_id, r]))
     : null;
 
+  const questionNumbers = {};
+  if (test) {
+    let questionNumber = 1;
+    test.sections.forEach(sec => {
+      sec.questions.forEach(q => {
+        questionNumbers[q.id] = questionNumber;
+        questionNumber += 1;
+      });
+    });
+  }
+
+  useEffect(() => {
+    if (!section?.questions?.length) return;
+    const currentInSection = section.questions.some(q => q.id === activeQuestionId);
+    if (!currentInSection) setActiveQuestionId(section.questions[0].id);
+  }, [activeQuestionId, section]);
+
   // Submit answers
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
+    if (!test) return;
     setSubmitting(true);
     try {
-      if (isMock) {
-        // Simulate scoring locally using mock answers
-        await new Promise(r => setTimeout(r, 1200));
-        const mockResult = buildMockResult(test, answers);
-        setResult(mockResult);
-        setView("results");
-        if (onComplete) onComplete();
-        setSubmitting(false);
-        return;
-      }
-
-      const token = await getToken();
-      const res = await fetch(`${apiBase}/listening/submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ test_id: test.id, answers }),
-      });
-      if (!res.ok) throw new Error("Submission failed");
-      const data = await res.json();
+      const data = await api.submitListening(test.id, answers);
       setResult(data);
       setView("results");
       if (onComplete) onComplete();
@@ -691,8 +928,8 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
     } finally {
       setSubmitting(false);
     }
-  };
-  // ✅ ADD THIS RIGHT AFTER handleSubmit:
+  }, [answers, onComplete, test]);
+
   useEffect(() => {
     if (autoSubmitRef) {
       autoSubmitRef.current = handleSubmit;
@@ -735,10 +972,10 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "0 2px" }}>
           <button className="lm-btn lm-btn-ghost" style={{ padding: "6px 12px" }}
-            onClick={() => { setView("test"); setResult(null); setAnswers({}); setActiveSection(0); }}>
+            onClick={() => { setView("test"); setResult(null); setAnswers({}); setActiveSection(0); setActiveQuestionId(null); }}>
             ← New attempt
           </button>
-          <div style={{ fontFamily: "'Sora'", fontSize: 22, fontWeight: 500 }}>Results</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>Results</div>
           <Badge color={C.accent}>{test.title}</Badge>
         </div>
 
@@ -747,7 +984,7 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
         {/* Review answers per section */}
         <div style={{ marginTop: 24 }}>
           <div style={{ fontSize: 12, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Review your answers</div>
-          {test.sections.map((sec, si) => (
+          {test.sections.map(sec => (
             <div key={sec.id} style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <Badge color={SECTION_COLORS[sec.section_number]}>Section {sec.section_number}</Badge>
@@ -757,7 +994,8 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
                 {sec.questions.map((q, qi) => (
                   <Question key={q.id} question={q} answers={answers} setAnswers={() => {}}
                     results={resultsMap} color={SECTION_COLORS[sec.section_number]}
-                    index={sec.questions.slice(0, qi).length + qi} />
+                    index={qi}
+                    questionNumber={questionNumbers[q.id]} />
                 ))}
               </div>
             </div>
@@ -769,200 +1007,126 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
 
   // ── Test view ──
   const sectionColor = SECTION_COLORS[section?.section_number] || C.accent;
+  const canSubmit = totalQuestions > 0 && totalAnswered >= totalQuestions;
+
+  const goToAdjacentSection = (direction) => {
+    setActiveSection(current => {
+      const next = Math.min(Math.max(current + direction, 0), test.sections.length - 1);
+      const nextQuestion = test.sections[next]?.questions?.[0];
+      if (nextQuestion) {
+        setActiveQuestionId(nextQuestion.id);
+        window.setTimeout(() => {
+          document
+            .getElementById(`listening-question-${nextQuestion.id}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 60);
+      }
+      return next;
+    });
+  };
 
   return (
-    <div className="lm-root" style={{ padding: "24px 0" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 500, marginBottom: 4 }}>Listening Test</div>
-          <div style={{ color: C.muted, fontSize: 13 }}>{test.title}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 12, color: C.mutedLight }}>
-            <span style={{ color: C.accent, fontFamily: "'JetBrains Mono'" }}>{totalAnswered}</span>
-            <span> / {totalQuestions} answered</span>
+    <div className="lm-root min-h-screen bg-gradient-to-b from-background via-secondary/30 to-background text-foreground">
+      <ListeningExamHeader
+        testTitle={test.title}
+        partLabel={`${getPartLabel(section, activeSection)} of ${test.sections.length}`}
+        formatted={formatted}
+        isWarning={isWarning}
+        isDanger={isDanger}
+        submitting={submitting}
+        canSubmit={canSubmit}
+        onSubmit={handleSubmit}
+        answered={totalAnswered}
+        total={totalQuestions}
+        partAnswered={answeredInSection}
+        partTotal={section?.questions.length || 0}
+      />
+
+      <main className="mx-auto max-w-3xl px-4 pb-40 pt-4 md:px-6">
+        {isWarning && (
+          <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+            isDanger ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}>
+            {isDanger
+              ? "Less than 1 minute remaining. Finish and submit as soon as you can."
+              : "Under 5 minutes left for Listening. Review unanswered questions."}
           </div>
-          <button
-            className="lm-btn lm-btn-primary"
-            disabled={totalAnswered < totalQuestions || submitting}
-            onClick={handleSubmit}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 22px" }}
-          >
-            {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
-          </button>
+        )}
+
+        <div className="space-y-4">
+          {section && <ListeningAudioBar section={section} />}
+
+          {section && (
+            <section className="lm-fadeup space-y-3" key={section.id}>
+              <p className="text-sm text-muted-foreground">
+                {getPartLabel(section, activeSection)}
+                {section.title ? ` · ${section.title}` : ""}
+              </p>
+
+              <div className="space-y-3">
+                {section.questions.map((q, qi) => (
+                  <Question
+                    key={q.id}
+                    question={q}
+                    answers={answers}
+                    setAnswers={setAnswers}
+                    results={null}
+                    color={sectionColor}
+                    index={qi}
+                    questionNumber={questionNumbers[q.id]}
+                    isActive={activeQuestionId === q.id}
+                    onActivate={() => setActiveQuestionId(q.id)}
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  disabled={activeSection === 0}
+                  onClick={() => goToAdjacentSection(-1)}
+                  className="inline-flex items-center gap-2 rounded-full border border-input bg-background px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous Part
+                </button>
+                <span className="hidden text-sm text-muted-foreground sm:inline">
+                  {getPartLabel(section, activeSection)} of {test.sections.length}
+                </span>
+                {activeSection < test.sections.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => goToAdjacentSection(1)}
+                    className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15"
+                  >
+                    Next Part
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!canSubmit || submitting}
+                    onClick={handleSubmit}
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting ? <><Spinner /> Submitting...</> : <><Check className="h-4 w-4" /> Finish Test</>}
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
         </div>
-      </div>
+      </main>
 
-      {/* Overall progress */}
-      <div style={{ marginBottom: 20 }}>
-        <ProgressBar value={(totalAnswered / totalQuestions) * 100} color={C.accent} height={3} />
-      </div>
-
-      {/* Section tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 22, overflowX: "auto", paddingBottom: 2 }}>
-        {test.sections.map((sec, si) => {
-          const sc = SECTION_COLORS[sec.section_number];
-          const secAnswered = sec.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
-          const secTotal = sec.questions.length;
-          const isActive = si === activeSection;
-          return (
-            <button
-              key={sec.id}
-              className="lm-btn"
-              onClick={() => setActiveSection(si)}
-              style={{
-                padding: "8px 16px", flexShrink: 0,
-                background: isActive ? sc + "22" : "transparent",
-                color: isActive ? sc : C.muted,
-                border: `1px solid ${isActive ? sc + "55" : C.border}`,
-                position: "relative",
-              }}
-            >
-              Section {sec.section_number}
-              <span style={{
-                marginLeft: 6, fontSize: 11, color: secAnswered === secTotal ? sc : C.muted,
-                fontFamily: "'JetBrains Mono'",
-              }}>
-                {secAnswered}/{secTotal}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Section body */}
-      {section && (
-        <div className="lm-fadeup" key={section.id}>
-          {/* Audio player */}
-          <AudioPlayer section={section} />
-
-          {/* Section progress */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: C.mutedLight }}>
-              {answeredInSection} of {section.questions.length} questions answered in this section
-            </div>
-            <ProgressBar value={(answeredInSection / section.questions.length) * 100} color={sectionColor} height={3} />
-          </div>
-
-          {/* Questions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {section.questions.map((q, qi) => (
-              <Question key={q.id} question={q} answers={answers} setAnswers={setAnswers}
-                results={null} color={sectionColor} index={qi} />
-            ))}
-          </div>
-
-          {/* Section nav */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, alignItems: "center" }}>
-            <button className="lm-btn lm-btn-ghost"
-              disabled={activeSection === 0}
-              onClick={() => setActiveSection(s => s - 1)}
-              style={{ padding: "9px 18px" }}>
-              ← Previous section
-            </button>
-            <span style={{ fontSize: 12, color: C.muted }}>
-              {activeSection + 1} of {test.sections.length}
-            </span>
-            {activeSection < test.sections.length - 1 ? (
-              <button className="lm-btn lm-btn-outline"
-                onClick={() => setActiveSection(s => s + 1)}
-                style={{ padding: "9px 18px" }}>
-                Next section →
-              </button>
-            ) : (
-              <button
-                className="lm-btn lm-btn-primary"
-                disabled={totalAnswered < totalQuestions || submitting}
-                onClick={handleSubmit}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 22px" }}
-              >
-                {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {isMock && (
-        <div style={{ marginTop: 28, padding: "10px 14px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.muted, textAlign: "center" }}>
-          Running in demo mode — connect <code style={{ color: C.accent, fontFamily: "'JetBrains Mono'" }}>apiBase</code> prop to your FastAPI backend to persist results
-        </div>
-      )}
+      <ListeningBottomNavigator
+        sections={test.sections}
+        answers={answers}
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        activeQuestionId={activeQuestionId}
+        setActiveQuestionId={setActiveQuestionId}
+        questionNumbers={questionNumbers}
+      />
     </div>
   );
-}
-
-// ─── Mock scoring (demo only — real scoring happens server-side) ──────────────
-function buildMockResult(test, userAnswers) {
-  const correctAnswers = {
-    q1: 1, q2: "thompson", q3: "march", q4: 1,
-    q5: 0, q6: 1, q7: 2,
-    q8: { 0: "Student A", 1: "Supervisor", 2: "Student B" }, q9: 1,
-    q10: "10", q11: 2, q12: "2.3",
-  };
-
-  const tips = {
-    fill: "For fill-in-the-blank: proper nouns are often spelled out in the audio — listen carefully for letter-by-letter spelling.",
-    tfng: "For Not Given: if you cannot find any evidence in either direction, choose Not Given rather than guessing True or False.",
-    mcq: "For MCQ: read all options before the audio plays. The correct answer is usually a paraphrase, not an exact match.",
-    matching: "For matching: listen for synonyms. Speakers rarely use the exact words from the question sheet.",
-  };
-
-  const sectionScores = {};
-  const questionResults = [];
-
-  test.sections.forEach(sec => {
-    let secCorrect = 0;
-    sec.questions.forEach(q => {
-      const userAns = userAnswers[q.id];
-      const correctAns = correctAnswers[q.id];
-      let isCorrect = false;
-
-      if (q.question_type === "fill") {
-        isCorrect = String(userAns || "").toLowerCase().trim() === String(correctAns).toLowerCase();
-      } else if (q.question_type === "matching") {
-        isCorrect = typeof userAns === "object" && userAns !== null &&
-          Object.entries(correctAns).every(([k, v]) =>
-            String(userAns[k] || "").toLowerCase() === String(v).toLowerCase()
-          );
-      } else {
-        isCorrect = userAns === correctAns;
-      }
-
-      if (isCorrect) secCorrect++;
-      questionResults.push({
-        question_id: q.id,
-        question_type: q.question_type,
-        question_text: q.question_text,
-        user_answer: userAns,
-        correct_answer: correctAns,
-        is_correct: isCorrect,
-        tip: isCorrect ? null : tips[q.question_type],
-      });
-    });
-
-    const ratio = secCorrect / sec.questions.length;
-    const band = ratio >= 0.875 ? 8.0 : ratio >= 0.75 ? 7.0 : ratio >= 0.625 ? 6.0 : ratio >= 0.5 ? 5.0 : 4.0;
-    sectionScores[sec.section_number] = { correct: secCorrect, total: sec.questions.length, band };
-  });
-
-  const totalCorrect = Object.values(sectionScores).reduce((a, s) => a + s.correct, 0);
-  const totalQ = Object.values(sectionScores).reduce((a, s) => a + s.total, 0);
-  const ratio = totalCorrect / totalQ;
-  const overall = ratio >= 0.875 ? 8.0 : ratio >= 0.75 ? 7.0 : ratio >= 0.625 ? 6.0 : ratio >= 0.5 ? 5.5 : 4.5;
-
-  const wrongTypes = [...new Set(questionResults.filter(r => !r.is_correct).map(r => r.question_type))];
-  const improvement_tips = wrongTypes.map(t => tips[t]).filter(Boolean);
-  if (!improvement_tips.length) improvement_tips.push("Excellent! Practise Sections 3 and 4 to maintain your score under academic lecture conditions.");
-
-  return {
-    attempt_id: "demo-attempt-1",
-    correct: totalCorrect,
-    total: totalQ,
-    overall_band: overall,
-    section_scores: sectionScores,
-    question_results: questionResults,
-    improvement_tips,
-  };
 }

@@ -130,6 +130,8 @@ function ListeningQTab({ api }) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [newTest, setNewTest] = useState(false);
   const [newTestTitle, setNewTestTitle] = useState("");
+  const [showNewSection, setShowNewSection] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => { api.admin.getListeningTests().then(setTests).catch(console.error); }, []);
@@ -143,11 +145,33 @@ function ListeningQTab({ api }) {
     if (!newTestTitle.trim()) return;
     setSaving(true);
     try {
-      await api.admin.createListeningTest({ title: newTestTitle, is_active: false });
+      const test = await api.admin.createListeningTest({ title: newTestTitle, is_active: false });
+      for (let i = 1; i <= 4; i++) {
+        await api.admin.createListeningSection(test.id, { section_number: i, title: "" });
+      }
       const updated = await api.admin.getListeningTests();
       setTests(updated);
       setNewTest(false);
       setNewTestTitle("");
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleCreateSection = async () => {
+    if (!selectedTest) return;
+    setSaving(true);
+    try {
+      const nextNum = (selectedTest.sections?.length || 0) + 1;
+      await api.admin.createListeningSection(selectedTest.id, {
+        section_number: nextNum,
+        title: newSectionTitle.trim(),
+      });
+      const updated = await api.admin.getListeningTests();
+      setTests(updated);
+      const refreshed = updated.find(t => t.id === selectedTest.id);
+      if (refreshed) setSelectedTest(refreshed);
+      setShowNewSection(false);
+      setNewSectionTitle("");
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
@@ -205,15 +229,35 @@ function ListeningQTab({ api }) {
         {tests.map(t => (
           <div key={t.id}>
             <div style={s.sidebarItem(selectedTest?.id === t.id)}
-              onClick={() => { setSelectedTest(t); setSelectedSection(null); }}>
+              onClick={() => { setSelectedTest(t); setSelectedSection(null); setShowNewSection(false); }}>
               {t.title}
             </div>
-            {selectedTest?.id === t.id && t.sections?.map(sec => (
-              <div key={sec.id} style={s.sidebarChild(selectedSection?.id === sec.id)}
-                onClick={() => setSelectedSection(sec)}>
-                S{sec.section_number}: {sec.title || "Untitled"}
-              </div>
-            ))}
+            {selectedTest?.id === t.id && (
+              <>
+                {t.sections?.map(sec => (
+                  <div key={sec.id} style={s.sidebarChild(selectedSection?.id === sec.id)}
+                    onClick={() => setSelectedSection(sec)}>
+                    S{sec.section_number}: {sec.title || "Untitled"}
+                  </div>
+                ))}
+                {showNewSection ? (
+                  <div style={{ padding: "4px 8px 6px 28px" }}>
+                    <input value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)}
+                      placeholder="Section title (optional)"
+                      style={{ ...s.input, fontSize: 12, marginBottom: 4 }} />
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <SBtn disabled={saving} onClick={handleCreateSection}>Add</SBtn>
+                      <SBtn variant="ghost" onClick={() => { setShowNewSection(false); setNewSectionTitle(""); }}>✕</SBtn>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ ...s.sidebarChild(false), color: "#6366f1", paddingLeft: 28 }}
+                    onClick={() => setShowNewSection(true)}>
+                    + Add section
+                  </div>
+                )}
+              </>
+            )}
           </div>
         ))}
       </div>

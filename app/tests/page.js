@@ -80,6 +80,7 @@ export default function TestsPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
+    if (!user) return;
     api.getAvailableTests().then(data => {
       setTests(data);
       data.forEach(t => {
@@ -88,7 +89,7 @@ export default function TestsPage() {
           .catch(() => {});
       });
     }).catch(console.error);
-  }, []);
+  }, [user]);
 
   const start = async (testId) => {
     setStarting(testId);
@@ -101,7 +102,7 @@ export default function TestsPage() {
     }
   };
 
-  if (loading) return <p style={{ padding: 32 }}>Loading…</p>;
+  if (loading) return <p style={{ padding: 32 }}>Loading...</p>;
 
   return (
     <div style={s.wrap}>
