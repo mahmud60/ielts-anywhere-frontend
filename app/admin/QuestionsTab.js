@@ -122,6 +122,8 @@ function ListeningQTab({ api }) {
   const [tests, setTests] = useState([]);
   const [selectedTest, setSelectedTest] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
+  const [selectedSubsection, setSelectedSubsection] = useState(null);
+  const [subsections, setSubsections] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [editingQ, setEditingQ] = useState(null);
   const [newQ, setNewQ] = useState(null);
@@ -132,14 +134,23 @@ function ListeningQTab({ api }) {
   const [newTestTitle, setNewTestTitle] = useState("");
   const [showNewSection, setShowNewSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [showNewSubsection, setShowNewSubsection] = useState(false);
+  const [newSubText, setNewSubText] = useState("");
+  const [newSubType, setNewSubType] = useState("regular");
   const fileRef = useRef(null);
 
-  useEffect(() => { api.admin.getListeningTests().then(setTests).catch(console.error); }, []);
+  const reloadTests = () => api.admin.getListeningTests().then(setTests).catch(console.error);
+
+  useEffect(() => { reloadTests(); }, []);
   useEffect(() => {
-    if (!selectedSection) { setQuestions([]); setAudioUrl(null); return; }
-    api.admin.getQuestions(selectedSection.id).then(setQuestions).catch(console.error);
-    setAudioUrl(selectedSection.audio_url);
+    if (!selectedSection) { setSubsections([]); setSelectedSubsection(null); setAudioUrl(null); return; }
+    api.admin.getSubsections(selectedSection.id).then(setSubsections).catch(console.error);
+    setAudioUrl(selectedSection.audio);
   }, [selectedSection]);
+  useEffect(() => {
+    if (!selectedSubsection) { setQuestions([]); return; }
+    api.admin.getQuestions(selectedSubsection.id).then(setQuestions).catch(console.error);
+  }, [selectedSubsection]);
 
   const handleCreateTest = async () => {
     if (!newTestTitle.trim()) return;
@@ -147,10 +158,9 @@ function ListeningQTab({ api }) {
     try {
       const test = await api.admin.createListeningTest({ title: newTestTitle, is_active: false });
       for (let i = 1; i <= 4; i++) {
-        await api.admin.createListeningSection(test.id, { section_number: i, title: "" });
+        await api.admin.createListeningSection(test.id, { part: i, title: "" });
       }
-      const updated = await api.admin.getListeningTests();
-      setTests(updated);
+      await reloadTests();
       setNewTest(false);
       setNewTestTitle("");
     } catch (e) { alert(e.message); }
@@ -161,17 +171,58 @@ function ListeningQTab({ api }) {
     if (!selectedTest) return;
     setSaving(true);
     try {
-      const nextNum = (selectedTest.sections?.length || 0) + 1;
-      await api.admin.createListeningSection(selectedTest.id, {
-        section_number: nextNum,
-        title: newSectionTitle.trim(),
-      });
+      const nextPart = (selectedTest.sections?.length || 0) + 1;
+      await api.admin.createListeningSection(selectedTest.id, { part: nextPart, title: newSectionTitle.trim() });
+      await reloadTests();
       const updated = await api.admin.getListeningTests();
-      setTests(updated);
       const refreshed = updated.find(t => t.id === selectedTest.id);
       if (refreshed) setSelectedTest(refreshed);
       setShowNewSection(false);
       setNewSectionTitle("");
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleCreateSubsection = async () => {
+    if (!selectedSection) return;
+    setSaving(true);
+    try {
+      await api.admin.createSubsection(selectedSection.id, {
+        subsection_type: newSubType,
+        text: newSubText.trim() || null,
+      });
+      const updated = await api.admin.getSubsections(selectedSection.id);
+      setSubsections(updated);
+      setShowNewSubsection(false);
+      setNewSubText("");
+      setNewSubType("regular");
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleDeleteTest = async (t) => {
+    if (!confirm(`Delete listening test "${t.title}" and ALL its sections, subsections, and questions?`)) return;
+    setSaving(true);
+    try {
+      await api.admin.deleteListeningTest(t.id);
+      await reloadTests();
+      if (selectedTest?.id === t.id) {
+        setSelectedTest(null);
+        setSelectedSection(null);
+        setSelectedSubsection(null);
+      }
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleDeleteSubsection = async (sub) => {
+    if (!confirm(`Delete subsection #${sub.order} (${sub.subsection_type}) and all its questions?`)) return;
+    setSaving(true);
+    try {
+      await api.admin.deleteSubsection(sub.id);
+      const updated = await api.admin.getSubsections(selectedSection.id);
+      setSubsections(updated);
+      if (selectedSubsection?.id === sub.id) setSelectedSubsection(null);
     } catch (e) { alert(e.message); }
     setSaving(false);
   };
@@ -193,9 +244,9 @@ function ListeningQTab({ api }) {
       if (qData.id) {
         await api.admin.updateQuestion(qData.id, qData);
       } else {
-        await api.admin.createQuestion(selectedSection.id, qData);
+        await api.admin.createQuestion(selectedSubsection.id, qData);
       }
-      const updated = await api.admin.getQuestions(selectedSection.id);
+      const updated = await api.admin.getQuestions(selectedSubsection.id);
       setQuestions(updated);
       setEditingQ(null);
       setNewQ(null);
@@ -209,10 +260,10 @@ function ListeningQTab({ api }) {
     setQuestions(qs => qs.filter(q => q.id !== qId));
   };
 
-  const blankQ = { question_type: "mcq", question_text: "", options: ["", "", "", ""], answer_key: 0, wrong_answer_tip: "" };
+  const blankQ = { question_type: "multiple_choices", text: "", options: [], answer_key: 1, wrong_answer_tip: "" };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
       {/* Sidebar */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -228,22 +279,61 @@ function ListeningQTab({ api }) {
         )}
         {tests.map(t => (
           <div key={t.id}>
-            <div style={s.sidebarItem(selectedTest?.id === t.id)}
-              onClick={() => { setSelectedTest(t); setSelectedSection(null); setShowNewSection(false); }}>
-              {t.title}
+            <div style={{ ...s.sidebarItem(selectedTest?.id === t.id), display: "flex", alignItems: "center", justifyContent: "space-between" }}
+              onClick={() => { setSelectedTest(t); setSelectedSection(null); setSelectedSubsection(null); setShowNewSection(false); }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+              <span
+                onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
+                style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
+                title="Delete test">×</span>
             </div>
             {selectedTest?.id === t.id && (
               <>
                 {t.sections?.map(sec => (
-                  <div key={sec.id} style={s.sidebarChild(selectedSection?.id === sec.id)}
-                    onClick={() => setSelectedSection(sec)}>
-                    S{sec.section_number}: {sec.title || "Untitled"}
+                  <div key={sec.id}>
+                    <div style={s.sidebarChild(selectedSection?.id === sec.id)}
+                      onClick={() => { setSelectedSection(sec); setSelectedSubsection(null); }}>
+                      Part {sec.part}: {sec.title || "Untitled"}
+                    </div>
+                    {selectedSection?.id === sec.id && subsections.map(sub => (
+                      <div key={sub.id}
+                        style={{ ...s.sidebarChild(selectedSubsection?.id === sub.id), paddingLeft: 44, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                        onClick={() => setSelectedSubsection(sub)}>
+                        <span>#{sub.order} {sub.subsection_type}</span>
+                        <span
+                          onClick={e => { e.stopPropagation(); handleDeleteSubsection(sub); }}
+                          style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7 }}
+                          title="Delete subsection">×</span>
+                      </div>
+                    ))}
+                    {selectedSection?.id === sec.id && (
+                      showNewSubsection ? (
+                        <div style={{ padding: "4px 8px 6px 44px" }}>
+                          <select value={newSubType} onChange={e => setNewSubType(e.target.value)}
+                            style={{ ...s.select, width: "100%", marginBottom: 4 }}>
+                            <option value="regular">regular</option>
+                            <option value="form">form</option>
+                          </select>
+                          <input value={newSubText} onChange={e => setNewSubText(e.target.value)}
+                            placeholder="Instruction text (optional)" style={{ ...s.input, fontSize: 12, marginBottom: 4 }} />
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <SBtn disabled={saving} onClick={handleCreateSubsection}>Add</SBtn>
+                            <SBtn variant="ghost" onClick={() => { setShowNewSubsection(false); setNewSubText(""); }}>✕</SBtn>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ ...s.sidebarChild(false), color: "#6366f1", paddingLeft: 44 }}
+                          onClick={() => setShowNewSubsection(true)}>
+                          + Add subsection
+                        </div>
+                      )
+                    )}
                   </div>
                 ))}
                 {showNewSection ? (
                   <div style={{ padding: "4px 8px 6px 28px" }}>
                     <input value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)}
-                      placeholder="Section title (optional)"
+                      placeholder="Part title (optional)"
                       style={{ ...s.input, fontSize: 12, marginBottom: 4 }} />
                     <div style={{ display: "flex", gap: 4 }}>
                       <SBtn disabled={saving} onClick={handleCreateSection}>Add</SBtn>
@@ -253,7 +343,7 @@ function ListeningQTab({ api }) {
                 ) : (
                   <div style={{ ...s.sidebarChild(false), color: "#6366f1", paddingLeft: 28 }}
                     onClick={() => setShowNewSection(true)}>
-                    + Add section
+                    + Add part
                   </div>
                 )}
               </>
@@ -265,14 +355,12 @@ function ListeningQTab({ api }) {
       {/* Main */}
       {!selectedSection ? (
         <div style={{ ...s.card, textAlign: "center", padding: 40, color: "#94a3b8" }}>
-          {selectedTest ? "Select a section from the sidebar" : "Select a test to get started"}
+          {selectedTest ? "Select a part from the sidebar" : "Select a test to get started"}
         </div>
-      ) : (
+      ) : !selectedSubsection ? (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 500 }}>
-              Section {selectedSection.section_number} — {selectedSection.title}
-            </h3>
+            <h3 style={{ fontSize: 15, fontWeight: 500 }}>Part {selectedSection.part} — {selectedSection.title}</h3>
           </div>
 
           {/* Audio */}
@@ -281,13 +369,29 @@ function ListeningQTab({ api }) {
             {audioUrl ? (
               <audio controls src={audioUrl} style={{ width: "100%", height: 36, marginBottom: 8 }} />
             ) : (
-              <div style={s.tip}>No audio uploaded yet for this section.</div>
+              <div style={s.tip}>No audio uploaded yet for this part.</div>
             )}
             <input ref={fileRef} type="file" accept="audio/*" onChange={handleAudioUpload} style={{ display: "none" }} />
             <SBtn variant="outline" disabled={uploading} onClick={() => fileRef.current.click()}>
               {uploading ? "Uploading…" : audioUrl ? "Replace audio" : "Upload audio"}
             </SBtn>
           </div>
+
+          <div style={{ ...s.card, textAlign: "center", padding: 24, color: "#94a3b8" }}>
+            Select a subsection from the sidebar, or add one using "+ Add subsection"
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 500 }}>
+              Part {selectedSection.part} › Subsection #{selectedSubsection.order} ({selectedSubsection.subsection_type})
+            </h3>
+          </div>
+
+          {selectedSubsection.text && (
+            <div style={{ ...s.tip, marginBottom: 14 }}>{selectedSubsection.text}</div>
+          )}
 
           {/* Questions */}
           <div style={s.card}>
@@ -313,7 +417,7 @@ function ListeningQTab({ api }) {
                         <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>Q{i + 1}</span>
                         <SBadge>{q.question_type}</SBadge>
                       </div>
-                      <div style={{ fontSize: 13, marginBottom: 4 }}>{q.question_text}</div>
+                      <div style={{ fontSize: 13, marginBottom: 4 }}>{q.text}</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}>
                         Answer: <code style={{ color: "#059669" }}>{JSON.stringify(q.answer_key)}</code>
                       </div>
@@ -334,73 +438,75 @@ function ListeningQTab({ api }) {
 }
 
 function ListeningQEditor({ q, onSave, onCancel, saving }) {
-  const [f, setF] = useState({ ...q, options: q.options || ["", "", "", ""] });
+  const defaultOpts = (q.options || []).map((o, i) =>
+    typeof o === "string" ? { order: i + 1, option: o } : o
+  );
+  const [f, setF] = useState({ ...q, options: defaultOpts });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const addOption = () => {
+    const next = (f.options.length > 0 ? Math.max(...f.options.map(o => o.order)) : 0) + 1;
+    set("options", [...f.options, { order: next, option: "" }]);
+  };
+  const setOptText = (order, text) =>
+    set("options", f.options.map(o => o.order === order ? { ...o, option: text } : o));
+  const removeOpt = (order) => set("options", f.options.filter(o => o.order !== order));
 
   return (
     <div style={{ padding: "14px 16px", background: "#eef2ff", borderRadius: 10, border: "1px solid #6366f133", marginBottom: 12 }}>
       <div style={s.grid2}>
         <FSelect label="Question type" value={f.question_type} onChange={v => set("question_type", v)}
           options={[
-            { value: "mcq", label: "Multiple choice" },
-            { value: "fill", label: "Fill in the blank" },
-            { value: "tfng", label: "True / False / Not Given" },
-            { value: "matching", label: "Matching" },
+            { value: "multiple_choices", label: "Multiple choice" },
+            { value: "fill_in_the_blank", label: "Fill in the blank" },
+            { value: "multiple_select", label: "Multiple select" },
+            { value: "dropdown", label: "Dropdown / Matching" },
           ]} />
-        <FInput label="Order index" type="number" value={f.order_index || 1}
-          onChange={v => set("order_index", parseInt(v) || 1)} />
+        <FInput label="Order" type="number" value={f.order || 1}
+          onChange={v => set("order", parseInt(v) || 1)} />
       </div>
-      <FInput label="Question text" value={f.question_text} onChange={v => set("question_text", v)}
+      <FInput label="Group title (optional, e.g. Regular activities - Beach)"
+        value={f.title || ""} onChange={v => set("title", v)} placeholder="Leave blank if not needed" />
+      <FInput label="IELTS question type (optional)"
+        value={f.ielts_question_type || ""} onChange={v => set("ielts_question_type", v)}
+        placeholder="e.g. form_note_table_flow_chart_summary_completion" />
+      <FInput label="Question text (use </blank> for fill-in-the-blank)"
+        value={f.text || ""} onChange={v => set("text", v)}
         placeholder="Enter the question text" rows={2} />
 
-      {(f.question_type === "mcq") && (
+      {(f.question_type === "multiple_choices" || f.question_type === "multiple_select" || f.question_type === "dropdown") && (
         <div style={s.row}>
-          <label style={s.label}>Options (select correct answer)</label>
-          {(f.options || ["", "", "", ""]).map((opt, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-              <input type="radio" name={`ans-${f.id || "new"}`} checked={f.answer_key === i}
-                onChange={() => set("answer_key", i)} />
-              <input value={opt} onChange={e => {
-                const opts = [...f.options]; opts[i] = e.target.value; set("options", opts);
-              }} placeholder={`Option ${i}`} style={{ ...s.input, flex: 1 }} />
+          <label style={s.label}>Options</label>
+          {f.options.map(opt => (
+            <div key={opt.order} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+              {f.question_type === "multiple_choices" && (
+                <input type="radio" name={`ans-${f.id || "new"}`} checked={f.answer_key === opt.order}
+                  onChange={() => set("answer_key", opt.order)} />
+              )}
+              <span style={{ fontSize: 12, color: "#64748b", minWidth: 20 }}>{opt.order}</span>
+              <input value={opt.option} onChange={e => setOptText(opt.order, e.target.value)}
+                placeholder={`Option ${opt.order}`} style={{ ...s.input, flex: 1 }} />
+              <SBtn variant="ghost" onClick={() => removeOpt(opt.order)}>✕</SBtn>
             </div>
           ))}
+          <SBtn variant="outline" onClick={addOption}>+ Option</SBtn>
+          {f.question_type === "multiple_select" && (
+            <FInput label="Answer key (JSON array of correct orders, e.g. [1,3])"
+              value={Array.isArray(f.answer_key) ? JSON.stringify(f.answer_key) : f.answer_key || "[]"}
+              onChange={v => { try { set("answer_key", JSON.parse(v)); } catch {} }}
+              placeholder="[1, 3]" />
+          )}
+          {f.question_type === "multiple_select" && (
+            <FInput label="Max selectable options" type="number"
+              value={f.max_selected_options || ""}
+              onChange={v => set("max_selected_options", parseInt(v) || null)} />
+          )}
         </div>
       )}
 
-      {f.question_type === "tfng" && (
-        <div style={s.row}>
-          <label style={s.label}>Correct answer</label>
-          <div style={{ display: "flex", gap: 10 }}>
-            {["True", "False", "Not Given"].map((opt, i) => (
-              <label key={i} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
-                <input type="radio" name={`tfng-${f.id || "new"}`} checked={f.answer_key === i}
-                  onChange={() => set("answer_key", i)} />
-                {opt}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {f.question_type === "fill" && (
+      {f.question_type === "fill_in_the_blank" && (
         <FInput label="Correct answer (stored lowercase)" value={f.answer_key || ""}
-          onChange={v => set("answer_key", v.toLowerCase())} placeholder="e.g. thompson" />
-      )}
-
-      {f.question_type === "matching" && (
-        <>
-          <FInput label="Items to match (comma-separated)" value={(f.options || []).join(", ")}
-            onChange={v => set("options", v.split(",").map(x => x.trim()).filter(Boolean))}
-            placeholder="Conducting surveys, Reviewing literature, Lab experiments" />
-          <FInput label="Match pool (comma-separated)" value={(f.matching_pool || []).join(", ")}
-            onChange={v => set("matching_pool", v.split(",").map(x => x.trim()).filter(Boolean))}
-            placeholder="Student A, Student B, Supervisor" />
-          <FInput label='Answer key (JSON: {"0":"Student A","1":"Supervisor"})'
-            value={typeof f.answer_key === "object" ? JSON.stringify(f.answer_key) : f.answer_key || "{}"}
-            onChange={v => { try { set("answer_key", JSON.parse(v)); } catch {} }}
-            placeholder='{"0":"Student A","1":"Supervisor","2":"Student B"}' />
-        </>
+          onChange={v => set("answer_key", v.toLowerCase())} placeholder="e.g. litter" />
       )}
 
       <FInput label="Wrong answer tip (shown to student if incorrect)"

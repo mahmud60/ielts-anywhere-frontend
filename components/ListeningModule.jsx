@@ -109,8 +109,8 @@ function AudioPlayer({ section }) {
   const audioRef = useRef(null);
   const mockTimerRef = useRef(null);
 
-  const hasRealAudio = Boolean(section.audio_url);
-  const color = SECTION_COLORS[section.section_number];
+  const hasRealAudio = Boolean(section.audio);
+  const color = SECTION_COLORS[section.part];
 
   // Playback state
   const [playing, setPlaying]   = useState(false);
@@ -210,7 +210,7 @@ function AudioPlayer({ section }) {
     const h =
       28 +
       Math.sin(i * 0.9) * 22 +
-      Math.cos(i * 1.7 + section.section_number) * 14;
+      Math.cos(i * 1.7 + section.part) * 14;
     return Math.max(10, Math.round(h));
   });
 
@@ -230,7 +230,7 @@ function AudioPlayer({ section }) {
       {hasRealAudio && (
         <audio
           ref={audioRef}
-          src={section.audio_url}
+          src={section.audio}
           preload="metadata"
           style={{ display: "none" }}
         />
@@ -241,7 +241,7 @@ function AudioPlayer({ section }) {
         display: "flex", alignItems: "center",
         gap: 10, marginBottom: 14,
       }}>
-        <Badge color={color}>Section {section.section_number}</Badge>
+        <Badge color={color}>Part {section.part}</Badge>
         <span style={{ color: C.mutedLight, fontSize: 13 }}>
           {section.title}
         </span>
@@ -371,11 +371,15 @@ function AudioPlayer({ section }) {
 
 // ─── Question components ──────────────────────────────────────────────────────
 function MCQQuestion({ question, value, onChange, result, color }) {
+  // Support both old string[] options and new {order, option}[] options
+  const opts = (question.options ?? []).map((o, i) =>
+    typeof o === "string" ? { order: i, option: o } : o
+  );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {question.options.map((opt, oi) => {
-        const selected = value === oi;
-        const isCorrect = result && oi === result.correct_answer;
+      {opts.map((opt) => {
+        const selected = value === opt.order;
+        const isCorrect = result && opt.order === result.correct_answer;
         const isWrong = result && selected && !result.is_correct;
         let cls = "lm-radio";
         if (result) {
@@ -386,9 +390,9 @@ function MCQQuestion({ question, value, onChange, result, color }) {
           cls += " lm-radio-selected";
         }
         return (
-          <label key={oi} className={cls} style={{ userSelect: "none" }}>
+          <label key={opt.order} className={cls} style={{ userSelect: "none" }}>
             <input type="radio" style={{ display: "none" }} checked={selected}
-              disabled={!!result} onChange={() => !result && onChange(oi)} />
+              disabled={!!result} onChange={() => !result && onChange(opt.order)} />
             <span style={{
               width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
               border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : selected ? color : C.border}`,
@@ -397,7 +401,56 @@ function MCQQuestion({ question, value, onChange, result, color }) {
             }}>
               {selected && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#000" }} />}
             </span>
-            <span style={{ flex: 1 }}>{opt}</span>
+            <span style={{ flex: 1 }}>{opt.option}</span>
+            {isCorrect && <span style={{ fontSize: 11, color: C.green, marginLeft: "auto" }}>✓ correct</span>}
+            {isWrong && <span style={{ fontSize: 11, color: C.red, marginLeft: "auto" }}>✗ wrong</span>}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function MultiSelectQuestion({ question, value = [], onChange, result, color }) {
+  const opts = (question.options ?? []).map((o, i) =>
+    typeof o === "string" ? { order: i, option: o } : o
+  );
+  const selected = new Set(Array.isArray(value) ? value : []);
+  const correctSet = result ? new Set(Array.isArray(result.correct_answer) ? result.correct_answer.map(String) : []) : null;
+
+  const toggle = (order) => {
+    if (result) return;
+    const next = new Set(selected);
+    if (next.has(order)) next.delete(order);
+    else if (!question.max_selected_options || next.size < question.max_selected_options) next.add(order);
+    onChange([...next]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {opts.map((opt) => {
+        const isSelected = selected.has(opt.order);
+        const isCorrect = result && correctSet?.has(String(opt.order));
+        const isWrong = result && isSelected && !isCorrect;
+        let cls = "lm-radio";
+        if (result) {
+          if (isCorrect) cls += " lm-radio-correct";
+          else if (isWrong) cls += " lm-radio-wrong";
+          else if (isSelected) cls += " lm-radio-selected";
+        } else if (isSelected) {
+          cls += " lm-radio-selected";
+        }
+        return (
+          <label key={opt.order} className={cls} style={{ userSelect: "none" }} onClick={() => toggle(opt.order)}>
+            <span style={{
+              width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+              border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : isSelected ? color : C.border}`,
+              background: isSelected || isCorrect ? (isCorrect ? C.green : isWrong ? C.red : color) : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {isSelected && <span style={{ fontSize: 9, color: "#000", fontWeight: 700 }}>✓</span>}
+            </span>
+            <span style={{ flex: 1 }}>{opt.option}</span>
             {isCorrect && <span style={{ fontSize: 11, color: C.green, marginLeft: "auto" }}>✓ correct</span>}
             {isWrong && <span style={{ fontSize: 11, color: C.red, marginLeft: "auto" }}>✗ wrong</span>}
           </label>
@@ -433,49 +486,44 @@ function TFNGQuestion({ question, value, onChange, result, color }) {
   return <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />;
 }
 
-function MatchingQuestion({ question, value = {}, onChange, result }) {
-  const pool = question.matching_pool || [];
+function MatchingQuestion({ question, value, onChange, result }) {
+  // For dropdown type: question.text is the label, question.options are the choices [{order, option}]
+  // value is the selected option order (integer)
+  const opts = (question.options ?? []).map((o, i) =>
+    typeof o === "string" ? { order: i, option: o } : o
+  );
+  const userAns = value;
+  const correctAns = result?.correct_answer;
+  const isCorrect = result && String(userAns) === String(correctAns);
+  const isWrong = result && !isCorrect;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {question.options.map((item, idx) => {
-        const userAns = value[idx];
-        const correctAns = result?.correct_answer?.[idx];
-        const isCorrect = result && String(userAns || "").toLowerCase() === String(correctAns || "").toLowerCase();
-        const isWrong = result && !isCorrect;
-        return (
-          <div key={idx} style={{
-            display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-            background: result ? (isCorrect ? C.greenDim : isWrong ? C.redDim : C.surface) : C.surface,
-            border: `1px solid ${result ? (isCorrect ? C.green + "44" : isWrong ? C.red + "44" : C.border) : C.border}`,
-            borderRadius: 9,
-          }}>
-            {/* Item label */}
-            <span style={{ fontSize: 13, flex: 1, color: C.text }}>{item}</span>
-            <span style={{ color: C.muted, fontSize: 18, flexShrink: 0 }}>→</span>
-            {/* Dropdown selector */}
-            <select
-              disabled={!!result}
-              value={userAns || ""}
-              onChange={e => !result && onChange({ ...value, [idx]: e.target.value })}
-              style={{
-                background: C.card, border: `1px solid ${C.border}`, color: C.text,
-                borderRadius: 7, padding: "6px 10px", fontSize: 13, fontFamily: "'Sora'",
-                cursor: result ? "default" : "pointer", minWidth: 140,
-              }}
-            >
-              <option value="">— Select —</option>
-              {pool.map((p, pi) => (
-                <option key={pi} value={p}>{p}</option>
-              ))}
-            </select>
-            {result && (
-              <span style={{ fontSize: 12, color: isCorrect ? C.green : C.red, marginLeft: 4, flexShrink: 0 }}>
-                {isCorrect ? "✓" : `✗ → ${correctAns}`}
-              </span>
-            )}
-          </div>
-        );
-      })}
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+      background: result ? (isCorrect ? C.greenDim : isWrong ? C.redDim : C.surface) : C.surface,
+      border: `1px solid ${result ? (isCorrect ? C.green + "44" : isWrong ? C.red + "44" : C.border) : C.border}`,
+      borderRadius: 9,
+    }}>
+      <select
+        disabled={!!result}
+        value={userAns ?? ""}
+        onChange={e => !result && onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        style={{
+          background: C.card, border: `1px solid ${C.border}`, color: C.text,
+          borderRadius: 7, padding: "6px 10px", fontSize: 13, fontFamily: "'Sora'",
+          cursor: result ? "default" : "pointer", minWidth: 100,
+        }}
+      >
+        <option value="">— Select —</option>
+        {opts.map(opt => (
+          <option key={opt.order} value={opt.order}>{opt.option}</option>
+        ))}
+      </select>
+      {result && (
+        <span style={{ fontSize: 12, color: isCorrect ? C.green : C.red, marginLeft: 4, flexShrink: 0 }}>
+          {isCorrect ? "✓" : `✗ → ${opts.find(o => String(o.order) === String(correctAns))?.option ?? correctAns}`}
+        </span>
+      )}
     </div>
   );
 }
@@ -488,8 +536,19 @@ function Question({ question, answers, setAnswers, results, color, index }) {
     setAnswers(a => ({ ...a, [question.id]: val }));
   }, [question.id, setAnswers]);
 
-  const typeLabelMap = { mcq: "Multiple choice", fill: "Fill in the blank", tfng: "True / False / Not Given", matching: "Matching" };
-  const typeColorMap = { mcq: C.accent, fill: C.gold, tfng: C.purple, matching: C.green };
+  const typeLabelMap = {
+    multiple_choices: "Multiple choice",
+    fill_in_the_blank: "Fill in the blank",
+    multiple_select: "Multiple select",
+    dropdown: "Matching",
+    // legacy keys kept for mock data compatibility
+    mcq: "Multiple choice", fill: "Fill in the blank", tfng: "True / False / Not Given", matching: "Matching",
+  };
+  const typeColorMap = {
+    multiple_choices: C.accent, fill_in_the_blank: C.gold,
+    multiple_select: C.purple, dropdown: C.green,
+    mcq: C.accent, fill: C.gold, tfng: C.purple, matching: C.green,
+  };
   const typeColor = typeColorMap[question.question_type] || C.accent;
 
   return (
@@ -502,22 +561,22 @@ function Question({ question, answers, setAnswers, results, color, index }) {
           fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
         }}>Q{index + 1}</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, lineHeight: 1.65, marginBottom: 6 }}>{question.question_text}</div>
+          <div style={{ fontSize: 14, lineHeight: 1.65, marginBottom: 6 }}>{question.text ?? question.question_text}</div>
           <Badge color={typeColor}>{typeLabelMap[question.question_type]}</Badge>
         </div>
       </div>
 
       {/* Input */}
-      {question.question_type === "mcq" && (
+      {(question.question_type === "multiple_choices" || question.question_type === "mcq" || question.question_type === "tfng") && (
         <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
-      {question.question_type === "fill" && (
+      {(question.question_type === "fill_in_the_blank" || question.question_type === "fill") && (
         <FillQuestion question={question} value={value} onChange={onChange} result={result} />
       )}
-      {question.question_type === "tfng" && (
-        <TFNGQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
+      {question.question_type === "multiple_select" && (
+        <MultiSelectQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
-      {question.question_type === "matching" && (
+      {(question.question_type === "dropdown" || question.question_type === "matching") && (
         <MatchingQuestion question={question} value={value} onChange={onChange} result={result} />
       )}
 
@@ -630,7 +689,8 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) throw new Error(await res.text());
-        setTest(await res.json());
+        const payload = await res.json();
+        setTest(payload.data ?? payload);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -640,16 +700,19 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
     load();
   }, [apiBase, sessionId]);
 
+  // Flatten subsections into a flat question list for a section
+  const sectionQuestions = (sec) =>
+    (sec?.subsections ?? []).flatMap(sub => sub.questions ?? []);
+
   // Answer completion tracking
   const section = test?.sections[activeSection];
-  const answeredInSection = section
-    ? section.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length
-    : 0;
+  const answeredInSection = sectionQuestions(section)
+    .filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
   const totalAnswered = test
-    ? test.sections.reduce((acc, s) => acc + s.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length, 0)
+    ? test.sections.reduce((acc, s) => acc + sectionQuestions(s).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length, 0)
     : 0;
   const totalQuestions = test
-    ? test.sections.reduce((acc, s) => acc + s.questions.length, 0)
+    ? test.sections.reduce((acc, s) => acc + sectionQuestions(s).length, 0)
     : 0;
 
   // Build results map keyed by question_id for fast lookup
@@ -750,14 +813,14 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
           {test.sections.map((sec, si) => (
             <div key={sec.id} style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <Badge color={SECTION_COLORS[sec.section_number]}>Section {sec.section_number}</Badge>
+                <Badge color={SECTION_COLORS[sec.part]}>Part {sec.part}</Badge>
                 <span style={{ color: C.mutedLight, fontSize: 13 }}>{sec.title}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {sec.questions.map((q, qi) => (
+                {sectionQuestions(sec).map((q, qi) => (
                   <Question key={q.id} question={q} answers={answers} setAnswers={() => {}}
-                    results={resultsMap} color={SECTION_COLORS[sec.section_number]}
-                    index={sec.questions.slice(0, qi).length + qi} />
+                    results={resultsMap} color={SECTION_COLORS[sec.part]}
+                    index={qi} />
                 ))}
               </div>
             </div>
@@ -768,7 +831,7 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
   }
 
   // ── Test view ──
-  const sectionColor = SECTION_COLORS[section?.section_number] || C.accent;
+  const sectionColor = SECTION_COLORS[section?.part] || C.accent;
 
   return (
     <div className="lm-root" style={{ padding: "24px 0" }}>
@@ -802,9 +865,9 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
       {/* Section tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 22, overflowX: "auto", paddingBottom: 2 }}>
         {test.sections.map((sec, si) => {
-          const sc = SECTION_COLORS[sec.section_number];
-          const secAnswered = sec.questions.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
-          const secTotal = sec.questions.length;
+          const sc = SECTION_COLORS[sec.part];
+          const secAnswered = sectionQuestions(sec).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
+          const secTotal = sectionQuestions(sec).length;
           const isActive = si === activeSection;
           return (
             <button
@@ -819,7 +882,7 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
                 position: "relative",
               }}
             >
-              Section {sec.section_number}
+              Part {sec.part}
               <span style={{
                 marginLeft: 6, fontSize: 11, color: secAnswered === secTotal ? sc : C.muted,
                 fontFamily: "'JetBrains Mono'",
@@ -840,17 +903,35 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
           {/* Section progress */}
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
             <div style={{ fontSize: 12, color: C.mutedLight }}>
-              {answeredInSection} of {section.questions.length} questions answered in this section
+              {answeredInSection} of {sectionQuestions(section).length} questions answered in this section
             </div>
-            <ProgressBar value={(answeredInSection / section.questions.length) * 100} color={sectionColor} height={3} />
+            <ProgressBar value={(answeredInSection / Math.max(1, sectionQuestions(section).length)) * 100} color={sectionColor} height={3} />
           </div>
 
-          {/* Questions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {section.questions.map((q, qi) => (
-              <Question key={q.id} question={q} answers={answers} setAnswers={setAnswers}
-                results={null} color={sectionColor} index={qi} />
-            ))}
+          {/* Subsections with questions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {(section.subsections ?? []).map((sub) => {
+              let globalOffset = 0;
+              for (const s of (section.subsections ?? [])) {
+                if (s.id === sub.id) break;
+                globalOffset += (s.questions ?? []).length;
+              }
+              return (
+                <div key={sub.id}>
+                  {sub.text && (
+                    <div style={{ padding: "10px 14px", background: C.surface, borderRadius: 8, marginBottom: 12, fontSize: 13, color: C.mutedLight, lineHeight: 1.65, borderLeft: `3px solid ${sectionColor}55` }}>
+                      {sub.text}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {(sub.questions ?? []).map((q, qi) => (
+                      <Question key={q.id} question={q} answers={answers} setAnswers={setAnswers}
+                        results={null} color={sectionColor} index={globalOffset + qi} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Section nav */}
@@ -944,7 +1025,7 @@ function buildMockResult(test, userAnswers) {
 
     const ratio = secCorrect / sec.questions.length;
     const band = ratio >= 0.875 ? 8.0 : ratio >= 0.75 ? 7.0 : ratio >= 0.625 ? 6.0 : ratio >= 0.5 ? 5.0 : 4.0;
-    sectionScores[sec.section_number] = { correct: secCorrect, total: sec.questions.length, band };
+    sectionScores[sec.part] = { correct: secCorrect, total: sec.questions.length, band };
   });
 
   const totalCorrect = Object.values(sectionScores).reduce((a, s) => a + s.correct, 0);
