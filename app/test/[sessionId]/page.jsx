@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/firebase";
@@ -24,6 +24,13 @@ const MOD_DURATION = {
   writing:   "60 minutes",
   speaking:  "15 minutes",
 };
+
+function getIdTokenForRequest() {
+  if (!auth?.currentUser) {
+    return Promise.reject(new Error("Not signed in"));
+  }
+  return auth.currentUser.getIdToken(true);
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function bandColor(b) {
@@ -121,7 +128,7 @@ function TimeExpiredScreen({ moduleName, sessionId, onRestart, onRetakeAll, rest
       </div>
 
       <h2 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8, color: "#111827" }}>
-        Time's up
+        Time&apos;s up
       </h2>
       <p style={{ fontSize: 15, color: "#6b7280", marginBottom: 32, lineHeight: 1.6 }}>
         Your {MOD_DURATION[moduleName]} for{" "}
@@ -255,7 +262,7 @@ function TimeExpiredScreen({ moduleName, sessionId, onRestart, onRetakeAll, rest
         fontSize: 12, color: "#9ca3af",
         marginTop: 20, lineHeight: 1.6,
       }}>
-        Restarting a single module resets only that module's timer and answers.
+        Restarting a single module resets only that module&apos;s timer and answers.
         Retaking the full test resets all four modules.
       </p>
     </div>
@@ -475,6 +482,7 @@ export default function SessionPage() {
   if (!session) return null;
 
   const showExpired = isExpired && current !== "complete";
+  const isListeningExam = current === "listening" && !showExpired && !transitioning;
 
   // The key for module components — changes on every reset/complete
   // so React fully recreates the component, reinitialising the timer hook
@@ -482,10 +490,10 @@ export default function SessionPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
-      {current !== "complete" && <ProgressBar current={current} />}
+      {current !== "complete" && current !== "listening" && <ProgressBar current={current} />}
 
       {/* Timer — hidden when expired (expired screen takes over) */}
-      {current !== "complete" && !showExpired && (
+      {current !== "complete" && current !== "listening" && !showExpired && (
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "12px 24px 0" }}>
           <ModuleTimer
             formatted={formatted}
@@ -499,7 +507,11 @@ export default function SessionPage() {
         </div>
       )}
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px" }}>
+      <div style={{
+        maxWidth: isListeningExam ? "none" : 960,
+        margin: "0 auto",
+        padding: isListeningExam ? 0 : "0 24px",
+      }}>
 
         {/* Time expired screen */}
         {showExpired && (
@@ -528,7 +540,7 @@ export default function SessionPage() {
           <ListeningModule
             key={moduleKey}
             apiBase={process.env.NEXT_PUBLIC_API_BASE}
-            getToken={() => auth.currentUser.getIdToken(true)}
+            getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
           />
@@ -537,7 +549,7 @@ export default function SessionPage() {
           <ReadingModule
             key={moduleKey}
             apiBase={process.env.NEXT_PUBLIC_API_BASE}
-            getToken={() => auth.currentUser.getIdToken(true)}
+            getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
           />
@@ -546,7 +558,7 @@ export default function SessionPage() {
           <WritingModule
             key={moduleKey}
             apiBase={process.env.NEXT_PUBLIC_API_BASE}
-            getToken={() => auth.currentUser.getIdToken(true)}
+            getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
           />
@@ -555,7 +567,7 @@ export default function SessionPage() {
           <SpeakingModule
             key={moduleKey}
             apiBase={process.env.NEXT_PUBLIC_API_BASE}
-            getToken={() => auth.currentUser.getIdToken(true)}
+            getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
           />

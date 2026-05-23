@@ -14,15 +14,6 @@ const MOD_COLOR = {
   speaking: "#8b5cf6",
 };
 
-const CRITERIA_LABELS = {
-  task_achievement: "Task Achievement",
-  coherence_cohesion: "Coherence & Cohesion",
-  lexical_resource: "Lexical Resource",
-  grammatical_range: "Grammatical Range",
-  fluency_coherence: "Fluency & Coherence",
-  pronunciation: "Pronunciation",
-};
-
 function bandColor(b) {
   if (b == null) return "#9ca3af";
   return b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626";
@@ -269,19 +260,40 @@ export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState(null);
   const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
-  useEffect(() => { if (!loading && !user) router.push("/login"); }, [user, loading, router]);
+  useEffect(() => {
+    if (!loading && !user) router.push("/login");
+  }, [user, loading, router]);
 
   useEffect(() => {
     if (!user) return;
-    api.getDashboard().then(setData).catch(console.error).finally(() => setFetching(false));
+    api.getDashboard()
+      .then(setData)
+      .catch((err) => {
+        console.error(err);
+        setError(err instanceof Error ? err.message : "Could not load dashboard.");
+      })
+      .finally(() => setFetching(false));
   }, [user]);
 
   if (loading || fetching) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <div style={{ color: "#9ca3af" }}>Loading dashboard…</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ maxWidth: 520, margin: "80px auto", padding: "0 20px", color: "#374151" }}>
+        <h1 style={{ fontSize: 22, marginBottom: 8 }}>Could not load dashboard</h1>
+        <p style={{ color: "#6b7280", lineHeight: 1.6 }}>{error}</p>
+        <button onClick={() => router.push("/login")} style={{
+          background: "#0ea5e9", color: "#fff", border: "none", borderRadius: 8,
+          padding: "9px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+        }}>Back to login</button>
       </div>
     );
   }
@@ -313,7 +325,10 @@ export default function DashboardPage() {
               borderRadius: 8, padding: "9px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer",
             }}>Practice</button>
           )}
-          <button onClick={() => signOut(auth).then(() => router.push("/login"))} style={{
+          <button onClick={() => {
+            if (auth) signOut(auth).then(() => router.push("/login")).catch(() => router.push("/login"));
+            else router.push("/login");
+          }} style={{
             background: "#fff", color: "#6b7280", border: "1px solid #e5e7eb",
             borderRadius: 8, padding: "9px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer",
           }}>Log out</button>
