@@ -1,623 +1,694 @@
 /**
- * ReadingModule.jsx
- *
- * Full IELTS reading module — fetches from FastAPI backend,
- * authenticates via Firebase, handles all 6 question types.
+ * ReadingModule.jsx — IELTS Reading (full-screen, matches screenshot design)
  *
  * Props:
- *   apiBase   — FastAPI URL e.g. "http://localhost:8000"
- *   getToken  — async () => Firebase ID token string
- *   sessionId — UUID string of the current TestSession
- *   onComplete— callback fired after successful submission
+ *   apiBase         — FastAPI URL
+ *   getToken        — async () => Firebase ID token
+ *   sessionId       — UUID
+ *   onComplete      — called after submit
+ *   autoSubmitRef   — optional ref wired by parent timer
+ *   timerFormatted  — "59:08" string from parent timer
+ *   timerWarning    — bool (< 5 min)
+ *   timerDanger     — bool (< 1 min)
+ *   onBack          — optional back navigation callback
  */
-
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#f8fafc",
-  surface: "#ffffff",
-  card: "#ffffff",
-  border: "#e2e8f0",
-  borderHover: "#94a3b8",
-  accent: "#0ea5e9",
-  accentDim: "#e0f2fe",
-  gold: "#d97706",
-  goldDim: "#fef3c7",
-  green: "#059669",
-  greenDim: "#d1fae5",
-  red: "#dc2626",
-  redDim: "#fee2e2",
-  purple: "#7c3aed",
-  purpleDim: "#ede9fe",
-  text: "#0f172a",
-  muted: "#64748b",
-  mutedLight: "#94a3b8",
-  passageBg: "#fffbeb",
-  passageBorder: "#fde68a",
-};
+const ACCENT    = "#312e81";   // deep indigo — matches listening module
+const ACCENT_BG = "#eef2ff";
+const BORDER    = "#e5e7eb";
+const SURFACE   = "#ffffff";
+const MUTED     = "#6b7280";
+const TEXT      = "#111827";
+const TEXT_SUB  = "#374151";
+const GREEN     = "#059669";
+const GREEN_BG  = "#ecfdf5";
+const RED       = "#dc2626";
+const RED_BG    = "#fef2f2";
+const GOLD      = "#d97706";
+const GOLD_BG   = "#fffbeb";
 
-const TYPE_COLORS = {
-  mcq: C.accent,
-  tfng: C.purple,
-  fill: C.gold,
-  matching_headings: C.green,
-  matching_info: "#0891b2",
-  short_answer: "#be185d",
-  multiple_select: "#7c3aed",
-};
+// ─── CSS ──────────────────────────────────────────────────────────────────────
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap');
+  .rm * { box-sizing: border-box; }
+  .rm { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: ${TEXT}; background: ${SURFACE}; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  .rm ::-webkit-scrollbar { width: 5px; height: 5px; }
+  .rm ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+  .rm ::-webkit-scrollbar-track { background: transparent; }
 
-const TYPE_LABELS = {
-  mcq: "Multiple choice",
-  tfng: "True / False / Not Given",
-  fill: "Fill in the blank",
-  matching_headings: "Matching headings",
-  matching_info: "Matching information",
-  short_answer: "Short answer",
-  multiple_select: "Multiple select",
-};
+  /* Header */
+  .rm-header { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 52px; border-bottom: 1px solid ${BORDER}; background: ${SURFACE}; flex-shrink: 0; }
+  .rm-subtitle { padding: 0 24px; height: 40px; display: flex; align-items: center; border-bottom: 1px solid ${BORDER}; background: #f9fafb; flex-shrink: 0; }
 
-// Normalize options to [{order, option}] regardless of source format.
-function normalizeOptions(options) {
-  if (!options || options.length === 0) return [];
-  return options.map((o, i) => typeof o === "string" ? { order: i + 1, option: o } : o);
+  /* Body */
+  .rm-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
+  .rm-passage-pane { border-right: 1px solid ${BORDER}; overflow-y: auto; height: 100%; background: #fffdf5; }
+  .rm-questions-pane { overflow-y: auto; height: 100%; padding: 20px 22px 32px; }
+
+  /* Bottom nav */
+  .rm-bottom { height: 52px; border-top: 1px solid ${BORDER}; display: flex; align-items: center; padding: 0 16px; gap: 2px; overflow-x: auto; flex-shrink: 0; background: ${SURFACE}; }
+  .rm-bottom::-webkit-scrollbar { height: 0; }
+  .rm-part-tab { padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: ${MUTED}; transition: all .12s; white-space: nowrap; }
+  .rm-part-tab.active { background: ${ACCENT_BG}; color: ${ACCENT}; }
+  .rm-part-tab:hover:not(.active) { background: #f3f4f6; }
+  .rm-q-dot { width: 27px; height: 27px; border-radius: 50%; border: 1.5px solid #d1d5db; background: transparent; font-size: 10.5px; font-weight: 600; cursor: pointer; color: ${TEXT_SUB}; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; }
+  .rm-q-dot.answered { background: ${ACCENT}; border-color: ${ACCENT}; color: #fff; }
+  .rm-q-dot:hover:not(.answered) { border-color: ${ACCENT}; color: ${ACCENT}; }
+  .rm-q-count { font-size: 11.5px; color: ${MUTED}; padding: 0 6px; white-space: nowrap; }
+  .rm-sep { width: 1px; height: 20px; background: ${BORDER}; margin: 0 6px; flex-shrink: 0; }
+
+  /* Passage */
+  .rm-passage-inner { padding: 24px 28px; max-width: 700px; }
+  .rm-passage-text { font-family: 'Lora', Georgia, serif; font-size: 14.5px; line-height: 1.9; color: #1e293b; }
+  .rm-passage-text p { margin-bottom: 0.9rem; }
+  .rm-para-label { font-weight: 700; color: #0369a1; font-family: -apple-system, sans-serif; font-size: 13px; margin-right: 6px; }
+
+  /* Group box */
+  .rm-group { border: 1px solid ${BORDER}; border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
+  .rm-group-header { font-size: 13.5px; font-weight: 700; color: ${ACCENT}; padding: 10px 16px; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
+  .rm-group-instr { padding: 8px 16px 10px; font-size: 12px; color: ${MUTED}; line-height: 1.65; white-space: pre-line; background: #f9fafb; border-bottom: 1px solid #f3f4f6; }
+
+  /* Form completion (fill/short_answer) */
+  .rm-form-title { padding: 8px 16px; font-size: 13px; font-weight: 600; color: ${TEXT}; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
+  .rm-form-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .rm-form-sentence { font-size: 13.5px; line-height: 2.1; }
+
+  /* Inline question number badge */
+  .rm-qbadge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: ${ACCENT}; color: #fff; font-size: 10px; font-weight: 700; vertical-align: middle; margin: 0 4px; flex-shrink: 0; }
+  .rm-qbadge.correct { background: ${GREEN}; }
+  .rm-qbadge.wrong   { background: ${RED}; }
+
+  /* Blank input */
+  .rm-blank { border: 1.5px solid #d1d5db; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-family: inherit; background: #f9fafb; vertical-align: middle; display: inline-block; outline: none; transition: border-color .12s, background .12s; }
+  .rm-blank:focus { border-color: ${ACCENT}; background: ${SURFACE}; }
+  .rm-blank:disabled { cursor: default; opacity: .75; }
+  .rm-blank.correct { border-color: ${GREEN}; background: ${GREEN_BG}; }
+  .rm-blank.wrong   { border-color: ${RED};   background: ${RED_BG}; }
+
+  /* Standalone text input (non-inline fill) */
+  .rm-input-full { width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 13.5px; font-family: inherit; color: ${TEXT}; background: ${SURFACE}; outline: none; transition: border-color .12s; }
+  .rm-input-full:focus { border-color: ${ACCENT}; }
+  .rm-input-full.correct { border-color: ${GREEN}; background: ${GREEN_BG}; }
+  .rm-input-full.wrong   { border-color: ${RED};   background: ${RED_BG}; }
+
+  /* MCQ / TFNG */
+  .rm-mcq-item { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; }
+  .rm-mcq-item:last-child { border-bottom: none; }
+  .rm-mcq-q { font-size: 13.5px; color: ${TEXT}; line-height: 1.55; margin-bottom: 10px; }
+  .rm-mcq-opts { display: flex; flex-direction: column; gap: 5px; }
+  .rm-opt { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 7px; cursor: pointer; user-select: none; transition: background .1s; }
+  .rm-opt:hover:not(.rm-opt-dis) { background: #f3f4f6; }
+  .rm-opt.rm-opt-sel  { background: ${ACCENT_BG}; }
+  .rm-opt.rm-opt-ok   { background: ${GREEN_BG}; cursor: default; }
+  .rm-opt.rm-opt-bad  { background: ${RED_BG};   cursor: default; }
+  .rm-opt.rm-opt-dis  { cursor: default; }
+  .rm-letter { min-width: 18px; font-size: 13px; font-weight: 600; color: ${TEXT_SUB}; }
+  .rm-radio { width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid #d1d5db; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rm-radio.sel { border-color: ${ACCENT}; background: ${ACCENT}; }
+  .rm-radio.ok  { border-color: ${GREEN};  background: ${GREEN}; }
+  .rm-radio.bad { border-color: ${RED};    background: ${RED}; }
+  .rm-radio-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+  .rm-opt-text { font-size: 13px; color: ${TEXT}; line-height: 1.45; flex: 1; }
+
+  /* TFNG */
+  .rm-tfng-opts { display: flex; gap: 7px; flex-wrap: wrap; }
+  .rm-tfng-btn { padding: 6px 14px; border-radius: 7px; font-size: 12.5px; font-weight: 500; cursor: pointer; border: 1.5px solid ${BORDER}; background: ${SURFACE}; color: ${TEXT}; transition: all .12s; }
+  .rm-tfng-btn:hover:not(:disabled) { border-color: ${ACCENT}; color: ${ACCENT}; }
+  .rm-tfng-btn.sel { background: ${ACCENT_BG}; border-color: ${ACCENT}66; color: ${ACCENT}; }
+  .rm-tfng-btn.ok  { background: ${GREEN_BG}; border-color: ${GREEN}55; color: ${GREEN}; }
+  .rm-tfng-btn.bad { background: ${RED_BG};   border-color: ${RED}55;   color: ${RED}; }
+
+  /* Matching */
+  .rm-match-select { padding: 7px 10px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 13px; font-family: inherit; color: ${TEXT}; background: ${SURFACE}; cursor: pointer; width: 100%; }
+  .rm-match-select:focus { outline: none; border-color: ${ACCENT}; }
+  .rm-match-select.correct { border-color: ${GREEN}; background: ${GREEN_BG}; }
+  .rm-match-select.wrong   { border-color: ${RED};   background: ${RED_BG}; }
+  .rm-match-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rm-match-pill { width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid ${BORDER}; background: ${SURFACE}; font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; }
+  .rm-match-pill:hover:not(:disabled) { border-color: ${ACCENT}; color: ${ACCENT}; }
+  .rm-match-pill.sel { background: ${ACCENT_BG}; border-color: ${ACCENT}66; color: ${ACCENT}; }
+  .rm-match-pill.ok  { background: ${GREEN_BG}; border-color: ${GREEN}55; color: ${GREEN}; }
+  .rm-match-pill.bad { background: ${RED_BG};   border-color: ${RED}55;   color: ${RED}; }
+
+  /* Heading options */
+  .rm-headings-box { background: ${GOLD_BG}; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .rm-headings-title { font-size: 11px; font-weight: 700; color: ${GOLD}; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+  .rm-heading-row { font-size: 13px; color: ${TEXT}; margin-bottom: 3px; }
+
+  /* Multiple select */
+  .rm-checkbox { width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid #d1d5db; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rm-checkbox.sel { border-color: ${ACCENT}; background: ${ACCENT}; }
+  .rm-checkbox.ok  { border-color: ${GREEN};  background: ${GREEN}; }
+  .rm-checkbox.bad { border-color: ${RED};    background: ${RED}; }
+
+  /* Tip */
+  .rm-tip { padding: 8px 12px; background: ${GOLD_BG}; border: 1px solid #fde68a; border-radius: 7px; font-size: 12px; color: #78350f; line-height: 1.55; margin-top: 8px; }
+
+  /* Correct hint */
+  .rm-correct-hint { font-size: 11.5px; color: ${MUTED}; margin-top: 6px; }
+  .rm-correct-hint strong { color: ${GREEN}; }
+
+  /* Loading / error */
+  .rm-center { display: flex; align-items: center; justify-content: center; flex: 1; }
+  @keyframes rm-spin { to { transform: rotate(360deg); } }
+  .rm-spinner { width: 20px; height: 20px; border: 2.5px solid ${BORDER}; border-top-color: ${ACCENT}; border-radius: 50%; animation: rm-spin .7s linear infinite; }
+
+  /* Results */
+  .rm-results { flex: 1; overflow-y: auto; padding: 28px 40px; max-width: 900px; margin: 0 auto; width: 100%; }
+  .rm-band-card { background: ${SURFACE}; border: 1px solid ${BORDER}; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+  .rm-review-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .rm-review-pane { border: 1px solid ${BORDER}; border-radius: 10px; overflow-y: auto; max-height: 520px; }
+`;
+
+function injectCSS() {
+  const id = "rm-css";
+  if (!document.getElementById(id)) {
+    const el = document.createElement("style");
+    el.id = id; el.textContent = CSS;
+    document.head.appendChild(el);
+  }
 }
 
-// Extract the display string from a correct_answer value (may be array or scalar).
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+function normalizeOptions(options) {
+  if (!options || !options.length) return [];
+  return options.map((o, i) => (typeof o === "string" ? { order: i + 1, option: o } : o));
+}
+
 function correctStr(ca) {
   if (Array.isArray(ca)) return ca[0] ?? "";
   return String(ca ?? "");
 }
 
-// Render question text that may contain </blank> markers as inline inputs.
-function InlineFill({ text, value, onChange, result, disabled }) {
-  const parts = (text || "").split("</blank>");
-  if (parts.length === 1) return null; // no blank — caller handles separately
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Spinner() {
+  return <div className="rm-spinner" />;
+}
+
+function QBadge({ n, result }) {
+  const cls = result ? (result.is_correct ? "correct" : "wrong") : "";
+  return <span className={`rm-qbadge ${cls}`}>{n}</span>;
+}
+
+// Passage renderer
+function Passage({ passage }) {
+  const hasParagraphs = passage.paragraphs?.length > 0;
+  return (
+    <div className="rm-passage-inner">
+      <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, fontFamily: "'Lora', Georgia, serif" }}>
+        {passage.title}
+      </h2>
+      <div className="rm-passage-text">
+        {hasParagraphs
+          ? passage.paragraphs.map((para, i) => {
+              const m = para.match(/^([A-Z])\s{2}/);
+              const label = m ? m[1] : null;
+              const text = m ? para.slice(m[0].length) : para;
+              return (
+                <p key={i}>
+                  {label && <span className="rm-para-label">{label}</span>}
+                  {text}
+                </p>
+              );
+            })
+          : passage.body.split(/\n\n+/).map((para, i) => (
+              <p key={i}>{para.replace(/\n/g, " ")}</p>
+            ))
+        }
+      </div>
+    </div>
+  );
+}
+
+// Inline sentence fill (question_text contains </blank>)
+function InlineSentence({ question, qNumber, value, onChange, result, disabled }) {
+  const parts = (question.question_text || "").split("</blank>");
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
+  const blankCls = result ? (isCorrect ? "correct" : "wrong") : "";
+  const badgeCls = result ? (isCorrect ? "correct" : "wrong") : "";
+
   return (
-    <span style={{ fontSize: 13.5, lineHeight: 2 }}>
+    <div className="rm-form-sentence">
       {parts.map((part, i) => (
         <span key={i}>
-          {part}
+          <span>{part}</span>
           {i < parts.length - 1 && (
-            <input
-              className={`rm-input ${result ? (isCorrect ? "rm-inp-correct" : "rm-inp-wrong") : ""}`}
-              style={{ width: 130, display: "inline-block", margin: "0 4px", padding: "3px 8px", verticalAlign: "middle" }}
-              value={value || ""}
-              disabled={disabled || !!result}
-              onChange={e => !result && onChange(e.target.value)}
-            />
+            <>
+              <span className={`rm-qbadge ${badgeCls}`}>{qNumber}</span>
+              <input
+                className={`rm-blank ${blankCls}`}
+                style={{ width: 140 }}
+                value={value || ""}
+                disabled={disabled || !!result}
+                onChange={e => !result && onChange(e.target.value)}
+                placeholder=""
+              />
+              {isWrong && (
+                <span style={{ fontSize: 11.5, color: MUTED, marginLeft: 4 }}>
+                  → <strong style={{ color: GREEN }}>{correctStr(result.correct_answer)}</strong>
+                </span>
+              )}
+            </>
           )}
         </span>
       ))}
-      {isWrong && (
-        <span style={{ marginLeft: 6, fontSize: 12, color: C.muted }}>
-          → <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>{correctStr(result.correct_answer)}</span>
-        </span>
-      )}
-    </span>
-  );
-}
-
-// ─── CSS ──────────────────────────────────────────────────────────────────────
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  .rm * { box-sizing: border-box; margin: 0; padding: 0; }
-  .rm { font-family: 'Inter', sans-serif; color: ${C.text}; background: ${C.bg}; }
-  .rm ::-webkit-scrollbar { width: 4px; height: 4px; }
-  .rm ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 4px; }
-  @keyframes rm-fadeup { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes rm-spin { to { transform:rotate(360deg); } }
-  .rm-fadeup { animation: rm-fadeup .3s ease both; }
-  .rm-card { background:${C.surface}; border:1px solid ${C.border}; border-radius:10px; }
-  .rm-passage { font-family:'Lora',serif; font-size:15px; line-height:1.85; color:#1e293b; }
-  .rm-passage p { margin-bottom:1rem; }
-  .rm-passage .para-label { font-weight:700; color:${C.accent}; font-family:'Inter',sans-serif; font-size:13px; }
-  .rm-option { display:flex; align-items:flex-start; gap:10px; padding:9px 13px; border-radius:8px; border:1px solid ${C.border}; cursor:pointer; transition:all .15s; font-size:13.5px; line-height:1.5; }
-  .rm-option:hover:not(.rm-opt-disabled) { border-color:${C.borderHover}; background:#f8fafc; }
-  .rm-option.rm-opt-selected { background:${C.accentDim}; border-color:${C.accent}66; color:${C.accent}; }
-  .rm-option.rm-opt-correct { background:${C.greenDim}; border-color:${C.green}55; }
-  .rm-option.rm-opt-wrong { background:${C.redDim}; border-color:${C.red}55; }
-  .rm-option.rm-opt-disabled { cursor:default; }
-  .rm-input { width:100%; padding:8px 12px; border:1px solid ${C.border}; border-radius:8px; font-family:'Inter',sans-serif; font-size:13.5px; color:${C.text}; background:${C.surface}; transition:border-color .15s; }
-  .rm-input:focus { outline:none; border-color:${C.accent}; }
-  .rm-input.rm-inp-correct { border-color:${C.green}; background:${C.greenDim}; }
-  .rm-input.rm-inp-wrong { border-color:${C.red}; background:${C.redDim}; }
-  .rm-select { padding:7px 10px; border:1px solid ${C.border}; border-radius:8px; font-family:'Inter',sans-serif; font-size:13px; color:${C.text}; background:${C.surface}; cursor:pointer; min-width:120px; }
-  .rm-btn { font-family:'Inter',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 18px; transition:all .15s; }
-  .rm-btn-primary { background:${C.accent}; color:#fff; }
-  .rm-btn-primary:hover { background:#0284c7; }
-  .rm-btn-primary:disabled { opacity:.45; cursor:not-allowed; }
-  .rm-btn-outline { background:transparent; color:${C.accent}; border:1px solid ${C.accent}44; }
-  .rm-btn-outline:hover { background:${C.accentDim}; }
-  .rm-btn-ghost { background:transparent; color:${C.muted}; border:none; }
-  .rm-badge { border-radius:99px; font-size:11px; font-weight:600; letter-spacing:.05em; padding:2px 9px; text-transform:uppercase; display:inline-block; }
-  .rm-spinner { width:17px; height:17px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:rm-spin .7s linear infinite; display:inline-block; }
-  .rm-tip { padding:9px 13px; background:${C.goldDim}; border:1px solid #fbbf2444; border-radius:8px; font-size:12.5px; color:#78350f; line-height:1.6; margin-top:10px; }
-`;
-
-function Badge({ children, color }) {
-  return (
-    <span className="rm-badge" style={{ background: color + "18", color, border: `1px solid ${color}33` }}>
-      {children}
-    </span>
-  );
-}
-
-function Spinner() {
-  return <span className="rm-spinner" />;
-}
-
-// ─── Passage renderer ─────────────────────────────────────────────────────────
-function Passage({ passage, highlightRef }) {
-  const hasParagraphs = passage.paragraphs && passage.paragraphs.length > 0;
-
-  return (
-    <div style={{ padding: "20px 24px" }}>
-      <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
-        Passage {passage.passage_number}
-      </div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 18, color: C.text, fontFamily: "'Lora', serif" }}>
-        {passage.title}
-      </h2>
-      <div className="rm-passage">
-        {hasParagraphs ? (
-          passage.paragraphs.map((para, i) => {
-            // Extract paragraph label (e.g. "A") from "A  The phenomenon..."
-            const match = para.match(/^([A-Z])\s{2}/);
-            const label = match ? match[1] : null;
-            const text = match ? para.slice(match[0].length) : para;
-            return (
-              <p key={i}>
-                {label && <span className="para-label">{label}  </span>}
-                {text}
-              </p>
-            );
-          })
-        ) : (
-          passage.body.split("\n\n").map((para, i) => (
-            <p key={i}>{para}</p>
-          ))
-        )}
-      </div>
     </div>
   );
 }
 
-// ─── Question type renderers ──────────────────────────────────────────────────
-function MCQQuestion({ question, value, onChange, result, color }) {
+// MCQ option row (A ○ text)
+function MCQOpt({ letter, text, selected, isCorrect, isWrong, onClick, disabled }) {
+  let cls = "rm-opt";
+  if (isCorrect) cls += " rm-opt-ok";
+  else if (isWrong) cls += " rm-opt-bad";
+  else if (selected) cls += " rm-opt-sel";
+  if (disabled) cls += " rm-opt-dis";
+
+  const radioCls = isCorrect ? "ok" : isWrong ? "bad" : selected ? "sel" : "";
+
+  return (
+    <div className={cls} onClick={!disabled ? onClick : undefined}>
+      <span className="rm-letter">{letter}</span>
+      <span className={`rm-radio ${radioCls}`}>
+        {(selected || isCorrect || isWrong) && <span className="rm-radio-dot" />}
+      </span>
+      <span className="rm-opt-text">{text}</span>
+      {isCorrect && <span style={{ fontSize: 11, color: GREEN, marginLeft: "auto" }}>✓</span>}
+      {isWrong && <span style={{ fontSize: 11, color: RED, marginLeft: "auto" }}>✗</span>}
+    </div>
+  );
+}
+
+// Renders one MCQ question (number + text + options)
+function MCQItem({ question, qNumber, value, onChange, result, groupType }) {
   const opts = normalizeOptions(question.options);
-  // Cathoven: options are objects, answer is option text.
-  // Legacy: options may be null/strings, answer is integer index.
-  const isCathoven = opts.length > 0 && typeof (question.options?.[0]) === "object";
+  const isCathoven = opts.length > 0 && typeof question.options?.[0] === "object";
   const ca = result?.correct_answer;
+  const isMultiSel = groupType === "multiple_select";
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      {opts.map((opt, oi) => {
-        const selected = isCathoven ? value === opt.option : value === oi;
-        const isCorrect = result && (isCathoven ? opt.option === correctStr(ca) : oi === Number(ca));
-        const isWrong = result && selected && !result.is_correct;
-        let cls = "rm-option rm-opt-disabled";
-        if (!result) cls = selected ? "rm-option rm-opt-selected" : "rm-option";
-        else if (isCorrect) cls = "rm-option rm-opt-correct rm-opt-disabled";
-        else if (isWrong) cls = "rm-option rm-opt-wrong rm-opt-disabled";
-        else cls = "rm-option rm-opt-disabled";
-
-        return (
-          <label key={oi} className={cls} onClick={() => !result && onChange(isCathoven ? opt.option : oi)}>
-            <span style={{
-              width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-              border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : selected ? color : C.border}`,
-              background: (selected || isCorrect) ? (isCorrect ? C.green : isWrong ? C.red : color) : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
-            }}>
-              {(selected || isCorrect) && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
-            </span>
-            <span style={{ flex: 1, fontSize: 13.5 }}>{opt.option}</span>
-            {isCorrect && <span style={{ fontSize: 11, color: C.green, flexShrink: 0 }}>✓</span>}
-            {isWrong && <span style={{ fontSize: 11, color: C.red, flexShrink: 0 }}>✗</span>}
-          </label>
-        );
-      })}
-    </div>
-  );
-}
-
-function TFNGQuestion({ question, value, onChange, result, color }) {
-  // Cathoven: question.options = [{option:"TRUE"}, {option:"FALSE"}, {option:"NOT GIVEN"}]
-  // Legacy: no options, hardcode
-  const rawOpts = normalizeOptions(question.options);
-  const isCathoven = rawOpts.length > 0;
-  const opts = isCathoven ? rawOpts.map(o => o.option) : ["True", "False", "Not Given"];
-  const ca = result?.correct_answer;
-
-  return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      {opts.map((opt, oi) => {
-        const selected = isCathoven ? value === opt : value === oi;
-        const caVal = isCathoven ? correctStr(ca) : Number(ca);
-        const isCorrect = result && (isCathoven
-          ? opt.toUpperCase() === caVal.toUpperCase()
-          : oi === caVal);
-        const isWrong = result && selected && !result.is_correct;
-        const bg = isCorrect ? C.greenDim : isWrong ? C.redDim : selected ? C.accentDim : C.surface;
-        const border = isCorrect ? C.green + "55" : isWrong ? C.red + "55" : selected ? color + "66" : C.border;
-        const textColor = isCorrect ? C.green : isWrong ? C.red : selected ? color : C.text;
-        return (
-          <button key={oi} className="rm-btn" disabled={!!result}
-            onClick={() => !result && onChange(isCathoven ? opt : oi)}
-            style={{ background: bg, border: `1px solid ${border}`, color: textColor, padding: "7px 16px", fontSize: 13 }}>
-            {opt}
-          </button>
-        );
-      })}
-      {result && !result.is_correct && (
-        <span style={{ fontSize: 12, color: C.muted, alignSelf: "center" }}>
-          Correct: <strong style={{ color: C.green }}>{correctStr(ca)}</strong>
-        </span>
-      )}
-    </div>
-  );
-}
-
-function FillQuestion({ question, value, onChange, result }) {
-  const isCorrect = result?.is_correct;
-  const isWrong = result && !isCorrect;
-  const hasBlank = (question.question_text || "").includes("</blank>");
-
-  // Inline rendering when the question stem has a blank marker
-  if (hasBlank) {
+  // Multi-select uses checkboxes
+  if (isMultiSel) {
+    const selected = Array.isArray(value) ? value : [];
+    const caArr = Array.isArray(ca) ? ca : [];
+    const caNorm = caArr.map(s => String(s).toLowerCase().trim());
+    const toggle = (opt) => {
+      if (result) return;
+      const next = selected.includes(opt)
+        ? selected.filter(s => s !== opt)
+        : [...selected, opt];
+      onChange(next);
+    };
     return (
-      <div>
-        <InlineFill
-          text={question.question_text}
-          value={value}
-          onChange={onChange}
-          result={result}
-          disabled={false}
-        />
+      <div className="rm-mcq-item" data-qid={question.id}>
+        <div className="rm-mcq-q">
+          <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+          {question.question_text}
+        </div>
+        <div className="rm-mcq-opts">
+          {opts.map((opt, oi) => {
+            const isSel = selected.includes(opt.option);
+            const isC = result && caNorm.includes(opt.option.toLowerCase().trim());
+            const isW = result && isSel && !isC;
+            let cls = "rm-opt";
+            if (isC) cls += " rm-opt-ok";
+            else if (isW) cls += " rm-opt-bad";
+            else if (isSel) cls += " rm-opt-sel";
+            if (result) cls += " rm-opt-dis";
+            const cbCls = isC ? "ok" : isW ? "bad" : isSel ? "sel" : "";
+            return (
+              <div key={oi} className={cls} onClick={() => toggle(opt.option)}>
+                <span className="rm-letter">{LETTERS[oi]}</span>
+                <span className={`rm-checkbox ${cbCls}`}>
+                  {(isSel || isC || isW) && <span style={{ width: 8, height: 2, background: "#fff", borderRadius: 1 }} />}
+                </span>
+                <span className="rm-opt-text">{opt.option}</span>
+              </div>
+            );
+          })}
+        </div>
+        {result && !result.is_correct && (
+          <div className="rm-correct-hint">Correct: <strong>{caArr.join(", ")}</strong></div>
+        )}
+        {result && !result.is_correct && result.tip && (
+          <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
+        )}
       </div>
     );
   }
 
   return (
-    <div>
-      <input
-        className={`rm-input ${result ? (isCorrect ? "rm-inp-correct" : "rm-inp-wrong") : ""}`}
-        value={value || ""}
-        disabled={!!result}
-        onChange={e => !result && onChange(e.target.value)}
-        placeholder="Type your answer from the passage…"
-      />
-      {isWrong && (
-        <div style={{ marginTop: 6, fontSize: 12, color: C.muted }}>
-          Correct: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>
-            {correctStr(result.correct_answer)}
-          </span>
-        </div>
+    <div className="rm-mcq-item" data-qid={question.id}>
+      <div className="rm-mcq-q">
+        <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+        {question.question_text}
+      </div>
+      <div className="rm-mcq-opts">
+        {opts.map((opt, oi) => {
+          const selected = isCathoven ? value === opt.option : value === oi;
+          const isC = result && (isCathoven
+            ? opt.option.toLowerCase() === correctStr(ca).toLowerCase()
+            : oi === Number(ca));
+          const isW = result && selected && !result.is_correct;
+          return (
+            <MCQOpt
+              key={oi}
+              letter={LETTERS[oi]}
+              text={opt.option}
+              selected={selected}
+              isCorrect={isC}
+              isWrong={isW}
+              disabled={!!result}
+              onClick={() => !result && onChange(isCathoven ? opt.option : oi)}
+            />
+          );
+        })}
+      </div>
+      {result && !result.is_correct && (
+        <div className="rm-correct-hint">Correct: <strong>{correctStr(ca)}</strong></div>
+      )}
+      {result && !result.is_correct && result.tip && (
+        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
       )}
     </div>
   );
 }
 
-function ShortAnswerQuestion({ question, value, onChange, result }) {
-  return <FillQuestion question={question} value={value} onChange={onChange} result={result} />;
+// TFNG item
+function TFNGItem({ question, qNumber, value, onChange, result }) {
+  const rawOpts = normalizeOptions(question.options);
+  const opts = rawOpts.length > 0
+    ? rawOpts.map(o => o.option)
+    : ["True", "False", "Not Given"];
+  const isCathoven = rawOpts.length > 0;
+  const ca = result?.correct_answer;
+
+  return (
+    <div className="rm-mcq-item" data-qid={question.id}>
+      <div className="rm-mcq-q">
+        <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+        {question.question_text}
+      </div>
+      <div className="rm-tfng-opts">
+        {opts.map((opt, oi) => {
+          const selected = isCathoven ? value === opt : value === oi;
+          const caVal = isCathoven ? correctStr(ca) : Number(ca);
+          const isC = result && (isCathoven
+            ? opt.toUpperCase() === caVal.toString().toUpperCase()
+            : oi === caVal);
+          const isW = result && selected && !result.is_correct;
+          const cls = isC ? "ok" : isW ? "bad" : selected ? "sel" : "";
+          return (
+            <button key={oi} className={`rm-tfng-btn ${cls}`}
+              disabled={!!result}
+              onClick={() => !result && onChange(isCathoven ? opt : oi)}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {result && !result.is_correct && (
+        <div className="rm-correct-hint">Correct: <strong>{correctStr(ca)}</strong></div>
+      )}
+      {result && !result.is_correct && result.tip && (
+        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
+      )}
+    </div>
+  );
 }
 
-function MatchingHeadingsQuestion({ question, groupData, value, onChange, result }) {
+// Matching headings item
+function MatchingHeadingsItem({ question, qNumber, groupData, value, onChange, result }) {
+  const legacyH = groupData.heading_options || [];
+  const cathovenOpts = normalizeOptions(question.options);
+  const useCathoven = cathovenOpts.length > 0 && !legacyH.length;
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
 
-  // Legacy: groupData.heading_options = ["i  Heading text", ...]
-  // Cathoven: question.options = [{option:"i"}, {option:"ii"}, ...]
-  const legacyHeadings = groupData.heading_options || [];
-  const cathovenOpts = normalizeOptions(question.options);
-  const useCathoven = cathovenOpts.length > 0 && !legacyHeadings.length;
-
   return (
-    <div>
+    <div className="rm-mcq-item" data-qid={question.id}>
+      <div className="rm-mcq-q">
+        <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+        {question.question_text}
+      </div>
       <select
-        className="rm-select"
+        className={`rm-match-select ${result ? (isCorrect ? "correct" : "wrong") : ""}`}
         value={value || ""}
         disabled={!!result}
         onChange={e => !result && onChange(e.target.value)}
-        style={{ width: "100%", borderColor: result ? (isCorrect ? C.green : C.red) : C.border }}
       >
         <option value="">— Select heading —</option>
         {useCathoven
-          ? cathovenOpts.map((o, i) => (
-              <option key={i} value={o.option}>{o.option}</option>
-            ))
-          : legacyHeadings.map((h, i) => (
-              <option key={i} value={h.split(/\s+/)[0].toLowerCase()}>{h}</option>
-            ))
+          ? cathovenOpts.map((o, i) => <option key={i} value={o.option}>{o.option}</option>)
+          : legacyH.map((h, i) => <option key={i} value={h.split(/\s+/)[0].toLowerCase()}>{h}</option>)
         }
       </select>
       {isWrong && (
-        <div style={{ marginTop: 6, fontSize: 12, color: C.muted }}>
-          Correct: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>
-            {correctStr(result.correct_answer)}
-          </span>
-        </div>
+        <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
+      )}
+      {isWrong && result.tip && (
+        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
       )}
     </div>
   );
 }
 
-function MatchingInfoQuestion({ question, groupData, value, onChange, result }) {
-  // Legacy: groupData.paragraph_labels = ["A","B","C","D","E"]
-  // Cathoven: question.options = [{option:"A"}, {option:"B"}, ...]
+// Matching info item
+function MatchingInfoItem({ question, qNumber, groupData, value, onChange, result }) {
   const cathovenOpts = normalizeOptions(question.options);
   const labels = cathovenOpts.length > 0
     ? cathovenOpts.map(o => o.option)
     : (groupData.paragraph_labels || ["A", "B", "C", "D", "E"]);
-
   const isCorrect = result?.is_correct;
-  const isWrong = result && !isCorrect;
   const ca = correctStr(result?.correct_answer);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    <div className="rm-mcq-item" data-qid={question.id}>
+      <div className="rm-mcq-q">
+        <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+        {question.question_text}
+      </div>
+      <div className="rm-match-grid">
         {labels.map(label => {
           const selected = value === label;
           const isC = result && label.toUpperCase() === ca.toUpperCase();
           const isW = result && selected && !result.is_correct;
+          const cls = isC ? "ok" : isW ? "bad" : selected ? "sel" : "";
           return (
-            <button key={label} className="rm-btn" disabled={!!result}
-              onClick={() => !result && onChange(label)}
-              style={{
-                width: 36, height: 36, padding: 0, fontSize: 14, fontWeight: 600,
-                background: isC ? C.greenDim : isW ? C.redDim : selected ? C.accentDim : C.surface,
-                border: `1px solid ${isC ? C.green + "55" : isW ? C.red + "55" : selected ? C.accent + "66" : C.border}`,
-                color: isC ? C.green : isW ? C.red : selected ? C.accent : C.text,
-              }}>
+            <button key={label} className={`rm-match-pill ${cls}`}
+              disabled={!!result}
+              onClick={() => !result && onChange(label)}>
               {label}
             </button>
           );
         })}
       </div>
-      {isWrong && (
-        <span style={{ fontSize: 12, color: C.muted }}>
-          Correct: <strong style={{ color: C.green }}>{ca}</strong>
-        </span>
-      )}
-    </div>
-  );
-}
-
-function MultipleSelectQuestion({ question, value, onChange, result, color }) {
-  const opts = normalizeOptions(question.options);
-  const selected = Array.isArray(value) ? value : [];
-  const ca = Array.isArray(result?.correct_answer) ? result.correct_answer : [];
-  const caNorm = ca.map(s => s.toLowerCase().trim());
-
-  const toggle = (opt) => {
-    if (result) return;
-    const next = selected.includes(opt)
-      ? selected.filter(s => s !== opt)
-      : [...selected, opt];
-    onChange(next);
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      {opts.map((opt, oi) => {
-        const isSel = selected.includes(opt.option);
-        const isC = result && caNorm.includes(opt.option.toLowerCase().trim());
-        const isW = result && isSel && !isC;
-        let cls = "rm-option rm-opt-disabled";
-        if (!result) cls = isSel ? "rm-option rm-opt-selected" : "rm-option";
-        else if (isC) cls = "rm-option rm-opt-correct rm-opt-disabled";
-        else if (isW) cls = "rm-option rm-opt-wrong rm-opt-disabled";
-        else cls = "rm-option rm-opt-disabled";
-
-        return (
-          <label key={oi} className={cls} onClick={() => toggle(opt.option)}>
-            <span style={{
-              width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-              border: `2px solid ${isC ? C.green : isW ? C.red : isSel ? color : C.border}`,
-              background: isC ? C.green : isW ? C.red : isSel ? color : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {(isSel || isC) && <span style={{ width: 8, height: 2, background: "#fff", borderRadius: 1 }} />}
-            </span>
-            <span style={{ flex: 1, fontSize: 13.5 }}>{opt.option}</span>
-          </label>
-        );
-      })}
       {result && !result.is_correct && (
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-          Correct: <span style={{ color: C.green }}>{ca.join(", ")}</span>
-        </div>
+        <div className="rm-correct-hint">Correct: <strong>{ca}</strong></div>
       )}
-    </div>
-  );
-}
-
-// ─── Single question wrapper ───────────────────────────────────────────────────
-function Question({ question, groupData, qNumber, answers, setAnswers, resultMap, submitted }) {
-  const qid = String(question.id);
-  const value = answers[qid];
-  const result = resultMap?.[qid];
-  const qt = groupData.question_type;
-  const color = TYPE_COLORS[qt] || C.accent;
-
-  const onChange = useCallback(val => {
-    if (!submitted) setAnswers(a => ({ ...a, [qid]: val }));
-  }, [qid, submitted, setAnswers]);
-
-  return (
-    <div style={{
-      padding: "14px 16px",
-      borderRadius: 10,
-      border: `1px solid ${result ? (result.is_correct ? C.green + "44" : C.red + "44") : C.border}`,
-      background: result ? (result.is_correct ? C.greenDim + "44" : C.redDim + "44") : C.surface,
-      marginBottom: 12,
-    }}>
-      {/* Question label + text — skip text for inline-blank fill (InlineFill renders it) */}
-      {(() => {
-        const hasInlineBlank = (qt === "fill" || qt === "short_answer") && (question.question_text || "").includes("</blank>");
-        return (
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 12 }}>
-            <span style={{
-              background: color + "18", color, border: `1px solid ${color}33`,
-              borderRadius: 6, padding: "2px 8px", fontSize: 12,
-              fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
-            }}>Q{qNumber}</span>
-            {hasInlineBlank
-              ? <InlineFill text={question.question_text} value={value} onChange={onChange} result={result} />
-              : <span style={{ fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{question.question_text}</span>
-            }
-          </div>
-        );
-      })()}
-
-      {qt === "mcq" && (
-        <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
-      )}
-      {qt === "tfng" && (
-        <TFNGQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
-      )}
-      {qt === "fill" && !(question.question_text || "").includes("</blank>") && (
-        <FillQuestion question={question} value={value} onChange={onChange} result={result} />
-      )}
-      {qt === "short_answer" && (
-        <ShortAnswerQuestion question={question} value={value} onChange={onChange} result={result} />
-      )}
-      {qt === "matching_headings" && (
-        <MatchingHeadingsQuestion question={question} groupData={groupData} value={value} onChange={onChange} result={result} />
-      )}
-      {qt === "matching_info" && (
-        <MatchingInfoQuestion question={question} groupData={groupData} value={value} onChange={onChange} result={result} />
-      )}
-      {qt === "multiple_select" && (
-        <MultipleSelectQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
-      )}
-
       {result && !result.is_correct && result.tip && (
-        <div className="rm-tip">
-          <strong>Tip:</strong> {result.tip}
-        </div>
+        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
       )}
     </div>
   );
 }
 
-// ─── Question group ───────────────────────────────────────────────────────────
-function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitted }) {
-  const color = TYPE_COLORS[group.question_type] || C.accent;
+// Short answer / plain fill item (no </blank> in question_text)
+function PlainFillItem({ question, qNumber, value, onChange, result }) {
+  const isCorrect = result?.is_correct;
+  const isWrong = result && !isCorrect;
+
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Badge color={color}>{TYPE_LABELS[group.question_type] || group.question_type}</Badge>
-        {group.word_limit && (
-          <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>{group.word_limit}</span>
-        )}
+    <div className="rm-mcq-item" data-qid={question.id}>
+      <div className="rm-mcq-q">
+        <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+        {question.question_text}
       </div>
-      {group.title && (
-        <div style={{ fontSize: 13, fontWeight: 700, fontStyle: "italic", color: C.text, marginBottom: 6 }}>
-          {group.title.toUpperCase()}
-        </div>
+      <input
+        className={`rm-input-full ${result ? (isCorrect ? "correct" : "wrong") : ""}`}
+        value={value || ""}
+        disabled={!!result}
+        onChange={e => !result && onChange(e.target.value)}
+        placeholder="Write your answer…"
+      />
+      {isWrong && (
+        <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
       )}
-      <div style={{
-        padding: "10px 14px", background: "#f8fafc",
-        borderRadius: 8, fontSize: 13, color: C.muted,
-        lineHeight: 1.6, marginBottom: 12, borderLeft: `3px solid ${color}`,
-        whiteSpace: "pre-line",
-      }}>
-        {group.instruction}
-      </div>
+      {isWrong && result.tip && (
+        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
+      )}
+    </div>
+  );
+}
 
-      {/* Heading options for matching_headings */}
-      {group.question_type === "matching_headings" && group.heading_options && (
-        <div style={{
-          padding: "12px 14px", background: C.goldDim,
-          borderRadius: 8, marginBottom: 14, border: `1px solid #fbbf2433`,
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 8 }}>
-            LIST OF HEADINGS
+// ─── Question Group ───────────────────────────────────────────────────────────
+function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitted }) {
+  const qt = group.question_type;
+  const firstQ = qOffset + 1;
+  const lastQ = qOffset + group.questions.length;
+  const rangeLabel = group.questions.length === 1
+    ? `Question ${firstQ}`
+    : `Questions ${firstQ}–${lastQ}`;
+
+  const onChange = useCallback((qid, val) => {
+    if (!submitted) setAnswers(a => ({ ...a, [qid]: val }));
+  }, [submitted, setAnswers]);
+
+  const isFormStyle = (qt === "fill" || qt === "short_answer") &&
+    group.questions.some(q => (q.question_text || "").includes("</blank>"));
+
+  return (
+    <div className="rm-group">
+      <div className="rm-group-header">{rangeLabel}</div>
+
+      {group.instruction && (
+        <div className="rm-group-instr">{group.instruction}</div>
+      )}
+
+      {/* Heading options list */}
+      {qt === "matching_headings" && group.heading_options?.length > 0 && (
+        <div style={{ padding: "10px 16px", borderBottom: `1px solid #f3f4f6` }}>
+          <div className="rm-headings-box">
+            <div className="rm-headings-title">List of headings</div>
+            {group.heading_options.map((h, i) => (
+              <div key={i} className="rm-heading-row">{h}</div>
+            ))}
           </div>
-          {group.heading_options.map((h, i) => (
-            <div key={i} style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>{h}</div>
-          ))}
         </div>
       )}
 
-      {group.questions.map((q, qi) => (
-        <Question
-          key={q.id}
-          question={q}
-          groupData={group}
-          qNumber={qOffset + qi + 1}
-          answers={answers}
-          setAnswers={setAnswers}
-          resultMap={resultMap}
-          submitted={submitted}
-        />
-      ))}
+      {/* Form-style fill questions */}
+      {isFormStyle ? (
+        <>
+          {group.title && <div className="rm-form-title">{group.title}</div>}
+          <div className="rm-form-body">
+            {group.questions.map((q, qi) => {
+              const qid = String(q.id);
+              const qNum = qOffset + qi + 1;
+              const value = answers[qid];
+              const result = resultMap?.[qid];
+              const hasBlank = (q.question_text || "").includes("</blank>");
+              if (hasBlank) {
+                return (
+                  <div key={q.id} data-qid={q.id}>
+                    <InlineSentence
+                      question={q}
+                      qNumber={qNum}
+                      value={value}
+                      onChange={val => onChange(qid, val)}
+                      result={result}
+                      disabled={submitted}
+                    />
+                    {result && !result.is_correct && result.tip && (
+                      <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
+                    )}
+                  </div>
+                );
+              }
+              // No blank marker — show as plain fill inside the form box
+              return (
+                <div key={q.id} data-qid={q.id} style={{ marginBottom: 10 }}>
+                  <div className="rm-form-sentence">
+                    <span className={`rm-qbadge ${result ? (result.is_correct ? "correct" : "wrong") : ""}`}>{qNum}</span>
+                    {" "}{q.question_text}
+                  </div>
+                  <input
+                    className={`rm-blank ${result ? (result.is_correct ? "correct" : "wrong") : ""}`}
+                    style={{ width: "100%", marginTop: 4 }}
+                    value={value || ""}
+                    disabled={submitted || !!result}
+                    onChange={e => onChange(qid, e.target.value)}
+                    placeholder=""
+                  />
+                  {result && !result.is_correct && (
+                    <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
+                  )}
+                  {result && !result.is_correct && result.tip && (
+                    <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        /* Card-style questions (MCQ, TFNG, matching, plain fill) */
+        <>
+          {group.title && (
+            <div style={{ padding: "8px 16px", fontWeight: 600, fontSize: 13, borderBottom: `1px solid #f3f4f6` }}>
+              {group.title}
+            </div>
+          )}
+          {group.questions.map((q, qi) => {
+            const qid = String(q.id);
+            const qNum = qOffset + qi + 1;
+            const value = answers[qid];
+            const result = resultMap?.[qid];
+            const cb = val => onChange(qid, val);
+
+            if (qt === "mcq" || qt === "multiple_select") {
+              return <MCQItem key={q.id} question={q} qNumber={qNum} value={value} onChange={cb} result={result} groupType={qt} />;
+            }
+            if (qt === "tfng") {
+              return <TFNGItem key={q.id} question={q} qNumber={qNum} value={value} onChange={cb} result={result} />;
+            }
+            if (qt === "matching_headings") {
+              return <MatchingHeadingsItem key={q.id} question={q} qNumber={qNum} groupData={group} value={value} onChange={cb} result={result} />;
+            }
+            if (qt === "matching_info") {
+              return <MatchingInfoItem key={q.id} question={q} qNumber={qNum} groupData={group} value={value} onChange={cb} result={result} />;
+            }
+            // fill or short_answer without </blank>
+            return <PlainFillItem key={q.id} question={q} qNumber={qNum} value={value} onChange={cb} result={result} />;
+          })}
+        </>
+      )}
     </div>
   );
 }
 
 // ─── Results summary ──────────────────────────────────────────────────────────
 function ResultsSummary({ result }) {
-  const bandColor = b => b >= 7 ? C.green : b >= 5.5 ? C.gold : C.red;
+  const bc = b => b >= 7 ? GREEN : b >= 5.5 ? GOLD : RED;
   return (
-    <div style={{
-      padding: "20px 24px", background: C.surface,
-      borderRadius: 12, border: `1px solid ${C.border}`,
-      marginBottom: 20,
-    }}>
-      <div style={{ display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
+    <div className="rm-band-card">
+      <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Overall band
-          </div>
-          <div style={{ fontSize: 52, fontWeight: 700, color: bandColor(result.overall_band), fontFamily: "'JetBrains Mono'", lineHeight: 1 }}>
+          <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Overall band</div>
+          <div style={{ fontSize: 52, fontWeight: 700, color: bc(result.overall_band), fontFamily: "monospace", lineHeight: 1 }}>
             {result.overall_band.toFixed(1)}
           </div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-            {result.correct} / {result.total} correct
-          </div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>{result.correct} / {result.total} correct</div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {result.passage_results.map(p => (
-              <div key={p.passage_number}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, color: C.muted }}>Passage {p.passage_number} — {p.passage_title}</span>
-                  <span style={{ fontSize: 12, color: bandColor(p.band), fontFamily: "'JetBrains Mono'" }}>
-                    {p.correct}/{p.total} — Band {p.band.toFixed(1)}
-                  </span>
-                </div>
-                <div style={{ height: 5, background: C.border, borderRadius: 4 }}>
-                  <div style={{ width: `${(p.correct / p.total) * 100}%`, height: "100%", background: bandColor(p.band), borderRadius: 4, transition: "width .4s" }} />
-                </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          {result.passage_results.map(p => (
+            <div key={p.passage_number} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: MUTED }}>Passage {p.passage_number} — {p.passage_title}</span>
+                <span style={{ fontSize: 12, color: bc(p.band), fontFamily: "monospace" }}>
+                  {p.correct}/{p.total} — Band {p.band.toFixed(1)}
+                </span>
               </div>
-            ))}
-          </div>
+              <div style={{ height: 5, background: BORDER, borderRadius: 4 }}>
+                <div style={{ width: `${(p.correct / p.total) * 100}%`, height: "100%", background: bc(p.band), borderRadius: 4 }} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
       {result.improvement_tips?.length > 0 && (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BORDER}` }}>
+          <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
             Improvement tips
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {result.improvement_tips.map((tip, i) => (
-              <div key={i} style={{
-                padding: "9px 13px", background: "#f8fafc",
-                borderRadius: 8, fontSize: 13, color: C.muted,
-                borderLeft: `3px solid ${C.gold}`, lineHeight: 1.6,
-              }}>
-                {tip}
-              </div>
-            ))}
-          </div>
+          {result.improvement_tips.map((tip, i) => (
+            <div key={i} className="rm-tip" style={{ marginTop: 6, marginBottom: 0 }}>{tip}</div>
+          ))}
         </div>
       )}
     </div>
@@ -625,16 +696,11 @@ function ResultsSummary({ result }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function ReadingModule({ apiBase, getToken, sessionId, onComplete, autoSubmitRef}) {
-  // Inject CSS once
-  useEffect(() => {
-    const id = "rm-styles";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("style");
-      s.id = id; s.textContent = CSS;
-      document.head.appendChild(s);
-    }
-  }, []);
+export default function ReadingModule({
+  apiBase, getToken, sessionId, onComplete, autoSubmitRef,
+  timerFormatted, timerWarning, timerDanger, onBack,
+}) {
+  useEffect(injectCSS, []);
 
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -643,9 +709,11 @@ export default function ReadingModule({ apiBase, getToken, sessionId, onComplete
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
-  const [view, setView] = useState("test"); // "test" | "results"
+  const [view, setView] = useState("test");
 
-  // Load test via session
+  const questionsRef = useRef(null);
+
+  // Load
   useEffect(() => {
     async function load() {
       try {
@@ -665,30 +733,32 @@ export default function ReadingModule({ apiBase, getToken, sessionId, onComplete
     if (sessionId && apiBase) load();
   }, [apiBase, sessionId, getToken]);
 
-  // Answer completion tracking
-  const passage = test?.passages[activePassage];
+  // Answer helpers
   const allQuestions = test
     ? test.passages.flatMap(p => p.question_groups.flatMap(g => g.questions))
     : [];
-  const totalAnswered = allQuestions.filter(q => {
+  const answered = q => {
     const a = answers[String(q.id)];
-    return a !== undefined && a !== "" && a !== null;
-  }).length;
+    return a !== undefined && a !== "" && a !== null && !(Array.isArray(a) && a.length === 0);
+  };
+  const totalAnswered = allQuestions.filter(answered).length;
   const totalQuestions = allQuestions.length;
 
-  // Build result map keyed by question_id
+  // Result map
   const resultMap = result
     ? Object.fromEntries(result.question_results.map(r => [r.question_id, r]))
     : null;
 
-  // Question number offset per passage
-  const getPassageQOffset = (passageIdx) => {
-    return test.passages
-      .slice(0, passageIdx)
-      .reduce((acc, p) => acc + p.question_groups.reduce((a, g) => a + g.questions.length, 0), 0);
-  };
+  // Question offset for a passage index
+  const passageQOffset = useCallback((pi) => {
+    if (!test) return 0;
+    return test.passages.slice(0, pi).reduce(
+      (acc, p) => acc + p.question_groups.reduce((a, g) => a + g.questions.length, 0),
+      0
+    );
+  }, [test]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
       const token = await getToken();
@@ -708,20 +778,27 @@ export default function ReadingModule({ apiBase, getToken, sessionId, onComplete
     } finally {
       setSubmitting(false);
     }
-  };
-  // ✅ ADD THIS RIGHT AFTER handleSubmit:
+  }, [apiBase, getToken, test, answers, onComplete]);
+
   useEffect(() => {
-    if (autoSubmitRef) {
-      autoSubmitRef.current = handleSubmit;
-    }
+    if (autoSubmitRef) autoSubmitRef.current = handleSubmit;
   }, [autoSubmitRef, handleSubmit]);
-  // ── Loading / error ──
+
+  // Scroll to question in questions pane
+  const scrollToQuestion = useCallback((qid) => {
+    const el = questionsRef.current?.querySelector(`[data-qid="${qid}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  // ── Loading ──
   if (loading) {
     return (
-      <div className="rm" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-        <div style={{ textAlign: "center" }}>
-          <Spinner />
-          <div style={{ color: C.muted, fontSize: 13, marginTop: 12 }}>Loading reading test…</div>
+      <div className="rm">
+        <div className="rm-center">
+          <div style={{ textAlign: "center" }}>
+            <Spinner />
+            <div style={{ color: MUTED, fontSize: 13, marginTop: 12 }}>Loading reading test…</div>
+          </div>
         </div>
       </div>
     );
@@ -729,168 +806,189 @@ export default function ReadingModule({ apiBase, getToken, sessionId, onComplete
 
   if (error) {
     return (
-      <div className="rm" style={{ padding: 24 }}>
-        <div style={{ padding: 16, background: "#fee2e2", borderRadius: 10, color: C.red, fontSize: 13 }}>
-          Error: {error}
+      <div className="rm">
+        <div className="rm-center">
+          <div style={{ padding: 16, background: "#fee2e2", borderRadius: 10, color: RED, fontSize: 13, maxWidth: 400 }}>
+            Error: {error}
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!test) return null;
+  if (!test) return <div className="rm" />;
+
+  const passage = test.passages[activePassage];
+  const pOffset = passageQOffset(activePassage);
+
+  // Question range for subtitle
+  const firstQNum = pOffset + 1;
+  const lastQNum = pOffset + passage.question_groups.reduce((a, g) => a + g.questions.length, 0);
+
+  const timerColor = timerDanger ? RED : timerWarning ? GOLD : MUTED;
 
   // ── Results view ──
   if (view === "results") {
     return (
-      <div className="rm rm-fadeup" style={{ padding: "24px 0" }}>
+      <div className="rm">
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <button className="rm-btn rm-btn-ghost" onClick={() => { setView("test"); setResult(null); setAnswers({}); }}>
-            ← New attempt
+        <div className="rm-header">
+          <button onClick={() => { setView("test"); setResult(null); setAnswers({}); }}
+            style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px" }}>
+            ←
           </button>
-          <h2 style={{ fontSize: 22, fontWeight: 600 }}>Reading results</h2>
+          <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Reading results</span>
         </div>
 
-        {result && <ResultsSummary result={result} />}
+        {/* Results body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+          {result && <ResultsSummary result={result} />}
 
-        {/* Review answers — same split-pane layout */}
-        <h3 style={{ fontSize: 16, fontWeight: 500, marginBottom: 16 }}>Review your answers</h3>
-        {test.passages.map((p, pi) => (
-          <div key={p.id} style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
-              Passage {p.passage_number} — {p.title}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div className="rm-card" style={{ maxHeight: 500, overflowY: "auto" }}>
-                <Passage passage={p} />
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, marginTop: 24 }}>Review your answers</h3>
+          {test.passages.map((p, pi) => {
+            const pOff = passageQOffset(pi);
+            return (
+              <div key={p.id} style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+                  Passage {p.passage_number} — {p.title}
+                </div>
+                <div className="rm-review-split">
+                  <div className="rm-review-pane">
+                    <Passage passage={p} />
+                  </div>
+                  <div className="rm-review-pane" style={{ padding: "16px" }}>
+                    {p.question_groups.map((g, gi) => {
+                      const gOff = pOff + p.question_groups.slice(0, gi).reduce((a, x) => a + x.questions.length, 0);
+                      return (
+                        <QuestionGroup
+                          key={g.id} group={g} qOffset={gOff}
+                          answers={answers} setAnswers={() => {}}
+                          resultMap={resultMap} submitted
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <div style={{ overflowY: "auto", maxHeight: 500 }}>
-                {p.question_groups.map(g => (
-                  <QuestionGroup
-                    key={g.id} group={g}
-                    qOffset={getPassageQOffset(pi) + p.question_groups.slice(0, p.question_groups.indexOf(g)).reduce((a, x) => a + x.questions.length, 0)}
-                    answers={answers} setAnswers={() => {}}
-                    resultMap={resultMap} submitted={true}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
     );
   }
 
   // ── Test view ──
   return (
-    <div className="rm" style={{ padding: "24px 0" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 2 }}>Reading Test</h2>
-          <div style={{ fontSize: 13, color: C.muted }}>{test.title}</div>
+    <div className="rm">
+      {/* ── Header bar ── */}
+      <div className="rm-header">
+        <button onClick={onBack}
+          style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px", flexShrink: 0 }}>
+          ←
+        </button>
+
+        {/* Timer — centre */}
+        <span style={{
+          marginLeft: "auto", marginRight: "auto",
+          fontSize: 16, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+          color: timerColor, flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          ⏱ {timerFormatted || "--:--"}
+        </span>
+
+        <button onClick={handleSubmit} disabled={submitting}
+          style={{
+            background: ACCENT, color: "#fff", border: "none",
+            borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 600,
+            cursor: submitting ? "default" : "pointer", flexShrink: 0,
+            opacity: submitting ? 0.7 : 1, whiteSpace: "nowrap",
+          }}>
+          {submitting ? "Submitting…" : "Finish Test"}
+        </button>
+      </div>
+
+      {/* ── Subtitle bar ── */}
+      <div className="rm-subtitle">
+        <span style={{ fontSize: 13, color: MUTED }}>
+          Part {activePassage + 1} — Read the text and answer questions {firstQNum}–{lastQNum}
+        </span>
+      </div>
+
+      {/* ── Main split pane ── */}
+      <div className="rm-body">
+        {/* Passage */}
+        <div className="rm-passage-pane">
+          <Passage passage={passage} key={passage.id} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 12, color: C.muted }}>
-            <span style={{ color: C.accent, fontFamily: "'JetBrains Mono'" }}>{totalAnswered}</span>
-            {" "}/{" "}{totalQuestions} answered
-          </span>
-          <button className="rm-btn rm-btn-primary"
-            disabled={totalAnswered < totalQuestions || submitting}
-            onClick={handleSubmit}
-            style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
-          </button>
+
+        {/* Questions */}
+        <div className="rm-questions-pane" ref={questionsRef}>
+          {passage.question_groups.map((g, gi) => {
+            const gOff = pOffset + passage.question_groups
+              .slice(0, gi)
+              .reduce((a, x) => a + x.questions.length, 0);
+            return (
+              <QuestionGroup
+                key={g.id} group={g} qOffset={gOff}
+                answers={answers} setAnswers={setAnswers}
+                resultMap={null} submitted={false}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* Overall progress bar */}
-      <div style={{ height: 3, background: C.border, borderRadius: 4, marginBottom: 18 }}>
-        <div style={{ width: `${(totalAnswered / totalQuestions) * 100}%`, height: "100%", background: C.accent, borderRadius: 4, transition: "width .3s" }} />
-      </div>
-
-      {/* Passage tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+      {/* ── Bottom navigation ── */}
+      <div className="rm-bottom">
         {test.passages.map((p, pi) => {
-          const pQuestions = p.question_groups.flatMap(g => g.questions);
-          const pAnswered = pQuestions.filter(q => {
-            const a = answers[String(q.id)];
-            return a !== undefined && a !== "" && a !== null;
-          }).length;
           const isActive = pi === activePassage;
+          const pQs = p.question_groups.flatMap(g => g.questions);
+          const pAnswered = pQs.filter(answered).length;
+          const pOff = passageQOffset(pi);
+
           return (
-            <button key={p.id} className="rm-btn"
-              onClick={() => setActivePassage(pi)}
-              style={{
-                padding: "7px 16px",
-                background: isActive ? C.accentDim : "transparent",
-                color: isActive ? C.accent : C.muted,
-                border: `1px solid ${isActive ? C.accent + "55" : C.border}`,
-              }}>
-              Passage {p.passage_number}
-              <span style={{ marginLeft: 6, fontSize: 11, fontFamily: "'JetBrains Mono'", color: pAnswered === pQuestions.length ? C.green : C.muted }}>
-                {pAnswered}/{pQuestions.length}
-              </span>
-            </button>
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+              {/* Separator between parts */}
+              {pi > 0 && <span className="rm-sep" />}
+
+              {/* Part tab */}
+              <button
+                className={`rm-part-tab ${isActive ? "active" : ""}`}
+                onClick={() => setActivePassage(pi)}>
+                Part {p.passage_number}
+              </button>
+
+              {/* Inactive: show count */}
+              {!isActive && (
+                <span className="rm-q-count">
+                  {pAnswered} of {pQs.length}
+                </span>
+              )}
+
+              {/* Active: show individual question circles */}
+              {isActive && pQs.map((q, qi) => {
+                const qNum = pOff + qi + 1;
+                const isAns = answered(q);
+                return (
+                  <button
+                    key={q.id}
+                    className={`rm-q-dot ${isAns ? "answered" : ""}`}
+                    onClick={() => scrollToQuestion(q.id)}
+                    title={`Question ${qNum}`}>
+                    {qNum}
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
+
+        {/* Total count right side */}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED, flexShrink: 0, paddingLeft: 12 }}>
+          {totalAnswered} of {totalQuestions} answered
+        </span>
       </div>
-
-      {/* Split pane: passage left, questions right */}
-      {passage && (
-        <div className="rm-fadeup" key={passage.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {/* Left — passage */}
-          <div className="rm-card" style={{
-            maxHeight: "calc(100vh - 200px)", overflowY: "auto",
-            position: "sticky", top: 80,
-            background: C.passageBg, borderColor: C.passageBorder,
-          }}>
-            <Passage passage={passage} />
-          </div>
-
-          {/* Right — questions */}
-          <div style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto", paddingRight: 4 }}>
-            {passage.question_groups.map((g, gi) => {
-              const groupOffset = passage.question_groups
-                .slice(0, gi)
-                .reduce((a, x) => a + x.questions.length, 0);
-              return (
-                <QuestionGroup
-                  key={g.id} group={g}
-                  qOffset={getPassageQOffset(activePassage) + groupOffset}
-                  answers={answers} setAnswers={setAnswers}
-                  resultMap={null} submitted={false}
-                />
-              );
-            })}
-
-            {/* Passage navigation */}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-              <button className="rm-btn rm-btn-ghost"
-                disabled={activePassage === 0}
-                onClick={() => setActivePassage(p => p - 1)}>
-                ← Previous
-              </button>
-              <span style={{ fontSize: 12, color: C.muted, alignSelf: "center" }}>
-                Passage {activePassage + 1} of {test.passages.length}
-              </span>
-              {activePassage < test.passages.length - 1 ? (
-                <button className="rm-btn rm-btn-outline"
-                  onClick={() => setActivePassage(p => p + 1)}>
-                  Next →
-                </button>
-              ) : (
-                <button className="rm-btn rm-btn-primary"
-                  disabled={totalAnswered < totalQuestions || submitting}
-                  onClick={handleSubmit}
-                  style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

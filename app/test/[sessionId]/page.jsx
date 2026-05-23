@@ -482,7 +482,9 @@ export default function SessionPage() {
   if (!session) return null;
 
   const showExpired = isExpired && current !== "complete";
-  const isListeningExam = current === "listening" && !showExpired && !transitioning;
+  const isListeningExam  = current === "listening" && !showExpired && !transitioning;
+  const isReadingExam    = current === "reading"   && !showExpired && !transitioning;
+  const isFullScreenExam = isListeningExam || isReadingExam;
 
   // The key for module components — changes on every reset/complete
   // so React fully recreates the component, reinitialising the timer hook
@@ -490,10 +492,10 @@ export default function SessionPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
-      {current !== "complete" && current !== "listening" && <ProgressBar current={current} />}
+      {current !== "complete" && !isFullScreenExam && <ProgressBar current={current} />}
 
-      {/* Timer — hidden when expired (expired screen takes over) */}
-      {current !== "complete" && current !== "listening" && !showExpired && (
+      {/* Timer — hidden for full-screen exams (they render their own header) */}
+      {current !== "complete" && !isFullScreenExam && !showExpired && (
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "12px 24px 0" }}>
           <ModuleTimer
             formatted={formatted}
@@ -508,9 +510,9 @@ export default function SessionPage() {
       )}
 
       <div style={{
-        maxWidth: isListeningExam ? "none" : 960,
+        maxWidth: isFullScreenExam ? "none" : 960,
         margin: "0 auto",
-        padding: isListeningExam ? 0 : "0 24px",
+        padding: isFullScreenExam ? 0 : "0 24px",
       }}>
 
         {/* Time expired screen */}
@@ -552,6 +554,10 @@ export default function SessionPage() {
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
+            timerFormatted={formatted}
+            timerWarning={isWarning}
+            timerDanger={isDanger}
+            onBack={() => router.push("/tests")}
           />
         )}
         {!showExpired && !transitioning && current === "writing" && (
