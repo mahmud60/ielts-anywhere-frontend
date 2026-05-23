@@ -44,6 +44,7 @@ const TYPE_COLORS = {
   matching_headings: C.green,
   matching_info: "#0891b2",
   short_answer: "#be185d",
+  multiple_select: "#7c3aed",
 };
 
 const TYPE_LABELS = {
@@ -53,7 +54,51 @@ const TYPE_LABELS = {
   matching_headings: "Matching headings",
   matching_info: "Matching information",
   short_answer: "Short answer",
+  multiple_select: "Multiple select",
 };
+
+// Normalize options to [{order, option}] regardless of source format.
+function normalizeOptions(options) {
+  if (!options || options.length === 0) return [];
+  return options.map((o, i) => typeof o === "string" ? { order: i + 1, option: o } : o);
+}
+
+// Extract the display string from a correct_answer value (may be array or scalar).
+function correctStr(ca) {
+  if (Array.isArray(ca)) return ca[0] ?? "";
+  return String(ca ?? "");
+}
+
+// Render question text that may contain </blank> markers as inline inputs.
+function InlineFill({ text, value, onChange, result, disabled }) {
+  const parts = (text || "").split("</blank>");
+  if (parts.length === 1) return null; // no blank — caller handles separately
+  const isCorrect = result?.is_correct;
+  const isWrong = result && !isCorrect;
+  return (
+    <span style={{ fontSize: 13.5, lineHeight: 2 }}>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {part}
+          {i < parts.length - 1 && (
+            <input
+              className={`rm-input ${result ? (isCorrect ? "rm-inp-correct" : "rm-inp-wrong") : ""}`}
+              style={{ width: 130, display: "inline-block", margin: "0 4px", padding: "3px 8px", verticalAlign: "middle" }}
+              value={value || ""}
+              disabled={disabled || !!result}
+              onChange={e => !result && onChange(e.target.value)}
+            />
+          )}
+        </span>
+      ))}
+      {isWrong && (
+        <span style={{ marginLeft: 6, fontSize: 12, color: C.muted }}>
+          → <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>{correctStr(result.correct_answer)}</span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
@@ -142,11 +187,17 @@ function Passage({ passage, highlightRef }) {
 
 // ─── Question type renderers ──────────────────────────────────────────────────
 function MCQQuestion({ question, value, onChange, result, color }) {
+  const opts = normalizeOptions(question.options);
+  // Cathoven: options are objects, answer is option text.
+  // Legacy: options may be null/strings, answer is integer index.
+  const isCathoven = opts.length > 0 && typeof (question.options?.[0]) === "object";
+  const ca = result?.correct_answer;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      {question.options.map((opt, oi) => {
-        const selected = value === oi;
-        const isCorrect = result && oi === result.correct_answer;
+      {opts.map((opt, oi) => {
+        const selected = isCathoven ? value === opt.option : value === oi;
+        const isCorrect = result && (isCathoven ? opt.option === correctStr(ca) : oi === Number(ca));
         const isWrong = result && selected && !result.is_correct;
         let cls = "rm-option rm-opt-disabled";
         if (!result) cls = selected ? "rm-option rm-opt-selected" : "rm-option";
@@ -155,7 +206,7 @@ function MCQQuestion({ question, value, onChange, result, color }) {
         else cls = "rm-option rm-opt-disabled";
 
         return (
-          <label key={oi} className={cls} onClick={() => !result && onChange(oi)}>
+          <label key={oi} className={cls} onClick={() => !result && onChange(isCathoven ? opt.option : oi)}>
             <span style={{
               width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
               border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : selected ? color : C.border}`,
@@ -164,7 +215,7 @@ function MCQQuestion({ question, value, onChange, result, color }) {
             }}>
               {(selected || isCorrect) && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
             </span>
-            <span style={{ flex: 1, fontSize: 13.5 }}>{opt}</span>
+            <span style={{ flex: 1, fontSize: 13.5 }}>{opt.option}</span>
             {isCorrect && <span style={{ fontSize: 11, color: C.green, flexShrink: 0 }}>✓</span>}
             {isWrong && <span style={{ fontSize: 11, color: C.red, flexShrink: 0 }}>✗</span>}
           </label>
@@ -175,19 +226,28 @@ function MCQQuestion({ question, value, onChange, result, color }) {
 }
 
 function TFNGQuestion({ question, value, onChange, result, color }) {
-  const opts = ["True", "False", "Not Given"];
+  // Cathoven: question.options = [{option:"TRUE"}, {option:"FALSE"}, {option:"NOT GIVEN"}]
+  // Legacy: no options, hardcode
+  const rawOpts = normalizeOptions(question.options);
+  const isCathoven = rawOpts.length > 0;
+  const opts = isCathoven ? rawOpts.map(o => o.option) : ["True", "False", "Not Given"];
+  const ca = result?.correct_answer;
+
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       {opts.map((opt, oi) => {
-        const selected = value === oi;
-        const isCorrect = result && oi === result.correct_answer;
+        const selected = isCathoven ? value === opt : value === oi;
+        const caVal = isCathoven ? correctStr(ca) : Number(ca);
+        const isCorrect = result && (isCathoven
+          ? opt.toUpperCase() === caVal.toUpperCase()
+          : oi === caVal);
         const isWrong = result && selected && !result.is_correct;
         const bg = isCorrect ? C.greenDim : isWrong ? C.redDim : selected ? C.accentDim : C.surface;
         const border = isCorrect ? C.green + "55" : isWrong ? C.red + "55" : selected ? color + "66" : C.border;
         const textColor = isCorrect ? C.green : isWrong ? C.red : selected ? color : C.text;
         return (
           <button key={oi} className="rm-btn" disabled={!!result}
-            onClick={() => !result && onChange(oi)}
+            onClick={() => !result && onChange(isCathoven ? opt : oi)}
             style={{ background: bg, border: `1px solid ${border}`, color: textColor, padding: "7px 16px", fontSize: 13 }}>
             {opt}
           </button>
@@ -195,7 +255,7 @@ function TFNGQuestion({ question, value, onChange, result, color }) {
       })}
       {result && !result.is_correct && (
         <span style={{ fontSize: 12, color: C.muted, alignSelf: "center" }}>
-          Correct: <strong style={{ color: C.green }}>{opts[result.correct_answer]}</strong>
+          Correct: <strong style={{ color: C.green }}>{correctStr(ca)}</strong>
         </span>
       )}
     </div>
@@ -205,6 +265,23 @@ function TFNGQuestion({ question, value, onChange, result, color }) {
 function FillQuestion({ question, value, onChange, result }) {
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
+  const hasBlank = (question.question_text || "").includes("</blank>");
+
+  // Inline rendering when the question stem has a blank marker
+  if (hasBlank) {
+    return (
+      <div>
+        <InlineFill
+          text={question.question_text}
+          value={value}
+          onChange={onChange}
+          result={result}
+          disabled={false}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <input
@@ -217,7 +294,7 @@ function FillQuestion({ question, value, onChange, result }) {
       {isWrong && (
         <div style={{ marginTop: 6, fontSize: 12, color: C.muted }}>
           Correct: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>
-            {Array.isArray(result.correct_answer) ? result.correct_answer[0] : result.correct_answer}
+            {correctStr(result.correct_answer)}
           </span>
         </div>
       )}
@@ -230,9 +307,14 @@ function ShortAnswerQuestion({ question, value, onChange, result }) {
 }
 
 function MatchingHeadingsQuestion({ question, groupData, value, onChange, result }) {
-  const headings = groupData.heading_options || [];
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
+
+  // Legacy: groupData.heading_options = ["i  Heading text", ...]
+  // Cathoven: question.options = [{option:"i"}, {option:"ii"}, ...]
+  const legacyHeadings = groupData.heading_options || [];
+  const cathovenOpts = normalizeOptions(question.options);
+  const useCathoven = cathovenOpts.length > 0 && !legacyHeadings.length;
 
   return (
     <div>
@@ -244,16 +326,19 @@ function MatchingHeadingsQuestion({ question, groupData, value, onChange, result
         style={{ width: "100%", borderColor: result ? (isCorrect ? C.green : C.red) : C.border }}
       >
         <option value="">— Select heading —</option>
-        {headings.map((h, i) => (
-          <option key={i} value={h.split(/\s+/)[0].toLowerCase()}>
-            {h}
-          </option>
-        ))}
+        {useCathoven
+          ? cathovenOpts.map((o, i) => (
+              <option key={i} value={o.option}>{o.option}</option>
+            ))
+          : legacyHeadings.map((h, i) => (
+              <option key={i} value={h.split(/\s+/)[0].toLowerCase()}>{h}</option>
+            ))
+        }
       </select>
       {isWrong && (
         <div style={{ marginTop: 6, fontSize: 12, color: C.muted }}>
           Correct: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>
-            {result.correct_answer}
+            {correctStr(result.correct_answer)}
           </span>
         </div>
       )}
@@ -262,17 +347,23 @@ function MatchingHeadingsQuestion({ question, groupData, value, onChange, result
 }
 
 function MatchingInfoQuestion({ question, groupData, value, onChange, result }) {
-  const labels = groupData.paragraph_labels || ["A", "B", "C", "D", "E"];
+  // Legacy: groupData.paragraph_labels = ["A","B","C","D","E"]
+  // Cathoven: question.options = [{option:"A"}, {option:"B"}, ...]
+  const cathovenOpts = normalizeOptions(question.options);
+  const labels = cathovenOpts.length > 0
+    ? cathovenOpts.map(o => o.option)
+    : (groupData.paragraph_labels || ["A", "B", "C", "D", "E"]);
+
   const isCorrect = result?.is_correct;
   const isWrong = result && !isCorrect;
+  const ca = correctStr(result?.correct_answer);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 13, color: C.muted }}>Paragraph:</span>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {labels.map(label => {
           const selected = value === label;
-          const isC = result && label === result.correct_answer;
+          const isC = result && label.toUpperCase() === ca.toUpperCase();
           const isW = result && selected && !result.is_correct;
           return (
             <button key={label} className="rm-btn" disabled={!!result}
@@ -290,8 +381,57 @@ function MatchingInfoQuestion({ question, groupData, value, onChange, result }) 
       </div>
       {isWrong && (
         <span style={{ fontSize: 12, color: C.muted }}>
-          Correct: <strong style={{ color: C.green }}>{result.correct_answer}</strong>
+          Correct: <strong style={{ color: C.green }}>{ca}</strong>
         </span>
+      )}
+    </div>
+  );
+}
+
+function MultipleSelectQuestion({ question, value, onChange, result, color }) {
+  const opts = normalizeOptions(question.options);
+  const selected = Array.isArray(value) ? value : [];
+  const ca = Array.isArray(result?.correct_answer) ? result.correct_answer : [];
+  const caNorm = ca.map(s => s.toLowerCase().trim());
+
+  const toggle = (opt) => {
+    if (result) return;
+    const next = selected.includes(opt)
+      ? selected.filter(s => s !== opt)
+      : [...selected, opt];
+    onChange(next);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {opts.map((opt, oi) => {
+        const isSel = selected.includes(opt.option);
+        const isC = result && caNorm.includes(opt.option.toLowerCase().trim());
+        const isW = result && isSel && !isC;
+        let cls = "rm-option rm-opt-disabled";
+        if (!result) cls = isSel ? "rm-option rm-opt-selected" : "rm-option";
+        else if (isC) cls = "rm-option rm-opt-correct rm-opt-disabled";
+        else if (isW) cls = "rm-option rm-opt-wrong rm-opt-disabled";
+        else cls = "rm-option rm-opt-disabled";
+
+        return (
+          <label key={oi} className={cls} onClick={() => toggle(opt.option)}>
+            <span style={{
+              width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+              border: `2px solid ${isC ? C.green : isW ? C.red : isSel ? color : C.border}`,
+              background: isC ? C.green : isW ? C.red : isSel ? color : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {(isSel || isC) && <span style={{ width: 8, height: 2, background: "#fff", borderRadius: 1 }} />}
+            </span>
+            <span style={{ flex: 1, fontSize: 13.5 }}>{opt.option}</span>
+          </label>
+        );
+      })}
+      {result && !result.is_correct && (
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+          Correct: <span style={{ color: C.green }}>{ca.join(", ")}</span>
+        </div>
       )}
     </div>
   );
@@ -317,14 +457,23 @@ function Question({ question, groupData, qNumber, answers, setAnswers, resultMap
       background: result ? (result.is_correct ? C.greenDim + "44" : C.redDim + "44") : C.surface,
       marginBottom: 12,
     }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 12 }}>
-        <span style={{
-          background: color + "18", color, border: `1px solid ${color}33`,
-          borderRadius: 6, padding: "2px 8px", fontSize: 12,
-          fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
-        }}>Q{qNumber}</span>
-        <span style={{ fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{question.question_text}</span>
-      </div>
+      {/* Question label + text — skip text for inline-blank fill (InlineFill renders it) */}
+      {(() => {
+        const hasInlineBlank = (qt === "fill" || qt === "short_answer") && (question.question_text || "").includes("</blank>");
+        return (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 12 }}>
+            <span style={{
+              background: color + "18", color, border: `1px solid ${color}33`,
+              borderRadius: 6, padding: "2px 8px", fontSize: 12,
+              fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
+            }}>Q{qNumber}</span>
+            {hasInlineBlank
+              ? <InlineFill text={question.question_text} value={value} onChange={onChange} result={result} />
+              : <span style={{ fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{question.question_text}</span>
+            }
+          </div>
+        );
+      })()}
 
       {qt === "mcq" && (
         <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
@@ -332,7 +481,7 @@ function Question({ question, groupData, qNumber, answers, setAnswers, resultMap
       {qt === "tfng" && (
         <TFNGQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
-      {qt === "fill" && (
+      {qt === "fill" && !(question.question_text || "").includes("</blank>") && (
         <FillQuestion question={question} value={value} onChange={onChange} result={result} />
       )}
       {qt === "short_answer" && (
@@ -343,6 +492,9 @@ function Question({ question, groupData, qNumber, answers, setAnswers, resultMap
       )}
       {qt === "matching_info" && (
         <MatchingInfoQuestion question={question} groupData={groupData} value={value} onChange={onChange} result={result} />
+      )}
+      {qt === "multiple_select" && (
+        <MultipleSelectQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
       )}
 
       {result && !result.is_correct && result.tip && (
@@ -360,15 +512,21 @@ function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitt
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Badge color={color}>{TYPE_LABELS[group.question_type]}</Badge>
+        <Badge color={color}>{TYPE_LABELS[group.question_type] || group.question_type}</Badge>
         {group.word_limit && (
           <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>{group.word_limit}</span>
         )}
       </div>
+      {group.title && (
+        <div style={{ fontSize: 13, fontWeight: 700, fontStyle: "italic", color: C.text, marginBottom: 6 }}>
+          {group.title.toUpperCase()}
+        </div>
+      )}
       <div style={{
         padding: "10px 14px", background: "#f8fafc",
         borderRadius: 8, fontSize: 13, color: C.muted,
         lineHeight: 1.6, marginBottom: 12, borderLeft: `3px solid ${color}`,
+        whiteSpace: "pre-line",
       }}>
         {group.instruction}
       </div>
