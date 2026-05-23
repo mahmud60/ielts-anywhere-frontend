@@ -1,409 +1,285 @@
 /**
- * ListeningModule.jsx
- *
- * Full IELTS listening module — fetches from FastAPI backend,
- * authenticates via Firebase, handles all 4 question types.
+ * ListeningModule.jsx — IELTS Listening (light theme)
  *
  * Props:
- *   apiBase  — your FastAPI URL, e.g. "http://localhost:8000"
- *   getToken — async function that returns a Firebase ID token string
- *              e.g. () => auth.currentUser.getIdToken(true)
- *
- * Standalone demo: if no props are passed, uses built-in mock data
- * so you can preview it here without a running backend.
+ *   apiBase      — FastAPI base URL
+ *   getToken     — async () => firebase id token string
+ *   sessionId    — test session UUID
+ *   onComplete   — called after successful submission
+ *   autoSubmitRef — ref wired up by parent timer
+ *   timeLeft     — optional seconds remaining (shown in top bar)
+ *   onBack       — optional callback for ← button
  */
-
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#080c18",
-  surface: "#0f1623",
-  card: "#131d2e",
-  cardHover: "#172034",
-  border: "#1c2d47",
-  borderHover: "#2a4060",
-  accent: "#00c8f8",
-  accentDim: "#003d4d",
-  accentHover: "#00e0ff",
-  gold: "#f0b429",
-  goldDim: "#352800",
-  green: "#00df76",
-  greenDim: "#00210f",
-  red: "#ff4d4d",
-  redDim: "#2a0000",
-  purple: "#a78bfa",
-  purpleDim: "#1e1040",
-  text: "#dce8fc",
-  muted: "#4e6a8a",
-  mutedLight: "#7a96b4",
-};
+const ACCENT       = "#312e81";
+const ACCENT_LIGHT = "#ede9fe";
+const BORDER       = "#e5e7eb";
+const SURFACE      = "#f9fafb";
+const TEXT         = "#111827";
+const TEXT_SUB     = "#374151";
+const MUTED        = "#6b7280";
+const MUTED_LIGHT  = "#9ca3af";
+const GREEN        = "#059669";
+const GREEN_BG     = "#ecfdf5";
+const RED          = "#dc2626";
+const RED_BG       = "#fef2f2";
 
-const SECTION_COLORS = {
-  1: C.accent,
-  2: C.gold,
-  3: C.purple,
-  4: C.green,
-};
-
-
-// ─── CSS injected once ────────────────────────────────────────────────────────
+// ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  .lm-root *, .lm-root *::before, .lm-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  .lm-root { font-family: 'Sora', sans-serif; background: ${C.bg}; color: ${C.text}; min-height: 100vh; }
-  .lm-root ::-webkit-scrollbar { width: 3px; height: 3px; }
-  .lm-root ::-webkit-scrollbar-track { background: ${C.surface}; }
-  .lm-root ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 3px; }
-  @keyframes lm-fadeup { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes lm-spin { to { transform:rotate(360deg); } }
-  @keyframes lm-wave { 0%,100%{transform:scaleY(.35)} 50%{transform:scaleY(1)} }
-  @keyframes lm-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-  .lm-fadeup { animation: lm-fadeup .35s ease both; }
-  .lm-card { background:${C.card}; border:1px solid ${C.border}; border-radius:12px; }
-  .lm-card-hover:hover { background:${C.cardHover}; border-color:${C.borderHover}; cursor:pointer; transition:all .15s; }
-  .lm-btn { font-family:'Sora',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 20px; transition:all .15s; }
-  .lm-btn-primary { background:${C.accent}; color:#000; }
-  .lm-btn-primary:hover { background:${C.accentHover}; }
-  .lm-btn-primary:disabled { opacity:.45; cursor:not-allowed; }
-  .lm-btn-outline { background:transparent; color:${C.accent}; border:1px solid ${C.accent}44; }
-  .lm-btn-outline:hover { background:${C.accent}12; border-color:${C.accent}88; }
-  .lm-btn-ghost { background:transparent; color:${C.muted}; }
-  .lm-btn-ghost:hover { color:${C.text}; }
-  .lm-radio { display:flex; align-items:center; gap:10px; padding:9px 14px; border-radius:9px; border:1px solid ${C.border}; cursor:pointer; transition:all .15s; font-size:13.5px; }
-  .lm-radio:hover { border-color:${C.borderHover}; background:${C.surface}; }
-  .lm-radio-selected { background:${C.accentDim}; border-color:${C.accent}55; color:${C.accent}; }
-  .lm-radio-correct { background:${C.greenDim}; border-color:${C.green}55; color:${C.green}; }
-  .lm-radio-wrong { background:${C.redDim}; border-color:${C.red}55; color:${C.red}; }
-  .lm-input { background:${C.surface}; border:1px solid ${C.border}; border-radius:8px; color:${C.text}; font-family:'Sora',sans-serif; font-size:13.5px; padding:9px 13px; transition:border-color .15s; width:100%; }
-  .lm-input:focus { outline:none; border-color:${C.accent}66; }
-  .lm-input-correct { border-color:${C.green}55; background:${C.greenDim}; }
-  .lm-input-wrong { border-color:${C.red}55; background:${C.redDim}; }
-  .lm-badge { border-radius:99px; font-size:11px; font-weight:600; letter-spacing:.06em; padding:2px 10px; text-transform:uppercase; display:inline-block; }
-  .lm-spinner { width:18px; height:18px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:lm-spin .7s linear infinite; display:inline-block; }
+  .lm *, .lm *::before, .lm *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  .lm {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #fff; color: #111827; min-height: 100vh;
+  }
+  .lm-blank {
+    border: 1.5px solid #d1d5db; border-radius: 6px;
+    padding: 3px 10px; font-size: 13.5px; font-family: inherit;
+    width: 120px; background: #f9fafb; vertical-align: middle;
+    display: inline-block; outline: none;
+    transition: border-color .12s, background .12s;
+  }
+  .lm-blank:focus { border-color: #312e81; background: #fff; }
+  .lm-blank:disabled { cursor: default; }
+  .lm-blank.ok  { border-color: #059669 !important; background: #ecfdf5 !important; }
+  .lm-blank.bad { border-color: #dc2626 !important; background: #fef2f2 !important; }
+  .lm-opt {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; border-radius: 8px; margin-bottom: 6px;
+    border: 1.5px solid #e5e7eb; cursor: pointer;
+    font-size: 13.5px; user-select: none;
+    transition: border-color .1s, background .1s; color: #374151;
+  }
+  label.lm-opt:hover { border-color: #a5b4fc; background: #f5f3ff; }
+  .lm-opt.sel  { border-color: #312e81; background: #ede9fe; color: #312e81; }
+  .lm-opt.ok   { border-color: #059669; background: #ecfdf5; color: #059669; }
+  .lm-opt.bad  { border-color: #dc2626; background: #fef2f2; color: #dc2626; }
+  @keyframes lm-spin { to { transform: rotate(360deg); } }
+  .lm-spinner {
+    width: 20px; height: 20px; border: 2px solid #e5e7eb;
+    border-top-color: #312e81; border-radius: 50%;
+    animation: lm-spin .7s linear infinite; display: inline-block;
+  }
+  @keyframes lm-fadein {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .lm-fadein { animation: lm-fadein .25s ease both; }
 `;
 
-// ─── Tiny helpers ─────────────────────────────────────────────────────────────
-function Badge({ children, color = C.accent }) {
+function injectCSS() {
+  if (typeof document === "undefined" || document.getElementById("lm-css")) return;
+  const s = document.createElement("style");
+  s.id = "lm-css";
+  s.textContent = CSS;
+  document.head.appendChild(s);
+}
+
+// ─── Number bubble ────────────────────────────────────────────────────────────
+function Bubble({ n, size = 22 }) {
   return (
-    <span className="lm-badge" style={{ background: color + "22", color, border: `1px solid ${color}44` }}>
-      {children}
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: size, height: size, borderRadius: "50%",
+      background: ACCENT, color: "#fff",
+      fontSize: size <= 20 ? 9 : 11, fontWeight: 700,
+      flexShrink: 0, verticalAlign: "middle", lineHeight: 1,
+    }}>{n}</span>
+  );
+}
+
+// ─── Inline blank (number bubble + input) ─────────────────────────────────────
+function InlineBlank({ n, value, onChange, disabled, result }) {
+  const isOk  = result?.is_correct;
+  const isBad = result && !isOk;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle" }}>
+      <Bubble n={n} />
+      <input
+        className={`lm-blank${isBad ? " bad" : isOk ? " ok" : ""}`}
+        value={value ?? ""}
+        onChange={e => !disabled && onChange(e.target.value)}
+        disabled={disabled}
+      />
     </span>
   );
 }
 
-function Spinner() {
-  return <span className="lm-spinner" />;
-}
-
-function ProgressBar({ value, color = C.accent, height = 4 }) {
+// ─── Stem renderer — splits on </blank> ───────────────────────────────────────
+function Stem({ text, n, value, onChange, disabled, result }) {
+  if (!text) return null;
+  const parts = text.split("</blank>");
+  if (parts.length < 2) {
+    return <span style={{ fontSize: 14, lineHeight: 1.75, color: TEXT_SUB }}>{text}</span>;
+  }
   return (
-    <div style={{ background: C.border, borderRadius: 4, height, overflow: "hidden" }}>
-      <div style={{ width: `${Math.min(100, value)}%`, height: "100%", background: color, borderRadius: 4, transition: "width .4s ease" }} />
-    </div>
+    <span style={{ fontSize: 14, lineHeight: 2.1, color: TEXT_SUB }}>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {part}
+          {i < parts.length - 1 && (
+            <InlineBlank
+              n={n} value={value} onChange={onChange}
+              disabled={disabled} result={result}
+            />
+          )}
+        </span>
+      ))}
+    </span>
   );
 }
 
-// ─── Audio Player ─────────────────────────────────────────────────────────────
+// ─── Instruction — bolds ALL-CAPS runs (word limit instructions) ──────────────
+function Instruction({ text }) {
+  if (!text) return null;
+  const parts = text.split(/(\b[A-Z][A-Z /]+[A-Z]\b)/g);
+  return (
+    <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.65, marginBottom: 4 }}>
+      {parts.map((p, i) =>
+        /^[A-Z][A-Z /]+[A-Z]$/.test(p.trim())
+          ? <strong key={i}>{p}</strong>
+          : <span key={i}>{p}</span>
+      )}
+    </p>
+  );
+}
+
+// ─── Audio player (compact, lives in sticky top bar) ──────────────────────────
 function AudioPlayer({ section }) {
   const audioRef = useRef(null);
-  const mockTimerRef = useRef(null);
+  const mockRef  = useRef(null);
+  const hasAudio = Boolean(section?.audio);
 
-  const hasRealAudio = Boolean(section.audio);
-  const color = SECTION_COLORS[section.part];
-
-  // Playback state
   const [playing, setPlaying]   = useState(false);
   const [time, setTime]         = useState(0);
-  const [duration, setDuration] = useState(
-    section.audio_duration_seconds || 120
-  );
-  const [audioReady, setAudioReady] = useState(!hasRealAudio); // mock is always ready
-  const [audioError, setAudioError] = useState(false);
+  const [duration, setDuration] = useState(section?.audio_duration_seconds || 240);
+  const [ready, setReady]       = useState(!hasAudio);
+  const [audioErr, setAudioErr] = useState(false);
 
-  // ── Real audio event wiring ───────────────────────────────────────────────
   useEffect(() => {
-    if (!hasRealAudio) return;
+    if (!hasAudio) return;
     const el = audioRef.current;
     if (!el) return;
-
-    const onTimeUpdate    = () => setTime(Math.floor(el.currentTime));
-    const onDuration      = () => {
-      if (isFinite(el.duration)) setDuration(Math.floor(el.duration));
+    const h = {
+      timeupdate:     () => setTime(Math.floor(el.currentTime)),
+      durationchange: () => isFinite(el.duration) && setDuration(Math.floor(el.duration)),
+      ended:          () => setPlaying(false),
+      canplay:        () => setReady(true),
+      error:          () => setAudioErr(true),
     };
-    const onEnded         = () => setPlaying(false);
-    const onCanPlay       = () => setAudioReady(true);
-    const onError         = () => { setAudioError(true); setAudioReady(false); };
+    Object.entries(h).forEach(([e, fn]) => el.addEventListener(e, fn));
+    return () => Object.entries(h).forEach(([e, fn]) => el.removeEventListener(e, fn));
+  }, [hasAudio]);
 
-    el.addEventListener("timeupdate",      onTimeUpdate);
-    el.addEventListener("durationchange",  onDuration);
-    el.addEventListener("ended",           onEnded);
-    el.addEventListener("canplay",         onCanPlay);
-    el.addEventListener("error",           onError);
-
-    return () => {
-      el.removeEventListener("timeupdate",     onTimeUpdate);
-      el.removeEventListener("durationchange", onDuration);
-      el.removeEventListener("ended",          onEnded);
-      el.removeEventListener("canplay",        onCanPlay);
-      el.removeEventListener("error",          onError);
-    };
-  }, [hasRealAudio]);
-
-  // ── Mock timer (no audio URL — demo mode) ─────────────────────────────────
   useEffect(() => {
-    if (hasRealAudio) return; // real audio handles its own timing
+    if (hasAudio) return;
     if (playing) {
-      mockTimerRef.current = setInterval(() => {
+      mockRef.current = setInterval(() => {
         setTime(t => {
-          if (t >= duration) {
-            setPlaying(false);
-            return duration;
-          }
+          if (t >= duration) { setPlaying(false); return duration; }
           return t + 1;
         });
       }, 1000);
     } else {
-      clearInterval(mockTimerRef.current);
+      clearInterval(mockRef.current);
     }
-    return () => clearInterval(mockTimerRef.current);
-  }, [playing, duration, hasRealAudio]);
+    return () => clearInterval(mockRef.current);
+  }, [playing, duration, hasAudio]);
 
-  // ── Controls ──────────────────────────────────────────────────────────────
-  const togglePlay = () => {
-    if (audioError) return;
-    if (hasRealAudio && audioRef.current) {
+  const toggle = () => {
+    if (audioErr) return;
+    if (hasAudio && audioRef.current) {
       playing
         ? audioRef.current.pause()
-        : audioRef.current.play().catch(() => setAudioError(true));
+        : audioRef.current.play().catch(() => setAudioErr(true));
     }
     setPlaying(p => !p);
   };
 
-  const handleScrub = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const newTime = Math.round(
-      ((e.clientX - rect.left) / rect.width) * duration
-    );
-    setTime(newTime);
-    if (hasRealAudio && audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
+  const scrub = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const t = Math.round(((e.clientX - r.left) / r.width) * duration);
+    setTime(t);
+    if (hasAudio && audioRef.current) audioRef.current.currentTime = t;
   };
 
-  const handleReset = () => {
-    setTime(0);
-    setPlaying(false);
-    if (hasRealAudio && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-  };
-
-  const pct = duration > 0 ? (time / duration) * 100 : 0;
-  const fmt = s =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-  // Stable waveform bar heights derived from section number so they
-  // look different per section but never change on re-render
-  const bars = Array.from({ length: 72 }, (_, i) => {
-    const h =
-      28 +
-      Math.sin(i * 0.9) * 22 +
-      Math.cos(i * 1.7 + section.part) * 14;
-    return Math.max(10, Math.round(h));
-  });
-
-  // Status badge
-  const statusBadge = audioError
-    ? { label: "Audio unavailable", color: C.red }
-    : hasRealAudio && !audioReady
-    ? { label: "Loading…", color: C.muted }
-    : hasRealAudio
-    ? { label: "Audio ready", color: C.green }
-    : { label: "Demo — no audio", color: C.muted };
+  const pct = duration > 0 ? Math.min(100, (time / duration) * 100) : 0;
+  const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   return (
-    <div className="lm-card" style={{ padding: "18px 20px", marginBottom: 20 }}>
-
-      {/* Hidden real audio element — all controls are custom */}
-      {hasRealAudio && (
-        <audio
-          ref={audioRef}
-          src={section.audio}
-          preload="metadata"
-          style={{ display: "none" }}
-        />
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+      {hasAudio && (
+        <audio ref={audioRef} src={section.audio} preload="metadata" style={{ display: "none" }} />
       )}
-
-      {/* Header */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        gap: 10, marginBottom: 14,
-      }}>
-        <Badge color={color}>Part {section.part}</Badge>
-        <span style={{ color: C.mutedLight, fontSize: 13 }}>
-          {section.title}
-        </span>
-        <Badge color={statusBadge.color}>{statusBadge.label}</Badge>
-        <span style={{
-          marginLeft: "auto", fontSize: 12,
-          color: C.muted, fontFamily: "'JetBrains Mono'",
-        }}>
-          {fmt(time)} / {fmt(duration)}
-        </span>
-      </div>
-
-      {/* Waveform — bars turn active colour as audio progresses */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        gap: 2, height: 48, marginBottom: 14,
-      }}>
-        {bars.map((h, i) => {
-          const active = (i / bars.length) * 100 <= pct;
-          return (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: `${h}%`,
-                borderRadius: 2,
-                background: active ? color : C.border,
-                animation:
-                  playing && active
-                    ? `lm-wave ${0.4 + (i % 7) * 0.08}s ease-in-out infinite`
-                    : "none",
-                animationDelay: `${(i % 5) * 0.06}s`,
-                transition: "background .15s",
-              }}
-            />
-          );
-        })}
-      </div>
-
-      {/* Transport bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-
-        {/* Play / pause button */}
-        <button
-          className="lm-btn"
-          onClick={togglePlay}
-          disabled={!audioReady && hasRealAudio}
-          style={{
-            width: 38, height: 38, borderRadius: "50%",
-            background: audioError ? C.red : color,
-            padding: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 15, flexShrink: 0,
-            opacity: !audioReady && hasRealAudio ? 0.45 : 1,
-            border: "none", cursor: "pointer",
-          }}
-        >
-          {audioError ? "!" : playing ? "⏸" : "▶"}
-        </button>
-
-        {/* Scrub track */}
-        <div
-          style={{
-            flex: 1, height: 5, background: C.border,
-            borderRadius: 5, position: "relative",
-            cursor: "pointer",
-          }}
-          onClick={handleScrub}
-        >
-          {/* Filled portion */}
-          <div style={{
-            width: `${pct}%`, height: "100%",
-            background: color, borderRadius: 5,
-          }} />
-          {/* Thumb */}
-          <div style={{
-            position: "absolute",
-            top: -4,
-            left: `${pct}%`,
-            width: 13, height: 13,
-            borderRadius: "50%",
-            background: color,
-            transform: "translateX(-50%)",
-            boxShadow: `0 0 0 3px ${color}33`,
-            transition: "left .1s",
-          }} />
-        </div>
-
-        {/* Reset */}
-        <button
-          className="lm-btn lm-btn-ghost"
-          onClick={handleReset}
-          style={{ padding: "4px 8px", fontSize: 12, border: "none", cursor: "pointer" }}
-        >
-          ↺
-        </button>
-      </div>
-
-      {/* Section context shown below controls */}
-      {section.context && (
+      <span style={{ fontSize: 13, color: MUTED, fontVariantNumeric: "tabular-nums", minWidth: 36, flexShrink: 0 }}>
+        {fmt(time)}
+      </span>
+      <button
+        onClick={toggle}
+        disabled={hasAudio && !ready}
+        style={{
+          width: 28, height: 28, borderRadius: "50%",
+          background: audioErr ? RED : ACCENT,
+          border: "none", color: "#fff", fontSize: 9,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: audioErr || (hasAudio && !ready) ? "default" : "pointer",
+          flexShrink: 0, opacity: hasAudio && !ready ? 0.5 : 1,
+        }}
+      >
+        {playing ? "⏸" : "▶"}
+      </button>
+      <div
+        style={{
+          flex: 1, height: 4, background: BORDER, borderRadius: 4,
+          position: "relative", cursor: "pointer",
+        }}
+        onClick={scrub}
+      >
+        <div style={{ width: `${pct}%`, height: "100%", background: ACCENT, borderRadius: 4 }} />
         <div style={{
-          marginTop: 14, padding: "10px 14px",
-          background: C.surface, borderRadius: 8,
-          fontSize: 12.5, color: C.mutedLight, lineHeight: 1.65,
-          borderLeft: `2px solid ${color}55`,
-        }}>
-          {section.context}
-        </div>
-      )}
-
-      {/* Error message */}
-      {audioError && (
-        <div style={{
-          marginTop: 10, padding: "9px 13px",
-          background: C.redDim, borderRadius: 8,
-          fontSize: 12.5, color: C.red,
-          border: `1px solid ${C.red}33`,
-          lineHeight: 1.6,
-        }}>
-          Could not load audio. Check that the file was uploaded in the admin
-          panel and that your R2 bucket has public access enabled.
-        </div>
-      )}
+          position: "absolute", top: "50%", left: `${pct}%`,
+          width: 12, height: 12, borderRadius: "50%", background: ACCENT,
+          transform: "translate(-50%, -50%)",
+          boxShadow: `0 0 0 3px ${ACCENT_LIGHT}`,
+          transition: "left .1s",
+        }} />
+      </div>
+      <span style={{ fontSize: 12, color: MUTED_LIGHT, minWidth: 36, textAlign: "right", flexShrink: 0 }}>
+        {fmt(duration)}
+      </span>
     </div>
   );
 }
 
-// ─── Question components ──────────────────────────────────────────────────────
-function MCQQuestion({ question, value, onChange, result, color }) {
-  // Support both old string[] options and new {order, option}[] options
+// ─── MCQ options ──────────────────────────────────────────────────────────────
+function MCQOpts({ question, value, onChange, result, disabled }) {
   const opts = (question.options ?? []).map((o, i) =>
     typeof o === "string" ? { order: i, option: o } : o
   );
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {opts.map((opt) => {
-        const selected = value === opt.order;
-        const isCorrect = result && opt.order === result.correct_answer;
-        const isWrong = result && selected && !result.is_correct;
-        let cls = "lm-radio";
-        if (result) {
-          if (isCorrect) cls += " lm-radio-correct";
-          else if (isWrong) cls += " lm-radio-wrong";
-          else if (selected) cls += " lm-radio-selected";
-        } else if (selected) {
-          cls += " lm-radio-selected";
-        }
+    <div style={{ marginTop: 10 }}>
+      {opts.map(opt => {
+        const sel   = value === opt.order;
+        const isOk  = result && opt.order === result.correct_answer;
+        const isBad = result && sel && !result.is_correct;
         return (
-          <label key={opt.order} className={cls} style={{ userSelect: "none" }}>
-            <input type="radio" style={{ display: "none" }} checked={selected}
-              disabled={!!result} onChange={() => !result && onChange(opt.order)} />
+          <label key={opt.order} className={`lm-opt${isOk ? " ok" : isBad ? " bad" : sel ? " sel" : ""}`}>
+            <input
+              type="radio" style={{ display: "none" }}
+              disabled={disabled || !!result}
+              checked={sel}
+              onChange={() => !result && !disabled && onChange(opt.order)}
+            />
             <span style={{
-              width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-              border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : selected ? color : C.border}`,
-              background: selected || isCorrect ? (isCorrect ? C.green : isWrong ? C.red : color) : "transparent",
+              width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+              border: "2px solid currentColor",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {selected && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#000" }} />}
+              {sel && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "currentColor" }} />}
             </span>
-            <span style={{ flex: 1 }}>{opt.option}</span>
-            {isCorrect && <span style={{ fontSize: 11, color: C.green, marginLeft: "auto" }}>✓ correct</span>}
-            {isWrong && <span style={{ fontSize: 11, color: C.red, marginLeft: "auto" }}>✗ wrong</span>}
+            <span>{opt.option}</span>
+            {isOk  && <span style={{ marginLeft: "auto", fontSize: 11 }}>✓</span>}
+            {isBad && <span style={{ marginLeft: "auto", fontSize: 11 }}>✗</span>}
           </label>
         );
       })}
@@ -411,48 +287,44 @@ function MCQQuestion({ question, value, onChange, result, color }) {
   );
 }
 
-function MultiSelectQuestion({ question, value = [], onChange, result, color }) {
-  const opts = (question.options ?? []).map((o, i) =>
+// ─── Multi-select options ─────────────────────────────────────────────────────
+function MultiSelectOpts({ question, value = [], onChange, result, disabled }) {
+  const opts    = (question.options ?? []).map((o, i) =>
     typeof o === "string" ? { order: i, option: o } : o
   );
-  const selected = new Set(Array.isArray(value) ? value : []);
-  const correctSet = result ? new Set(Array.isArray(result.correct_answer) ? result.correct_answer.map(String) : []) : null;
+  const sel     = new Set(Array.isArray(value) ? value : []);
+  const correct = result
+    ? new Set(Array.isArray(result.correct_answer) ? result.correct_answer.map(String) : [])
+    : null;
 
-  const toggle = (order) => {
-    if (result) return;
-    const next = new Set(selected);
+  const toggle = order => {
+    if (result || disabled) return;
+    const next = new Set(sel);
     if (next.has(order)) next.delete(order);
     else if (!question.max_selected_options || next.size < question.max_selected_options) next.add(order);
     onChange([...next]);
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {opts.map((opt) => {
-        const isSelected = selected.has(opt.order);
-        const isCorrect = result && correctSet?.has(String(opt.order));
-        const isWrong = result && isSelected && !isCorrect;
-        let cls = "lm-radio";
-        if (result) {
-          if (isCorrect) cls += " lm-radio-correct";
-          else if (isWrong) cls += " lm-radio-wrong";
-          else if (isSelected) cls += " lm-radio-selected";
-        } else if (isSelected) {
-          cls += " lm-radio-selected";
-        }
+    <div style={{ marginTop: 10 }}>
+      {opts.map(opt => {
+        const isSel = sel.has(opt.order);
+        const isOk  = result && correct?.has(String(opt.order));
+        const isBad = result && isSel && !isOk;
         return (
-          <label key={opt.order} className={cls} style={{ userSelect: "none" }} onClick={() => toggle(opt.order)}>
+          <label
+            key={opt.order}
+            className={`lm-opt${isOk ? " ok" : isBad ? " bad" : isSel ? " sel" : ""}`}
+            onClick={() => toggle(opt.order)}
+          >
             <span style={{
-              width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-              border: `2px solid ${isCorrect ? C.green : isWrong ? C.red : isSelected ? color : C.border}`,
-              background: isSelected || isCorrect ? (isCorrect ? C.green : isWrong ? C.red : color) : "transparent",
+              width: 15, height: 15, borderRadius: 3, flexShrink: 0,
+              border: "2px solid currentColor",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {isSelected && <span style={{ fontSize: 9, color: "#000", fontWeight: 700 }}>✓</span>}
+              {isSel && <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>✓</span>}
             </span>
-            <span style={{ flex: 1 }}>{opt.option}</span>
-            {isCorrect && <span style={{ fontSize: 11, color: C.green, marginLeft: "auto" }}>✓ correct</span>}
-            {isWrong && <span style={{ fontSize: 11, color: C.red, marginLeft: "auto" }}>✗ wrong</span>}
+            <span>{opt.option}</span>
           </label>
         );
       })}
@@ -460,234 +332,438 @@ function MultiSelectQuestion({ question, value = [], onChange, result, color }) 
   );
 }
 
-function FillQuestion({ question, value, onChange, result }) {
-  const isCorrect = result?.is_correct;
-  const isWrong = result && !isCorrect;
-  return (
-    <div>
-      <input
-        className={`lm-input ${result ? (isCorrect ? "lm-input-correct" : "lm-input-wrong") : ""}`}
-        value={value || ""}
-        disabled={!!result}
-        onChange={e => !result && onChange(e.target.value)}
-        placeholder="Type your answer…"
-      />
-      {isWrong && (
-        <div style={{ marginTop: 6, fontSize: 12, color: C.mutedLight }}>
-          Correct answer: <span style={{ color: C.green, fontFamily: "'JetBrains Mono'" }}>{result.correct_answer}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TFNGQuestion({ question, value, onChange, result, color }) {
-  // TFNG reuses MCQ logic — options are ["True", "False", "Not Given"]
-  return <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />;
-}
-
-function MatchingQuestion({ question, value, onChange, result }) {
-  // For dropdown type: question.text is the label, question.options are the choices [{order, option}]
-  // value is the selected option order (integer)
-  const opts = (question.options ?? []).map((o, i) =>
+// ─── Dropdown (matching / dropdown question type) ─────────────────────────────
+function DropdownOpt({ question, value, onChange, result, disabled }) {
+  const opts  = (question.options ?? []).map((o, i) =>
     typeof o === "string" ? { order: i, option: o } : o
   );
-  const userAns = value;
-  const correctAns = result?.correct_answer;
-  const isCorrect = result && String(userAns) === String(correctAns);
-  const isWrong = result && !isCorrect;
-
+  const isOk  = result?.is_correct;
+  const isBad = result && !isOk;
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-      background: result ? (isCorrect ? C.greenDim : isWrong ? C.redDim : C.surface) : C.surface,
-      border: `1px solid ${result ? (isCorrect ? C.green + "44" : isWrong ? C.red + "44" : C.border) : C.border}`,
-      borderRadius: 9,
-    }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, verticalAlign: "middle" }}>
       <select
-        disabled={!!result}
-        value={userAns ?? ""}
-        onChange={e => !result && onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+        disabled={disabled || !!result}
+        value={value ?? ""}
+        onChange={e => !result && !disabled && onChange(e.target.value === "" ? undefined : Number(e.target.value))}
         style={{
-          background: C.card, border: `1px solid ${C.border}`, color: C.text,
-          borderRadius: 7, padding: "6px 10px", fontSize: 13, fontFamily: "'Sora'",
-          cursor: result ? "default" : "pointer", minWidth: 100,
+          border: `1.5px solid ${isBad ? RED : isOk ? GREEN : "#d1d5db"}`,
+          borderRadius: 6, padding: "3px 8px", fontSize: 13, fontFamily: "inherit",
+          background: isBad ? RED_BG : isOk ? GREEN_BG : SURFACE,
+          cursor: disabled || result ? "default" : "pointer", outline: "none",
         }}
       >
         <option value="">— Select —</option>
-        {opts.map(opt => (
-          <option key={opt.order} value={opt.order}>{opt.option}</option>
-        ))}
+        {opts.map(o => <option key={o.order} value={o.order}>{o.option}</option>)}
       </select>
       {result && (
-        <span style={{ fontSize: 12, color: isCorrect ? C.green : C.red, marginLeft: 4, flexShrink: 0 }}>
-          {isCorrect ? "✓" : `✗ → ${opts.find(o => String(o.order) === String(correctAns))?.option ?? correctAns}`}
+        <span style={{ fontSize: 12, color: isOk ? GREEN : RED }}>
+          {isOk
+            ? "✓"
+            : `✗ → ${opts.find(o => String(o.order) === String(result.correct_answer))?.option ?? result.correct_answer}`}
         </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Subsection heading (Questions X–Y + instruction + title) ─────────────────
+function SubHead({ sub, qOffset }) {
+  const count = (sub.questions ?? []).length;
+  const start = qOffset + 1;
+  const end   = qOffset + count;
+  const range = start === end ? `Question ${start}` : `Questions ${start}–${end}`;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, marginBottom: 8 }}>{range}</h3>
+      {sub.text && sub.text.split("\n").map((line, i) => (
+        <Instruction key={i} text={line} />
+      ))}
+      {sub.title && (
+        <p style={{ fontSize: 13, fontStyle: "italic", fontWeight: 700, color: TEXT, marginTop: 8 }}>
+          {sub.title.toUpperCase()}
+        </p>
       )}
     </div>
   );
 }
 
-function Question({ question, answers, setAnswers, results, color, index }) {
-  const value = answers[question.id];
-  const result = results?.[question.id];
+// ─── Form subsection ──────────────────────────────────────────────────────────
+// Renders questions as lines of text with inline blanks inside a bordered box.
+function FormSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
+  const qs = sub.questions ?? [];
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <SubHead sub={sub} qOffset={qOffset} />
+      <div style={{
+        border: `1px solid ${BORDER}`, borderRadius: 10,
+        padding: "20px 24px", background: "#fff",
+        display: "flex", flexDirection: "column", gap: 10,
+      }}>
+        {sub.visual && (
+          <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 6, marginBottom: 8 }} />
+        )}
+        {qs.map((q, i) => {
+          const n        = qOffset + i + 1;
+          const value    = answers[q.id];
+          const result   = results?.[String(q.id)];
+          const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
 
-  const onChange = useCallback(val => {
-    setAnswers(a => ({ ...a, [question.id]: val }));
-  }, [question.id, setAnswers]);
+          if (q.question_type === "fill_in_the_blank") {
+            return (
+              <div key={q.id} style={{ lineHeight: 2.1 }}>
+                <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                {result && !result.is_correct && (
+                  <span style={{ fontSize: 12, color: MUTED, marginLeft: 8 }}>
+                    → <span style={{ color: GREEN }}>{result.correct_answer}</span>
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div key={q.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <div style={{ paddingTop: 2 }}><Bubble n={n} /></div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.7, marginBottom: 4 }}>{q.text}</p>
+                {q.question_type === "multiple_choices" && <MCQOpts question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
+                {q.question_type === "multiple_select"  && <MultiSelectOpts question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
+                {q.question_type === "dropdown"         && <DropdownOpt question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-  const typeLabelMap = {
-    multiple_choices: "Multiple choice",
-    fill_in_the_blank: "Fill in the blank",
-    multiple_select: "Multiple select",
-    dropdown: "Matching",
-    // legacy keys kept for mock data compatibility
-    mcq: "Multiple choice", fill: "Fill in the blank", tfng: "True / False / Not Given", matching: "Matching",
-  };
-  const typeColorMap = {
-    multiple_choices: C.accent, fill_in_the_blank: C.gold,
-    multiple_select: C.purple, dropdown: C.green,
-    mcq: C.accent, fill: C.gold, tfng: C.purple, matching: C.green,
-  };
-  const typeColor = typeColorMap[question.question_type] || C.accent;
+// ─── Grid subsection ──────────────────────────────────────────────────────────
+// Renders a table; cells that reference question IDs show the question stem with inline blanks.
+function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
+  const qs      = sub.questions ?? [];
+  const headers = (sub.grid_headers ?? []).slice().sort((a, b) => a.order - b.order);
+  const cells   = sub.grid_cells ?? [];
+  const numCols = headers.length || cells.reduce((m, c) => Math.max(m, c.col + 1), 0);
+  const numRows = cells.reduce((m, c) => Math.max(m, c.row + 1), 0);
+
+  const cellMap = {};
+  cells.forEach(c => { cellMap[`${c.row}-${c.col}`] = c; });
+
+  const qMap = {};
+  qs.forEach((q, i) => { qMap[q.id] = { ...q, _i: i }; });
+
+  const cellStyle = { border: `1px solid ${BORDER}`, padding: "10px 14px", color: TEXT_SUB, verticalAlign: "middle" };
 
   return (
-    <div className="lm-card lm-fadeup" style={{ padding: "18px 20px", animationDelay: `${index * 0.04}s` }}>
-      {/* Question header */}
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14 }}>
-        <span style={{
-          background: color + "22", color, border: `1px solid ${color}44`,
-          borderRadius: 6, padding: "2px 9px", fontSize: 12,
-          fontFamily: "'JetBrains Mono'", flexShrink: 0, fontWeight: 500,
-        }}>Q{index + 1}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, lineHeight: 1.65, marginBottom: 6 }}>{question.text ?? question.question_text}</div>
-          <Badge color={typeColor}>{typeLabelMap[question.question_type]}</Badge>
-        </div>
+    <div style={{ marginBottom: 36 }}>
+      <SubHead sub={sub} qOffset={qOffset} />
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          {headers.length > 0 && (
+            <thead>
+              <tr>
+                {headers.map(h => (
+                  <th key={h.order} style={{ ...cellStyle, background: SURFACE, fontWeight: 600, color: TEXT_SUB }}>
+                    {h.text}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {Array.from({ length: numRows }, (_, row) => (
+              <tr key={row}>
+                {Array.from({ length: numCols }, (_, col) => {
+                  const cell = cellMap[`${row}-${col}`];
+                  if (!cell) return <td key={col} style={cellStyle} />;
+
+                  const qIds = cell.question_ids ?? [];
+                  if (qIds.length === 0) {
+                    return <td key={col} style={cellStyle}>{cell.cell_text ?? ""}</td>;
+                  }
+                  return (
+                    <td key={col} style={cellStyle}>
+                      {qIds.map(qid => {
+                        const q = qMap[qid];
+                        if (!q) return null;
+                        const n        = qOffset + q._i + 1;
+                        const value    = answers[q.id];
+                        const result   = results?.[String(q.id)];
+                        const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
+                        return (
+                          <span key={qid}>
+                            <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                            {result && !result.is_correct && (
+                              <span style={{ fontSize: 12, color: MUTED, marginLeft: 6 }}>
+                                → <span style={{ color: GREEN }}>{result.correct_answer}</span>
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+    </div>
+  );
+}
 
-      {/* Input */}
-      {(question.question_type === "multiple_choices" || question.question_type === "mcq" || question.question_type === "tfng") && (
-        <MCQQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
-      )}
-      {(question.question_type === "fill_in_the_blank" || question.question_type === "fill") && (
-        <FillQuestion question={question} value={value} onChange={onChange} result={result} />
-      )}
-      {question.question_type === "multiple_select" && (
-        <MultiSelectQuestion question={question} value={value} onChange={onChange} result={result} color={color} />
-      )}
-      {(question.question_type === "dropdown" || question.question_type === "matching") && (
-        <MatchingQuestion question={question} value={value} onChange={onChange} result={result} />
-      )}
-
-      {/* Tip */}
-      {result && !result.is_correct && result.tip && (
-        <div style={{ marginTop: 12, padding: "8px 12px", background: C.goldDim, border: `1px solid ${C.gold}33`, borderRadius: 8, fontSize: 12.5, color: C.mutedLight, lineHeight: 1.6 }}>
-          <span style={{ color: C.gold }}>Tip: </span>{result.tip}
+// ─── Table subsection ─────────────────────────────────────────────────────────
+// Lettered option pool + list of matching questions.
+function TableSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
+  const qs         = sub.questions ?? [];
+  const sharedOpts = qs[0]?.options ?? [];
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <SubHead sub={sub} qOffset={qOffset} />
+      {sharedOpts.length > 0 && (
+        <div style={{
+          border: `1px solid ${BORDER}`, borderRadius: 8,
+          padding: "12px 18px", marginBottom: 16, background: SURFACE,
+          display: "flex", flexWrap: "wrap", gap: "8px 24px",
+        }}>
+          {sharedOpts.map(o => (
+            <span key={o.order} style={{ fontSize: 13.5, color: TEXT_SUB }}>
+              <strong>{String.fromCharCode(65 + o.order)}</strong>&nbsp;&nbsp;{o.option}
+            </span>
+          ))}
         </div>
       )}
+      {qs.map((q, i) => {
+        const n        = qOffset + i + 1;
+        const value    = answers[q.id];
+        const result   = results?.[String(q.id)];
+        const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
+        return (
+          <div key={q.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+            <Bubble n={n} />
+            <span style={{ flex: 1, fontSize: 14, color: TEXT_SUB }}>{q.text}</span>
+            <DropdownOpt question={q} value={value} onChange={onChange} result={result} disabled={disabled} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Regular subsection ───────────────────────────────────────────────────────
+// Standard question list: fill, MCQ, multi-select, dropdown with group labels.
+function RegularSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
+  const qs = sub.questions ?? [];
+  let prevGroup = null;
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <SubHead sub={sub} qOffset={qOffset} />
+      {sub.visual && (
+        <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 16 }} />
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {qs.map((q, i) => {
+          const n        = qOffset + i + 1;
+          const value    = answers[q.id];
+          const result   = results?.[String(q.id)];
+          const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
+          const label    = q.group_label;
+          const showLabel = label && label !== prevGroup;
+          if (showLabel) prevGroup = label;
+
+          return (
+            <div key={q.id}>
+              {showLabel && (
+                <p style={{ fontSize: 13, fontWeight: 600, color: MUTED, marginBottom: 10 }}>{label}</p>
+              )}
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                {q.question_type !== "fill_in_the_blank" && (
+                  <div style={{ paddingTop: 2, flexShrink: 0 }}><Bubble n={n} /></div>
+                )}
+                <div style={{ flex: 1 }}>
+                  {q.question_type === "fill_in_the_blank" ? (
+                    <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                  ) : (
+                    <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.7 }}>{q.text}</p>
+                  )}
+                  {q.question_type === "multiple_choices" && <MCQOpts question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
+                  {q.question_type === "multiple_select"  && <MultiSelectOpts question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
+                  {q.question_type === "dropdown"         && (
+                    <div style={{ marginTop: 8 }}>
+                      <DropdownOpt question={q} value={value} onChange={onChange} result={result} disabled={disabled} />
+                    </div>
+                  )}
+                  {result && !result.is_correct && result.tip && (
+                    <div style={{
+                      marginTop: 8, padding: "8px 12px",
+                      background: "#fef9c3", border: "1px solid #fde68a",
+                      borderRadius: 6, fontSize: 12.5, color: "#92400e", lineHeight: 1.6,
+                    }}>
+                      <strong>Tip: </strong>{result.tip}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Subsection router ────────────────────────────────────────────────────────
+function Subsection(props) {
+  switch (props.sub.subsection_type) {
+    case "form":  return <FormSubsection  {...props} />;
+    case "grid":  return <GridSubsection  {...props} />;
+    case "table": return <TableSubsection {...props} />;
+    default:      return <RegularSubsection {...props} />;
+  }
+}
+
+// ─── Bottom navigation ────────────────────────────────────────────────────────
+function BottomNav({ sections, activeSection, setActiveSection, answers }) {
+  return (
+    <div style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+      background: "#fff", borderTop: `1px solid ${BORDER}`,
+      padding: "10px 20px", display: "flex", alignItems: "center",
+      gap: 0, overflowX: "auto",
+    }}>
+      {sections.map((sec, si) => {
+        const isActive = si === activeSection;
+        const qs       = (sec.subsections ?? []).flatMap(s => s.questions ?? []);
+        const answered = qs.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
+        return (
+          <div key={sec.id} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {si > 0 && <div style={{ width: 1, height: 20, background: BORDER, marginRight: 4 }} />}
+            <button
+              onClick={() => setActiveSection(si)}
+              style={{
+                padding: "5px 14px", borderRadius: 99, fontWeight: 600, fontSize: 13,
+                background: isActive ? ACCENT : "transparent",
+                color: isActive ? "#fff" : MUTED,
+                border: `1.5px solid ${isActive ? ACCENT : BORDER}`,
+                cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+              }}
+            >
+              Part {sec.part}
+            </button>
+            {isActive ? (
+              <div style={{ display: "flex", gap: 4 }}>
+                {qs.map((q, qi) => {
+                  const done = answers[q.id] !== undefined && answers[q.id] !== "";
+                  return (
+                    <span key={q.id} style={{
+                      width: 20, height: 20, borderRadius: "50%",
+                      fontSize: 9, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: done ? ACCENT : "#f3f4f6",
+                      color: done ? "#fff" : MUTED_LIGHT,
+                      border: `1px solid ${done ? ACCENT : BORDER}`,
+                    }}>
+                      {qi + 1}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span style={{ fontSize: 12, color: MUTED_LIGHT, whiteSpace: "nowrap" }}>
+                {answered} of {qs.length}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ─── Results panel ────────────────────────────────────────────────────────────
 function ResultsPanel({ result }) {
-  const bandColor = b => b >= 7 ? C.green : b >= 5.5 ? C.gold : C.red;
+  const bandColor = b => b >= 7 ? GREEN : b >= 5.5 ? "#d97706" : RED;
   const bc = bandColor(result.overall_band);
-
   return (
-    <div className="lm-fadeup" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Overall */}
-      <div className="lm-card" style={{ padding: 24, borderColor: bc + "55", display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Overall Band</div>
-          <div style={{ fontSize: 56, fontWeight: 600, color: bc, fontFamily: "'JetBrains Mono'", lineHeight: 1 }}>
-            {result.overall_band.toFixed(1)}
-          </div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{result.correct} / {result.total} correct</div>
+          <p style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>Overall Band</p>
+          <p style={{ fontSize: 52, fontWeight: 700, color: bc, lineHeight: 1 }}>{result.overall_band.toFixed(1)}</p>
+          <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>{result.correct} / {result.total} correct</p>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>
             {result.overall_band >= 7 ? "Strong performance — well done!" : result.overall_band >= 5.5 ? "Developing — keep practising" : "Needs significant improvement"}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {Object.entries(result.section_scores).map(([secNum, data]) => {
-              const sc = SECTION_COLORS[parseInt(secNum)] || C.accent;
-              return (
-                <div key={secNum}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                    <span style={{ fontSize: 12, color: C.mutedLight }}>Section {secNum}</span>
-                    <span style={{ fontSize: 12, color: sc, fontFamily: "'JetBrains Mono'" }}>
-                      {data.correct}/{data.total} — Band {data.band.toFixed(1)}
-                    </span>
-                  </div>
-                  <ProgressBar value={(data.correct / data.total) * 100} color={sc} height={5} />
-                </div>
-              );
-            })}
-          </div>
+          </p>
+          {Object.entries(result.section_scores ?? {}).map(([n, d]) => (
+            <div key={n} style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, color: MUTED }}>Part {n}</span>
+                <span style={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>
+                  {d.correct}/{d.total} — Band {d.band?.toFixed(1)}
+                </span>
+              </div>
+              <div style={{ height: 5, background: BORDER, borderRadius: 3 }}>
+                <div style={{ width: `${(d.correct / Math.max(1, d.total)) * 100}%`, height: "100%", background: ACCENT, borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Tips */}
       {result.improvement_tips?.length > 0 && (
-        <div className="lm-card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 12, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Improvement tips</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {result.improvement_tips.map((tip, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, padding: "10px 14px", background: C.surface, borderRadius: 9, borderLeft: `3px solid ${C.gold}` }}>
-                <span style={{ color: C.gold, fontSize: 14, flexShrink: 0 }}>→</span>
-                <span style={{ fontSize: 13.5, color: C.mutedLight, lineHeight: 1.65 }}>{tip}</span>
-              </div>
-            ))}
-          </div>
+        <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20 }}>
+          <p style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 14 }}>Improvement Tips</p>
+          {result.improvement_tips.map((tip, i) => (
+            <div key={i} style={{
+              display: "flex", gap: 12, padding: "10px 14px", marginBottom: 8,
+              background: SURFACE, borderRadius: 8, borderLeft: "3px solid #d97706",
+            }}>
+              <span style={{ color: "#d97706", flexShrink: 0 }}>→</span>
+              <span style={{ fontSize: 13.5, color: TEXT_SUB, lineHeight: 1.65 }}>{tip}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-export default function ListeningModule({ apiBase, getToken, sessionId, onComplete, autoSubmitRef }) {
-  // Inject CSS once
-  useEffect(() => {
-    const id = "lm-styles";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("style");
-      s.id = id;
-      s.textContent = CSS;
-      document.head.appendChild(s);
-    }
-  }, []);
+// ─── Helper: flatten all questions in a section ───────────────────────────────
+function sectionQs(sec) {
+  return (sec?.subsections ?? []).flatMap(s => s.questions ?? []);
+}
 
-  const isMock = !apiBase;
+// ─── Main export ──────────────────────────────────────────────────────────────
+export default function ListeningModule({
+  apiBase, getToken, sessionId, onComplete, autoSubmitRef, timeLeft, onBack,
+}) {
+  useEffect(injectCSS, []);
 
-  // State
-  const [test, setTest] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeSection, setActiveSection] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [view, setView] = useState("test"); // "test" | "results"
+  const [test, setTest]                     = useState(null);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [activeSection, setActiveSection]   = useState(0);
+  const [answers, setAnswers]               = useState({});
+  const [submitting, setSubmitting]         = useState(false);
+  const [result, setResult]                 = useState(null);
+  const [view, setView]                     = useState("test");
 
-  // Load test
+  // ── Load test ──
   useEffect(() => {
     async function load() {
       if (!apiBase || !sessionId) {
-        // Demo mode — use mock data
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 400));
         setTest(MOCK_TEST);
         setLoading(false);
         return;
       }
       try {
         const token = await getToken();
-        const res = await fetch(
-          `${apiBase}/listening/for-session/${sessionId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res   = await fetch(`${apiBase}/listening/for-session/${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error(await res.text());
         const payload = await res.json();
         setTest(payload.data ?? payload);
@@ -700,74 +776,47 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
     load();
   }, [apiBase, sessionId]);
 
-  // Flatten subsections into a flat question list for a section
-  const sectionQuestions = (sec) =>
-    (sec?.subsections ?? []).flatMap(sub => sub.questions ?? []);
-
-  // Answer completion tracking
-  const section = test?.sections[activeSection];
-  const answeredInSection = sectionQuestions(section)
-    .filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
-  const totalAnswered = test
-    ? test.sections.reduce((acc, s) => acc + sectionQuestions(s).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length, 0)
-    : 0;
-  const totalQuestions = test
-    ? test.sections.reduce((acc, s) => acc + sectionQuestions(s).length, 0)
-    : 0;
-
-  // Build results map keyed by question_id for fast lookup
-  const resultsMap = result
-    ? Object.fromEntries(result.question_results.map(r => [r.question_id, r]))
-    : null;
-
-  // Submit answers
-  const handleSubmit = async () => {
+  // ── Submit ──
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
-      if (isMock) {
-        // Simulate scoring locally using mock answers
-        await new Promise(r => setTimeout(r, 1200));
-        const mockResult = buildMockResult(test, answers);
-        setResult(mockResult);
+      if (!apiBase || !sessionId) {
+        await new Promise(r => setTimeout(r, 800));
+        setResult(buildMockResult(test, answers));
         setView("results");
-        if (onComplete) onComplete();
-        setSubmitting(false);
+        onComplete?.();
         return;
       }
-
       const token = await getToken();
-      const res = await fetch(`${apiBase}/listening/submit`, {
+      const res   = await fetch(`${apiBase}/listening/submit`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ test_id: test.id, answers }),
       });
       if (!res.ok) throw new Error("Submission failed");
-      const data = await res.json();
-      setResult(data);
+      setResult(await res.json());
       setView("results");
-      if (onComplete) onComplete();
+      onComplete?.();
     } catch (e) {
       setError(e.message);
     } finally {
       setSubmitting(false);
     }
-  };
-  // ✅ ADD THIS RIGHT AFTER handleSubmit:
+  }, [apiBase, sessionId, getToken, test, answers, onComplete]);
+
   useEffect(() => {
-    if (autoSubmitRef) {
-      autoSubmitRef.current = handleSubmit;
-    }
+    if (autoSubmitRef) autoSubmitRef.current = handleSubmit;
   }, [autoSubmitRef, handleSubmit]);
-  // ── Loading / error states ──
+
+  const fmtTime = s => s != null ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : null;
+
+  // ── Loading ──
   if (loading) {
     return (
-      <div className="lm-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
+      <div className="lm" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
         <div style={{ textAlign: "center" }}>
-          <Spinner />
-          <div style={{ color: C.muted, fontSize: 13, marginTop: 12 }}>Loading test…</div>
+          <span className="lm-spinner" />
+          <p style={{ color: MUTED, fontSize: 13, marginTop: 12 }}>Loading test…</p>
         </div>
       </div>
     );
@@ -775,9 +824,9 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
 
   if (error) {
     return (
-      <div className="lm-root" style={{ padding: 32 }}>
-        <div className="lm-card" style={{ padding: 20, borderColor: C.red + "44", color: C.red, fontSize: 13 }}>
-          Error: {error}
+      <div className="lm" style={{ padding: 32 }}>
+        <div style={{ padding: 16, border: `1px solid ${RED}44`, borderRadius: 10, color: RED, fontSize: 13 }}>
+          {error}
         </div>
       </div>
     );
@@ -785,8 +834,8 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
 
   if (!test) {
     return (
-      <div className="lm-root" style={{ padding: 32 }}>
-        <div className="lm-card" style={{ padding: 20, color: C.muted, fontSize: 13 }}>No tests available.</div>
+      <div className="lm" style={{ padding: 32 }}>
+        <p style={{ color: MUTED, fontSize: 13 }}>No test available.</p>
       </div>
     );
   }
@@ -794,256 +843,295 @@ export default function ListeningModule({ apiBase, getToken, sessionId, onComple
   // ── Results view ──
   if (view === "results" && result) {
     return (
-      <div className="lm-root" style={{ padding: "24px 0" }}>
-        {/* Top bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "0 2px" }}>
-          <button className="lm-btn lm-btn-ghost" style={{ padding: "6px 12px" }}
-            onClick={() => { setView("test"); setResult(null); setAnswers({}); setActiveSection(0); }}>
-            ← New attempt
-          </button>
-          <div style={{ fontFamily: "'Sora'", fontSize: 22, fontWeight: 500 }}>Results</div>
-          <Badge color={C.accent}>{test.title}</Badge>
+      <div className="lm">
+        <div style={{
+          position: "sticky", top: 0, zIndex: 100,
+          background: "#fff", borderBottom: `1px solid ${BORDER}`,
+          padding: "0 20px", height: 52,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <button
+            onClick={() => { setView("test"); setResult(null); setAnswers({}); setActiveSection(0); }}
+            style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px" }}
+          >←</button>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>Results — {test.title}</span>
         </div>
-
-        <ResultsPanel result={result} />
-
-        {/* Review answers per section */}
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 12, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Review your answers</div>
-          {test.sections.map((sec, si) => (
-            <div key={sec.id} style={{ marginBottom: 28 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <Badge color={SECTION_COLORS[sec.part]}>Part {sec.part}</Badge>
-                <span style={{ color: C.mutedLight, fontSize: 13 }}>{sec.title}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {sectionQuestions(sec).map((q, qi) => (
-                  <Question key={q.id} question={q} answers={answers} setAnswers={() => {}}
-                    results={resultsMap} color={SECTION_COLORS[sec.part]}
-                    index={qi} />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px 48px" }}>
+          <ResultsPanel result={result} />
         </div>
       </div>
     );
   }
 
   // ── Test view ──
-  const sectionColor = SECTION_COLORS[section?.part] || C.accent;
+  const section = test.sections[activeSection];
+
+  // Global question offset for this section (questions in earlier sections come first)
+  const globalOffset = test.sections
+    .slice(0, activeSection)
+    .reduce((a, s) => a + sectionQs(s).length, 0);
+
+  const secQs   = sectionQs(section);
+  const secFirst = globalOffset + 1;
+  const secLast  = globalOffset + secQs.length;
+
+  // Per-subsection offsets (within the global numbering)
+  let subOffset = globalOffset;
+  const subsWithOffset = (section?.subsections ?? []).map(sub => {
+    const off = subOffset;
+    subOffset += (sub.questions ?? []).length;
+    return { sub, offset: off };
+  });
+
+  const totalQ        = test.sections.reduce((a, s) => a + sectionQs(s).length, 0);
+  const totalAnswered = test.sections.reduce(
+    (a, s) => a + sectionQs(s).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length,
+    0
+  );
 
   return (
-    <div className="lm-root" style={{ padding: "24px 0" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 500, marginBottom: 4 }}>Listening Test</div>
-          <div style={{ color: C.muted, fontSize: 13 }}>{test.title}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 12, color: C.mutedLight }}>
-            <span style={{ color: C.accent, fontFamily: "'JetBrains Mono'" }}>{totalAnswered}</span>
-            <span> / {totalQuestions} answered</span>
-          </div>
+    <div className="lm" style={{ minHeight: "100vh", paddingBottom: 72 }}>
+
+      {/* ── Sticky top bar ── */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 100,
+        background: "#fff", borderBottom: `1px solid ${BORDER}`,
+        padding: "0 20px", height: 52,
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <button
+          onClick={onBack}
+          style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px", flexShrink: 0 }}
+        >←</button>
+
+        {timeLeft != null && (
+          <span style={{ fontSize: 13, color: MUTED, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+            {fmtTime(timeLeft)}
+          </span>
+        )}
+
+        {section && <AudioPlayer key={section.id} section={section} />}
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            background: ACCENT, color: "#fff", border: "none",
+            borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 600,
+            cursor: submitting ? "default" : "pointer",
+            whiteSpace: "nowrap", flexShrink: 0,
+            opacity: submitting ? 0.7 : 1,
+          }}
+        >
+          {submitting ? "Submitting…" : "Finish Test"}
+        </button>
+      </div>
+
+      {/* ── Part label ── */}
+      <div style={{ padding: "8px 20px", borderBottom: `1px solid ${BORDER}` }}>
+        <span style={{ fontSize: 13, color: MUTED }}>
+          Part {section?.part} — Listen and answer questions {secFirst}–{secLast}
+        </span>
+      </div>
+
+      {/* ── Scrollable content ── */}
+      <div
+        className="lm-fadein"
+        key={section?.id}
+        style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px 24px" }}
+      >
+        {subsWithOffset.map(({ sub, offset }) => (
+          <Subsection
+            key={sub.id}
+            sub={sub}
+            answers={answers}
+            setAnswers={setAnswers}
+            results={null}
+            qOffset={offset}
+            disabled={false}
+          />
+        ))}
+
+        {/* ── Section navigation ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 20, borderTop: `1px solid ${BORDER}` }}>
           <button
-            className="lm-btn lm-btn-primary"
-            disabled={totalAnswered < totalQuestions || submitting}
-            onClick={handleSubmit}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 22px" }}
+            onClick={() => setActiveSection(s => s - 1)}
+            disabled={activeSection === 0}
+            style={{
+              border: `1px solid ${BORDER}`, background: "none", borderRadius: 8,
+              padding: "8px 18px", fontSize: 13,
+              color: activeSection === 0 ? MUTED_LIGHT : TEXT,
+              cursor: activeSection === 0 ? "default" : "pointer",
+            }}
           >
-            {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
+            ← Previous
           </button>
-        </div>
-      </div>
-
-      {/* Overall progress */}
-      <div style={{ marginBottom: 20 }}>
-        <ProgressBar value={(totalAnswered / totalQuestions) * 100} color={C.accent} height={3} />
-      </div>
-
-      {/* Section tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 22, overflowX: "auto", paddingBottom: 2 }}>
-        {test.sections.map((sec, si) => {
-          const sc = SECTION_COLORS[sec.part];
-          const secAnswered = sectionQuestions(sec).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
-          const secTotal = sectionQuestions(sec).length;
-          const isActive = si === activeSection;
-          return (
+          {activeSection < test.sections.length - 1 ? (
             <button
-              key={sec.id}
-              className="lm-btn"
-              onClick={() => setActiveSection(si)}
+              onClick={() => setActiveSection(s => s + 1)}
               style={{
-                padding: "8px 16px", flexShrink: 0,
-                background: isActive ? sc + "22" : "transparent",
-                color: isActive ? sc : C.muted,
-                border: `1px solid ${isActive ? sc + "55" : C.border}`,
-                position: "relative",
+                border: `1.5px solid ${ACCENT}`, background: ACCENT_LIGHT,
+                borderRadius: 8, padding: "8px 18px", fontSize: 13,
+                color: ACCENT, fontWeight: 600, cursor: "pointer",
               }}
             >
-              Part {sec.part}
-              <span style={{
-                marginLeft: 6, fontSize: 11, color: secAnswered === secTotal ? sc : C.muted,
-                fontFamily: "'JetBrains Mono'",
-              }}>
-                {secAnswered}/{secTotal}
-              </span>
+              Next Part →
             </button>
-          );
-        })}
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              style={{
+                background: ACCENT, color: "#fff", border: "none",
+                borderRadius: 8, padding: "8px 18px", fontSize: 13,
+                fontWeight: 600, cursor: submitting ? "default" : "pointer",
+              }}
+            >
+              {submitting ? "Submitting…" : "Finish Test"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Section body */}
-      {section && (
-        <div className="lm-fadeup" key={section.id}>
-          {/* Audio player */}
-          <AudioPlayer section={section} />
-
-          {/* Section progress */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: C.mutedLight }}>
-              {answeredInSection} of {sectionQuestions(section).length} questions answered in this section
-            </div>
-            <ProgressBar value={(answeredInSection / Math.max(1, sectionQuestions(section).length)) * 100} color={sectionColor} height={3} />
-          </div>
-
-          {/* Subsections with questions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {(section.subsections ?? []).map((sub) => {
-              let globalOffset = 0;
-              for (const s of (section.subsections ?? [])) {
-                if (s.id === sub.id) break;
-                globalOffset += (s.questions ?? []).length;
-              }
-              return (
-                <div key={sub.id}>
-                  {sub.text && (
-                    <div style={{ padding: "10px 14px", background: C.surface, borderRadius: 8, marginBottom: 12, fontSize: 13, color: C.mutedLight, lineHeight: 1.65, borderLeft: `3px solid ${sectionColor}55` }}>
-                      {sub.text}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {(sub.questions ?? []).map((q, qi) => (
-                      <Question key={q.id} question={q} answers={answers} setAnswers={setAnswers}
-                        results={null} color={sectionColor} index={globalOffset + qi} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Section nav */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, alignItems: "center" }}>
-            <button className="lm-btn lm-btn-ghost"
-              disabled={activeSection === 0}
-              onClick={() => setActiveSection(s => s - 1)}
-              style={{ padding: "9px 18px" }}>
-              ← Previous section
-            </button>
-            <span style={{ fontSize: 12, color: C.muted }}>
-              {activeSection + 1} of {test.sections.length}
-            </span>
-            {activeSection < test.sections.length - 1 ? (
-              <button className="lm-btn lm-btn-outline"
-                onClick={() => setActiveSection(s => s + 1)}
-                style={{ padding: "9px 18px" }}>
-                Next section →
-              </button>
-            ) : (
-              <button
-                className="lm-btn lm-btn-primary"
-                disabled={totalAnswered < totalQuestions || submitting}
-                onClick={handleSubmit}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 22px" }}
-              >
-                {submitting ? <><Spinner /> Submitting…</> : "Submit test"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {isMock && (
-        <div style={{ marginTop: 28, padding: "10px 14px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.muted, textAlign: "center" }}>
-          Running in demo mode — connect <code style={{ color: C.accent, fontFamily: "'JetBrains Mono'" }}>apiBase</code> prop to your FastAPI backend to persist results
-        </div>
-      )}
+      {/* ── Bottom nav ── */}
+      <BottomNav
+        sections={test.sections}
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        answers={answers}
+      />
     </div>
   );
 }
 
-// ─── Mock scoring (demo only — real scoring happens server-side) ──────────────
+// ─── Mock test (demo mode) ────────────────────────────────────────────────────
+const MOCK_TEST = {
+  id: "mock-1",
+  title: "IELTS Practice Test 1",
+  sections: [
+    {
+      id: 1, part: 1, title: "Section 1", audio: null, audio_duration_seconds: 480,
+      subsections: [
+        {
+          id: 1, order: 1, subsection_type: "form",
+          text: "Complete the form below.\nWrite ONE WORD AND/OR A NUMBER for each answer.",
+          title: "Guitar Group", visual: null, grid_headers: null, grid_cells: null,
+          questions: [
+            { id: 1, order: 1, question_type: "fill_in_the_blank", text: "Coordinator: Gary </blank>", options: [], group_label: null },
+            { id: 2, order: 2, question_type: "fill_in_the_blank", text: "Level: </blank>",            options: [], group_label: null },
+            { id: 3, order: 3, question_type: "fill_in_the_blank", text: "Place: the </blank>",        options: [], group_label: null },
+            { id: 4, order: 4, question_type: "fill_in_the_blank", text: "</blank> Street",            options: [], group_label: null },
+            { id: 5, order: 5, question_type: "fill_in_the_blank", text: "Time: Thursday morning at </blank>", options: [], group_label: null },
+            { id: 6, order: 6, question_type: "fill_in_the_blank", text: "Recommended website: 'The perfect </blank>'", options: [], group_label: null },
+          ],
+        },
+        {
+          id: 2, order: 2, subsection_type: "grid",
+          text: "Complete the table below.\nWrite ONE WORD ONLY for each answer.",
+          title: "A Typical 45-Minute Guitar Lesson", visual: null,
+          grid_headers: [{ order: 0, text: "Time" }, { order: 1, text: "Activity" }, { order: 2, text: "Notes" }],
+          grid_cells: [
+            { row: 0, col: 0, cell_text: "5 minutes",  question_ids: [] },
+            { row: 0, col: 1, cell_text: "tuning guitars", question_ids: [] },
+            { row: 0, col: 2, cell_text: "", question_ids: [7] },
+            { row: 1, col: 0, cell_text: "10 minutes", question_ids: [] },
+            { row: 1, col: 1, cell_text: "strumming chords using our thumbs", question_ids: [] },
+            { row: 1, col: 2, cell_text: "", question_ids: [8] },
+            { row: 2, col: 0, cell_text: "15 minutes", question_ids: [] },
+            { row: 2, col: 1, cell_text: "playing songs", question_ids: [] },
+            { row: 2, col: 2, cell_text: "", question_ids: [9] },
+            { row: 3, col: 0, cell_text: "10 minutes", question_ids: [] },
+            { row: 3, col: 1, cell_text: "playing single notes and simple tunes", question_ids: [] },
+            { row: 3, col: 2, cell_text: "", question_ids: [10] },
+            { row: 4, col: 0, cell_text: "5 minutes",  question_ids: [] },
+            { row: 4, col: 1, cell_text: "noting things to practise at home", question_ids: [] },
+            { row: 4, col: 2, cell_text: "–", question_ids: [] },
+          ],
+          questions: [
+            { id: 7,  order: 7,  question_type: "fill_in_the_blank", text: "using an app or by </blank>",          options: [], group_label: null },
+            { id: 8,  order: 8,  question_type: "fill_in_the_blank", text: "keeping time while the teacher is </blank>", options: [], group_label: null },
+            { id: 9,  order: 9,  question_type: "fill_in_the_blank", text: "often listening to a </blank> of a song",   options: [], group_label: null },
+            { id: 10, order: 10, question_type: "fill_in_the_blank", text: "playing together, then </blank>",       options: [], group_label: null },
+          ],
+        },
+      ],
+    },
+    {
+      id: 2, part: 2, title: "Section 2", audio: null, audio_duration_seconds: 480,
+      subsections: [{
+        id: 3, order: 1, subsection_type: "regular",
+        text: "Choose the correct letter, A, B or C.",
+        title: null, visual: null, grid_headers: null, grid_cells: null,
+        questions: [
+          { id: 11, order: 11, question_type: "multiple_choices", group_label: null,
+            text: "What is the main purpose of the announcement?",
+            options: [{ order: 0, option: "A  To advertise a new service" }, { order: 1, option: "B  To explain a recent change" }, { order: 2, option: "C  To request public feedback" }] },
+          { id: 12, order: 12, question_type: "multiple_choices", group_label: null,
+            text: "What time does the facility close on weekends?",
+            options: [{ order: 0, option: "A  4:30 pm" }, { order: 1, option: "B  5:00 pm" }, { order: 2, option: "C  5:30 pm" }] },
+        ],
+      }],
+    },
+    {
+      id: 3, part: 3, title: "Section 3", audio: null, audio_duration_seconds: 480,
+      subsections: [{ id: 4, order: 1, subsection_type: "regular", text: "Answer the questions.", title: null, visual: null, grid_headers: null, grid_cells: null,
+        questions: [{ id: 13, order: 13, question_type: "fill_in_the_blank", text: "The student's project topic is </blank>.", options: [], group_label: null }] }],
+    },
+    {
+      id: 4, part: 4, title: "Section 4", audio: null, audio_duration_seconds: 480,
+      subsections: [{ id: 5, order: 1, subsection_type: "regular", text: "Complete the notes.", title: null, visual: null, grid_headers: null, grid_cells: null,
+        questions: [{ id: 14, order: 14, question_type: "fill_in_the_blank", text: "The main benefit described is </blank>.", options: [], group_label: null }] }],
+    },
+  ],
+};
+
+// ─── Mock scoring (demo only — real scoring is server-side) ───────────────────
 function buildMockResult(test, userAnswers) {
-  const correctAnswers = {
-    q1: 1, q2: "thompson", q3: "march", q4: 1,
-    q5: 0, q6: 1, q7: 2,
-    q8: { 0: "Student A", 1: "Supervisor", 2: "Student B" }, q9: 1,
-    q10: "10", q11: 2, q12: "2.3",
+  const keys = {
+    1: "Thompson", 2: "intermediate", 3: "park", 4: "Oak",
+    5: "9am", 6: "beginner", 7: "ear", 8: "singing",
+    9: "recording", 10: "solo", 11: 1, 12: 2,
+    13: "ecology", 14: "sustainability",
   };
-
-  const tips = {
-    fill: "For fill-in-the-blank: proper nouns are often spelled out in the audio — listen carefully for letter-by-letter spelling.",
-    tfng: "For Not Given: if you cannot find any evidence in either direction, choose Not Given rather than guessing True or False.",
-    mcq: "For MCQ: read all options before the audio plays. The correct answer is usually a paraphrase, not an exact match.",
-    matching: "For matching: listen for synonyms. Speakers rarely use the exact words from the question sheet.",
-  };
-
-  const sectionScores = {};
-  const questionResults = [];
+  const sectionScores    = {};
+  const question_results = [];
 
   test.sections.forEach(sec => {
-    let secCorrect = 0;
-    sec.questions.forEach(q => {
-      const userAns = userAnswers[q.id];
-      const correctAns = correctAnswers[q.id];
-      let isCorrect = false;
-
-      if (q.question_type === "fill") {
-        isCorrect = String(userAns || "").toLowerCase().trim() === String(correctAns).toLowerCase();
-      } else if (q.question_type === "matching") {
-        isCorrect = typeof userAns === "object" && userAns !== null &&
-          Object.entries(correctAns).every(([k, v]) =>
-            String(userAns[k] || "").toLowerCase() === String(v).toLowerCase()
-          );
-      } else {
-        isCorrect = userAns === correctAns;
-      }
-
-      if (isCorrect) secCorrect++;
-      questionResults.push({
-        question_id: q.id,
-        question_type: q.question_type,
-        question_text: q.question_text,
-        user_answer: userAns,
-        correct_answer: correctAns,
+    let correct = 0;
+    const qs = (sec.subsections ?? []).flatMap(s => s.questions ?? []);
+    qs.forEach(q => {
+      const ua = userAnswers[q.id];
+      const ca = keys[q.id];
+      const isCorrect = typeof ca === "string"
+        ? String(ua ?? "").toLowerCase().trim() === ca.toLowerCase()
+        : ua === ca;
+      if (isCorrect) correct++;
+      question_results.push({
+        question_id: String(q.id), question_type: q.question_type,
+        text: q.text, user_answer: ua, correct_answer: ca,
         is_correct: isCorrect,
-        tip: isCorrect ? null : tips[q.question_type],
+        tip: isCorrect ? null : "Listen carefully for paraphrases and synonyms.",
       });
     });
-
-    const ratio = secCorrect / sec.questions.length;
-    const band = ratio >= 0.875 ? 8.0 : ratio >= 0.75 ? 7.0 : ratio >= 0.625 ? 6.0 : ratio >= 0.5 ? 5.0 : 4.0;
-    sectionScores[sec.part] = { correct: secCorrect, total: sec.questions.length, band };
+    const ratio = correct / Math.max(1, qs.length);
+    sectionScores[sec.part] = {
+      correct, total: qs.length,
+      band: ratio >= .875 ? 8 : ratio >= .75 ? 7 : ratio >= .625 ? 6 : ratio >= .5 ? 5 : 4,
+    };
   });
 
   const totalCorrect = Object.values(sectionScores).reduce((a, s) => a + s.correct, 0);
-  const totalQ = Object.values(sectionScores).reduce((a, s) => a + s.total, 0);
-  const ratio = totalCorrect / totalQ;
-  const overall = ratio >= 0.875 ? 8.0 : ratio >= 0.75 ? 7.0 : ratio >= 0.625 ? 6.0 : ratio >= 0.5 ? 5.5 : 4.5;
-
-  const wrongTypes = [...new Set(questionResults.filter(r => !r.is_correct).map(r => r.question_type))];
-  const improvement_tips = wrongTypes.map(t => tips[t]).filter(Boolean);
-  if (!improvement_tips.length) improvement_tips.push("Excellent! Practise Sections 3 and 4 to maintain your score under academic lecture conditions.");
+  const totalQ       = Object.values(sectionScores).reduce((a, s) => a + s.total, 0);
+  const r            = totalCorrect / Math.max(1, totalQ);
 
   return {
-    attempt_id: "demo-attempt-1",
-    correct: totalCorrect,
-    total: totalQ,
-    overall_band: overall,
+    attempt_id: "demo-1",
+    correct: totalCorrect, total: totalQ,
+    overall_band: r >= .875 ? 8 : r >= .75 ? 7 : r >= .625 ? 6 : r >= .5 ? 5.5 : 4.5,
     section_scores: sectionScores,
-    question_results: questionResults,
-    improvement_tips,
+    question_results,
+    improvement_tips: totalCorrect < totalQ
+      ? ["Practise listening for specific information in form-completion tasks.", "Focus on paraphrases — the audio rarely uses the exact words on the page."]
+      : ["Excellent! Maintain this level with regular timed practice tests."],
   };
 }

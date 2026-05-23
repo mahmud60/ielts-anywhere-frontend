@@ -1,4 +1,4 @@
-/**
+﻿/**
  * QuestionsTab — drop-in replacement for the existing QuestionsTab in admin/page.js
  *
  * Covers all 4 modules with separate sub-tabs:
@@ -260,7 +260,7 @@ function ListeningQTab({ api }) {
     setQuestions(qs => qs.filter(q => q.id !== qId));
   };
 
-  const blankQ = { question_type: "multiple_choices", text: "", options: [], answer_key: 1, wrong_answer_tip: "" };
+  const blankQ = { question_type: "multiple_choices", stem: "", options: [], answer_key: 1, wrong_answer_tip: "" };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
@@ -417,7 +417,7 @@ function ListeningQTab({ api }) {
                         <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>Q{i + 1}</span>
                         <SBadge>{q.question_type}</SBadge>
                       </div>
-                      <div style={{ fontSize: 13, marginBottom: 4 }}>{q.text}</div>
+                      <div style={{ fontSize: 13, marginBottom: 4 }}>{q.stem ?? q.text}</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}>
                         Answer: <code style={{ color: "#059669" }}>{JSON.stringify(q.answer_key)}</code>
                       </div>
@@ -471,7 +471,7 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
         value={f.ielts_question_type || ""} onChange={v => set("ielts_question_type", v)}
         placeholder="e.g. form_note_table_flow_chart_summary_completion" />
       <FInput label="Question text (use </blank> for fill-in-the-blank)"
-        value={f.text || ""} onChange={v => set("text", v)}
+        value={f.stem || ""} onChange={v => set("stem", v)}
         placeholder="Enter the question text" rows={2} />
 
       {(f.question_type === "multiple_choices" || f.question_type === "multiple_select" || f.question_type === "dropdown") && (
