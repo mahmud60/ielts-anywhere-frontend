@@ -620,6 +620,46 @@ function ReadingQTab({ api }) {
     setQuestions(qs => qs.filter(q => q.id !== qId));
   };
 
+  const handleDeleteTest = async (t) => {
+    if (!confirm(`Delete reading test "${t.title}" and ALL its passages, groups, and questions?`)) return;
+    setSaving(true);
+    try {
+      await api.admin.deleteReadingTest(t.id);
+      await reload();
+      if (selectedTest?.id === t.id) {
+        setSelectedTest(null);
+        setSelectedPassage(null);
+        setSelectedGroup(null);
+      }
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleDeletePassage = async (p) => {
+    if (!confirm(`Delete passage "${p.title}" and ALL its groups and questions?`)) return;
+    setSaving(true);
+    try {
+      await api.admin.deleteReadingPassage(p.id);
+      await reload();
+      if (selectedPassage?.id === p.id) {
+        setSelectedPassage(null);
+        setSelectedGroup(null);
+      }
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleDeleteGroup = async (g) => {
+    if (!confirm(`Delete question group (${g.question_type}) and all its questions?`)) return;
+    setSaving(true);
+    try {
+      await api.admin.deleteReadingGroup(g.id);
+      await reload();
+      if (selectedGroup?.id === g.id) setSelectedGroup(null);
+    } catch (e) { alert(e.message); }
+    setSaving(false);
+  };
+
   // Sync passage/group selections when tests reload
   useEffect(() => {
     if (!selectedTest || !tests.length) return;
@@ -656,21 +696,33 @@ function ReadingQTab({ api }) {
         )}
         {tests.map(t => (
           <div key={t.id}>
-            <div style={s.sidebarItem(selectedTest?.id === t.id)}
+            <div style={{ ...s.sidebarItem(selectedTest?.id === t.id), display: "flex", alignItems: "center", justifyContent: "space-between" }}
               onClick={() => { setSelectedTest(t); setSelectedPassage(null); setSelectedGroup(null); }}>
-              {t.title}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+              <span
+                onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
+                style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
+                title="Delete test">×</span>
             </div>
             {selectedTest?.id === t.id && t.passages?.map(p => (
               <div key={p.id}>
-                <div style={s.sidebarChild(selectedPassage?.id === p.id)}
+                <div style={{ ...s.sidebarChild(selectedPassage?.id === p.id), display: "flex", alignItems: "center", justifyContent: "space-between" }}
                   onClick={() => { setSelectedPassage(p); setSelectedGroup(null); }}>
-                  P{p.passage_number}: {p.title}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>P{p.passage_number}: {p.title}</span>
+                  <span
+                    onClick={e => { e.stopPropagation(); handleDeletePassage(p); }}
+                    style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
+                    title="Delete passage">×</span>
                 </div>
                 {selectedPassage?.id === p.id && p.question_groups?.map(g => (
                   <div key={g.id}
-                    style={{ ...s.sidebarChild(selectedGroup?.id === g.id), paddingLeft: 40 }}
+                    style={{ ...s.sidebarChild(selectedGroup?.id === g.id), paddingLeft: 40, display: "flex", alignItems: "center", justifyContent: "space-between" }}
                     onClick={() => setSelectedGroup(g)}>
-                    G{g.order_index}: {g.question_type}
+                    <span>G{g.order_index}: {g.question_type}</span>
+                    <span
+                      onClick={e => { e.stopPropagation(); handleDeleteGroup(g); }}
+                      style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
+                      title="Delete group">×</span>
                   </div>
                 ))}
               </div>
@@ -710,7 +762,10 @@ function ReadingQTab({ api }) {
                     <div style={{ fontWeight: 500, fontSize: 13 }}>Passage {p.passage_number}: {p.title}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8" }}>{p.question_groups?.length || 0} question groups</div>
                   </div>
-                  <SBtn variant="outline" onClick={() => setSelectedPassage(p)}>Manage →</SBtn>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <SBtn variant="outline" onClick={() => setSelectedPassage(p)}>Manage →</SBtn>
+                    <SBtn variant="danger" onClick={() => handleDeletePassage(p)}>Delete</SBtn>
+                  </div>
                 </div>
               </div>
             ))}
@@ -802,7 +857,10 @@ function ReadingQTab({ api }) {
                       <div style={{ fontSize: 12, color: "#64748b" }}>{g.instruction?.slice(0, 80)}…</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}>{g.question_count} questions</div>
                     </div>
-                    <SBtn variant="outline" onClick={() => setSelectedGroup(g)}>Manage questions →</SBtn>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <SBtn variant="outline" onClick={() => setSelectedGroup(g)}>Manage questions →</SBtn>
+                      <SBtn variant="danger" onClick={() => handleDeleteGroup(g)}>Delete</SBtn>
+                    </div>
                   </div>
                 </div>
               ))}
