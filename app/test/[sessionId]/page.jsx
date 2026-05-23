@@ -539,11 +539,10 @@ export default function SessionPage() {
         {!showExpired && !transitioning && current === "listening" && (
           <ListeningModule
             key={moduleKey}
+            apiBase={process.env.NEXT_PUBLIC_API_BASE}
+            getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
-            formatted={formatted}
-            isWarning={isWarning}
-            isDanger={isDanger}
           />
         )}
         {!showExpired && !transitioning && current === "reading" && (

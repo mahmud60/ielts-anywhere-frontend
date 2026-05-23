@@ -496,7 +496,8 @@ export default function ReadingModule({ apiBase, getToken, sessionId, onComplete
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-        setTest(await res.json());
+        const payload = await res.json();
+        setTest(payload.data ?? payload);
       } catch (e) {
         setError(e.message);
       } finally {
