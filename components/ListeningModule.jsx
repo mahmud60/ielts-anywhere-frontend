@@ -440,19 +440,23 @@ function FormSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
 // ─── Grid subsection ──────────────────────────────────────────────────────────
 // Renders a table; cells that reference question IDs show the question stem with inline blanks.
 function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
-  const qs      = sub.questions ?? [];
+  const qs      = (sub.questions ?? []).slice().sort((a, b) => a.order - b.order);
   const headers = (sub.grid_headers ?? []).slice().sort((a, b) => a.order - b.order);
   const cells   = sub.grid_cells ?? [];
-  const numCols = headers.length || cells.reduce((m, c) => Math.max(m, c.col + 1), 0);
-  const numRows = cells.reduce((m, c) => Math.max(m, c.row + 1), 0);
 
+  // Data uses 1-based row/col — key the map that way
   const cellMap = {};
   cells.forEach(c => { cellMap[`${c.row}-${c.col}`] = c; });
 
-  const qMap = {};
-  qs.forEach((q, i) => { qMap[q.id] = { ...q, _i: i }; });
+  const numCols = headers.length || cells.reduce((m, c) => Math.max(m, c.col), 0);
+  const numRows = cells.reduce((m, c) => Math.max(m, c.row), 0);
 
-  const cellStyle = { border: `1px solid ${BORDER}`, padding: "10px 14px", color: TEXT_SUB, verticalAlign: "middle" };
+  // grid_cells embed Cathoven question IDs; sub.questions has DB IDs.
+  // Match by `order` (both sets are sequentially ordered within the subsection).
+  const qByOrder = {};
+  qs.forEach((q, i) => { qByOrder[q.order] = { q, i }; });
+
+  const cellStyle = { border: `1px solid ${BORDER}`, padding: "10px 14px", color: TEXT_SUB, verticalAlign: "middle", fontSize: 13.5 };
 
   return (
     <div style={{ marginBottom: 36 }}>
@@ -471,31 +475,33 @@ function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
             </thead>
           )}
           <tbody>
-            {Array.from({ length: numRows }, (_, row) => (
-              <tr key={row}>
-                {Array.from({ length: numCols }, (_, col) => {
-                  const cell = cellMap[`${row}-${col}`];
-                  if (!cell) return <td key={col} style={cellStyle} />;
+            {Array.from({ length: numRows }, (_, ri) => (
+              <tr key={ri}>
+                {Array.from({ length: numCols }, (_, ci) => {
+                  const cell = cellMap[`${ri + 1}-${ci + 1}`];
+                  if (!cell) return <td key={ci} style={cellStyle} />;
 
-                  const qIds = cell.question_ids ?? [];
-                  if (qIds.length === 0) {
-                    return <td key={col} style={cellStyle}>{cell.cell_text ?? ""}</td>;
+                  const cellQs = cell.questions ?? [];
+                  if (cellQs.length === 0) {
+                    return <td key={ci} style={cellStyle}>{cell.text ?? ""}</td>;
                   }
                   return (
-                    <td key={col} style={cellStyle}>
-                      {qIds.map(qid => {
-                        const q = qMap[qid];
-                        if (!q) return null;
-                        const n        = qOffset + q._i + 1;
-                        const value    = answers[q.id];
-                        const result   = results?.[String(q.id)];
-                        const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
+                    <td key={ci} style={cellStyle}>
+                      {cell.text ? <span style={{ marginRight: 4 }}>{cell.text}</span> : null}
+                      {cellQs.map(cq => {
+                        const match = qByOrder[cq.order];
+                        if (!match) return null;
+                        const { q: dbQ, i } = match;
+                        const n        = qOffset + i + 1;
+                        const value    = answers[dbQ.id];
+                        const result   = results?.[String(dbQ.id)];
+                        const onChange = val => setAnswers(a => ({ ...a, [dbQ.id]: val }));
                         return (
-                          <span key={qid}>
-                            <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                          <span key={cq.order}>
+                            <Stem text={cq.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
                             {result && !result.is_correct && (
                               <span style={{ fontSize: 12, color: MUTED, marginLeft: 6 }}>
-                                → <span style={{ color: GREEN }}>{result.correct_answer}</span>
+                                → <span style={{ color: GREEN }}>{Array.isArray(result.correct_answer) ? result.correct_answer[0] : result.correct_answer}</span>
                               </span>
                             )}
                           </span>
