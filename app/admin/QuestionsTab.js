@@ -466,7 +466,7 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
           onChange={v => set("order", parseInt(v) || 1)} />
       </div>
       <FInput label="Group title (optional, e.g. Regular activities - Beach)"
-        value={f.title || ""} onChange={v => set("title", v)} placeholder="Leave blank if not needed" />
+        value={f.group_label || ""} onChange={v => set("group_label", v)} placeholder="Leave blank if not needed" />
       <FInput label="IELTS question type (optional)"
         value={f.ielts_question_type || ""} onChange={v => set("ielts_question_type", v)}
         placeholder="e.g. form_note_table_flow_chart_summary_completion" />
