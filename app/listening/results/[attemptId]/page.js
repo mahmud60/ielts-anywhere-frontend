@@ -1,0 +1,45 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
+import { auth } from "@/lib/firebase";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import ListeningModule from "@/components/ListeningModule";
+
+function getToken() {
+  if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
+  return auth.currentUser.getIdToken(true);
+}
+
+export default function ListeningResultPage() {
+  const { attemptId } = useParams();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [attempt, setAttempt] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!loading && !user) router.push("/login");
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    api.getListeningAttempt(attemptId)
+      .then(setAttempt)
+      .catch(e => setErr(e.message));
+  }, [user, attemptId]);
+
+  if (loading || (!attempt && !err)) return null;
+  if (err) return <p style={{ padding: 32, fontFamily: "system-ui", color: "#dc2626" }}>{err}</p>;
+
+  return (
+    <ListeningModule
+      apiBase={process.env.NEXT_PUBLIC_API_BASE}
+      getToken={getToken}
+      testId={attempt.test_id}
+      initialResult={attempt}
+      onBack={() => router.push("/listening")}
+    />
+  );
+}

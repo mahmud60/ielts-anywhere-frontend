@@ -953,6 +953,7 @@ function AnswerKeyItem({ num, qResult }) {
 export default function ReadingModule({
   apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef,
   timerFormatted, timerWarning, timerDanger, onBack,
+  initialResult,
 }) {
   useEffect(injectCSS, []);
 
@@ -962,8 +963,8 @@ export default function ReadingModule({
   const [activePassage, setActivePassage] = useState(0);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [view, setView] = useState("test");
+  const [result, setResult] = useState(initialResult ?? null);
+  const [view, setView] = useState(initialResult ? "results" : "test");
   const [warmPassage, setWarmPassage] = useState(false);
 
   const questionsRef = useRef(null);

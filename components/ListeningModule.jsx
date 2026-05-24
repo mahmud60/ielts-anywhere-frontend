@@ -1152,6 +1152,7 @@ function buildSectionNavSlots(sec, numbering) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function ListeningModule({
   apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef, timeLeft, onBack,
+  initialResult,
 }) {
   useEffect(injectCSS, []);
 
@@ -1161,8 +1162,8 @@ export default function ListeningModule({
   const [activeSection, setActiveSection]   = useState(0);
   const [answers, setAnswers]               = useState({});
   const [submitting, setSubmitting]         = useState(false);
-  const [result, setResult]                 = useState(null);
-  const [view, setView]                     = useState("test");
+  const [result, setResult]                 = useState(initialResult ?? null);
+  const [view, setView]                     = useState(initialResult ? "results" : "test");
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [reviewPart, setReviewPart]             = useState(1);
 
