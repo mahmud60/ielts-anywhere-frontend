@@ -14,6 +14,70 @@ const MOD_COLOR = {
   speaking: "#8b5cf6",
 };
 
+const BTN = {
+  primary: {
+    background: "#0ea5e9",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    padding: "9px 18px",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  secondary: {
+    background: "#fff",
+    color: "#374151",
+    border: "1px solid #e5e7eb",
+    borderRadius: 8,
+    padding: "9px 14px",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  pro: {
+    background: "#6366f1",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    padding: "9px 18px",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+};
+
+/** Reuses dashboard `is_pro` with fallbacks for other profile shapes. */
+function isProUser(profile) {
+  if (!profile) return false;
+  if (profile.is_pro === true || profile.isPro === true) return true;
+
+  const possibleTier =
+    profile.subscription_tier ||
+    profile.subscriptionTier ||
+    profile.subscription ||
+    profile.plan ||
+    profile.tier;
+
+  const tier = String(possibleTier || "").toLowerCase();
+  return tier === "pro" || tier === "premium";
+}
+
+function isNewDashboardUser(data) {
+  if (!data) return false;
+
+  const total = data.total_tests ?? data.testsTaken ?? 0;
+  if (Number(total) === 0) return true;
+
+  const recent = data.recent_sessions ?? data.recentSessions;
+  if (!recent || (Array.isArray(recent) && recent.length === 0)) return true;
+
+  return false;
+}
+
 function bandColor(b) {
   if (b == null) return "#9ca3af";
   return b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626";
@@ -45,6 +109,158 @@ function StatCard({ label, value, sub }) {
 
 function SectionTitle({ children }) {
   return <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 14, marginTop: 0 }}>{children}</h2>;
+}
+
+// ── Welcome + access flow ─────────────────────────────────────────────────────
+function WelcomeCard({ router }) {
+  return (
+    <div
+      style={{
+        background: "#f0f9ff",
+        border: "1px solid #bae6fd",
+        borderRadius: 12,
+        padding: "22px 24px",
+        marginBottom: 20,
+      }}
+    >
+      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 8px", color: "#0c4a6e" }}>
+        Welcome to IELTS Anywhere
+      </h2>
+      <p style={{ fontSize: 14, color: "#0369a1", margin: "0 0 16px", lineHeight: 1.6, maxWidth: 520 }}>
+        Let&apos;s estimate your IELTS level first with a short diagnostic.
+      </p>
+      <button
+        type="button"
+        onClick={() => router.push("/tests?mode=diagnostic")}
+        style={BTN.primary}
+      >
+        Start Free Diagnostic
+      </button>
+      {/* TODO: In the next milestone, /tests should use mode=diagnostic to show diagnostic-specific tests or behavior. */}
+    </div>
+  );
+}
+
+function AccessFlowCard({ title, description, accent, children, muted }) {
+  return (
+    <div
+      style={{
+        background: muted ? "#fafafa" : "#fff",
+        border: `1px solid ${muted ? "#e5e7eb" : "#e5e7eb"}`,
+        borderRadius: 12,
+        padding: "20px 22px",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 200,
+        opacity: muted ? 0.95 : 1,
+      }}
+    >
+      {accent && (
+        <div
+          style={{
+            width: 4,
+            height: 28,
+            borderRadius: 2,
+            background: accent,
+            marginBottom: 12,
+          }}
+        />
+      )}
+      <h3 style={{ fontSize: 15, fontWeight: 600, color: "#111827", margin: "0 0 8px" }}>{title}</h3>
+      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 16px", lineHeight: 1.55, flex: 1 }}>
+        {description}
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto" }}>{children}</div>
+    </div>
+  );
+}
+
+function AccessFlowSection({ router, isPro }) {
+  return (
+    <section style={{ marginBottom: 28 }}>
+      <SectionTitle>What would you like to do?</SectionTitle>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12,
+        }}
+      >
+        <AccessFlowCard
+          title="Free Diagnostic"
+          description="Start with a short diagnostic to understand your current level and identify where to improve first."
+          accent="#0ea5e9"
+        >
+          <button
+            type="button"
+            onClick={() => router.push("/tests?mode=diagnostic")}
+            style={BTN.primary}
+          >
+            Start Free Diagnostic
+          </button>
+          {/* TODO: /tests should filter or adjust behavior based on mode=diagnostic in the next milestone. */}
+        </AccessFlowCard>
+
+        <AccessFlowCard
+          title="Practice Listening & Reading"
+          description="Practice Listening and Reading separately without full exam pressure."
+          accent="#f59e0b"
+        >
+          <button type="button" onClick={() => router.push("/reading")} style={BTN.secondary}>
+            Practice Reading
+          </button>
+          <button type="button" onClick={() => router.push("/listening")} style={BTN.secondary}>
+            Practice Listening
+          </button>
+        </AccessFlowCard>
+
+        {isPro ? (
+          <AccessFlowCard
+            title="Full Mock Test"
+            description="Take a complete IELTS simulation across all four modules with timed sections and detailed results."
+            accent="#6366f1"
+          >
+            <button
+              type="button"
+              onClick={() => router.push("/tests?mode=full_mock")}
+              style={BTN.pro}
+            >
+              Start Full Mock Test
+            </button>
+            {/* TODO: /tests should filter or adjust behavior based on mode=full_mock in the next milestone. */}
+          </AccessFlowCard>
+        ) : (
+          <AccessFlowCard
+            title="Full Mock Test"
+            description="Full mock tests include Listening, Reading, Writing, Speaking, AI feedback, progress analytics, and personalized tips."
+            accent="#6366f1"
+            muted
+          >
+            <div style={{ width: "100%" }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#6366f1",
+                  background: "#eef2ff",
+                  border: "1px solid #e0e7ff",
+                  borderRadius: 99,
+                  padding: "2px 10px",
+                  marginBottom: 8,
+                }}
+              >
+                Pro
+              </span>
+            </div>
+            <button type="button" onClick={() => router.push("/pricing")} style={BTN.pro}>
+              Unlock Full Mock Test
+            </button>
+          </AccessFlowCard>
+        )}
+      </div>
+    </section>
+  );
 }
 
 // ── Progress chart ────────────────────────────────────────────────────────────
@@ -299,7 +515,8 @@ export default function DashboardPage() {
   }
   if (!data) return null;
 
-  const isPro = data.is_pro;
+  const isPro = isProUser(data);
+  const isNewUser = isNewDashboardUser(data);
   const tabs = isPro
     ? ["overview", "progress", "weaknesses", "tips", "vocabulary"]
     : ["overview"];
@@ -334,6 +551,10 @@ export default function DashboardPage() {
           }}>Log out</button>
         </div>
       </div>
+
+      {isNewUser && <WelcomeCard router={router} />}
+
+      <AccessFlowSection router={router} isPro={isPro} />
 
       {/* Stat cards */}
       <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
@@ -396,11 +617,14 @@ export default function DashboardPage() {
             <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6" }}>
               <SectionTitle>Recent tests</SectionTitle>
             </div>
-            {data.recent_sessions.length === 0 ? (
+            {(data.recent_sessions ?? []).length === 0 ? (
               <div style={{ padding: 24, color: "#9ca3af", fontSize: 14, textAlign: "center" }}>
                 No completed tests yet.{" "}
-                <span style={{ color: "#0ea5e9", cursor: "pointer" }} onClick={() => router.push("/tests")}>
-                  Take your first test →
+                <span
+                  style={{ color: "#0ea5e9", cursor: "pointer" }}
+                  onClick={() => router.push("/tests?mode=diagnostic")}
+                >
+                  Start your free diagnostic →
                 </span>
               </div>
             ) : (
