@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
-import { useConversation } from "@elevenlabs/react";
+import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { api } from "@/lib/api";
 
 const AGENT_ID = "agent_9801ksdjxvqqfkdvsh8acxc4xge5";
@@ -54,7 +54,15 @@ function useElapsedTimer(running) {
 }
 
 /* ─── Main page ─────────────────────────────────────────────────────────── */
-export default function SpeakingSessionPage() {
+export default function SpeakingSession() {
+  return (
+    <ConversationProvider>
+      <SpeakingSessionInner />
+    </ConversationProvider>
+  );
+}
+
+function SpeakingSessionInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
