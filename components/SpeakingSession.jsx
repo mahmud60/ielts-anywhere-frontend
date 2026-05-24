@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
-import { useConversation, ConversationProvider } from "@elevenlabs/react";
+import { Conversation } from "@elevenlabs/react";
 import { api } from "@/lib/api";
 
 const AGENT_ID = "agent_9801ksdjxvqqfkdvsh8acxc4xge5";
@@ -15,7 +15,6 @@ const MUTED   = "#94a3b8";
 const GREEN   = "#059669";
 const AMBER   = "#d97706";
 
-/* ─── Mic icon ─────────────────────────────────────────────────────────── */
 function MicIcon({ size = 28, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -28,7 +27,6 @@ function MicIcon({ size = 28, color = "currentColor" }) {
   );
 }
 
-/* ─── Elapsed timer ─────────────────────────────────────────────────────── */
 function useElapsedTimer(running) {
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef(null);
@@ -53,33 +51,25 @@ function useElapsedTimer(running) {
   return `${mm}:${ss}`;
 }
 
-/* ─── Main page ─────────────────────────────────────────────────────────── */
 export default function SpeakingSession() {
-  return (
-    <ConversationProvider>
-      <SpeakingSessionInner />
-    </ConversationProvider>
-  );
-}
-
-function SpeakingSessionInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  const [phase, setPhase]       = useState("idle"); // idle | connecting | live | ending | scoring | error
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [phase, setPhase]         = useState("idle"); // idle | connecting | live | ending | scoring | error
+  const [errorMsg, setErrorMsg]   = useState(null);
   const [transcript, setTranscript] = useState([]);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+
   const elSessionId   = useRef(null);
   const submittedRef  = useRef(false);
   const transcriptRef = useRef([]);
+  const convRef       = useRef(null);
 
   const timerRunning = phase === "live";
   const elapsed = useElapsedTimer(timerRunning);
 
-  // Keep transcriptRef current so callbacks always see the latest messages
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-  /* ── Submit transcript → score with Claude → navigate to results ── */
   const submitAndRedirect = useCallback(async () => {
     if (submittedRef.current) return;
     submittedRef.current = true;
@@ -100,39 +90,41 @@ function SpeakingSessionInner() {
     }
   }, [router]);
 
-  /* ── ElevenLabs conversation hook ── */
-  const conversation = useConversation({
-    onConnect: ({ conversationId }) => {
-      elSessionId.current = conversationId;
-      setPhase("live");
-    },
-    onDisconnect: () => {
-      // submittedRef prevents double-submission when both agent
-      // goodbye and manual End Test trigger onDisconnect
-      submitAndRedirect();
-    },
-    onMessage: ({ message, source }) => {
-      setTranscript(prev => [...prev, {
-        role: source === "ai" ? "agent" : "user",
-        text: message,
-        timestamp: Date.now(),
-      }]);
-    },
-    onError: (msg) => {
-      setPhase("error");
-      setErrorMsg(typeof msg === "string" ? msg : "Connection error. Check your microphone and try again.");
-    },
-  });
-
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  /* ── Connect to ElevenLabs agent directly (public agent, no API key needed) ── */
   async function handleStart() {
     setPhase("connecting");
+    // Capture the latest submitAndRedirect so the onDisconnect closure stays fresh.
+    const doSubmit = submitAndRedirect;
     try {
-      await conversation.startSession({ agentId: AGENT_ID });
+      const conv = await Conversation.startSession({
+        agentId: AGENT_ID,
+        onConnect: ({ conversationId }) => {
+          elSessionId.current = conversationId;
+          setPhase("live");
+        },
+        onDisconnect: () => {
+          convRef.current = null;
+          doSubmit();
+        },
+        onMessage: ({ message, source }) => {
+          setTranscript(prev => [...prev, {
+            role: source === "ai" ? "agent" : "user",
+            text: message,
+            timestamp: Date.now(),
+          }]);
+        },
+        onModeChange: ({ mode }) => {
+          setAgentSpeaking(mode === "speaking");
+        },
+        onError: (msg) => {
+          setPhase("error");
+          setErrorMsg(typeof msg === "string" ? msg : "Connection error. Check your microphone and try again.");
+        },
+      });
+      convRef.current = conv;
     } catch (e) {
       const msg = e?.message ?? String(e);
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
@@ -144,11 +136,10 @@ function SpeakingSessionInner() {
     }
   }
 
-  /* ── End test manually ── */
   async function handleEnd() {
     setPhase("ending");
     try {
-      await conversation.endSession();
+      await convRef.current?.endSession();
     } catch {
       // onDisconnect fires regardless; submitAndRedirect handles the rest
     }
@@ -178,8 +169,7 @@ function SpeakingSessionInner() {
   /* ─── Main UI ─────────────────────────────────────────────────────────── */
   const isLive       = phase === "live";
   const isConnecting = phase === "connecting" || phase === "ending";
-  const agentSpeaking = isLive && conversation.isSpeaking;
-  const userSpeaking  = isLive && !conversation.isSpeaking;
+  const userSpeaking = isLive && !agentSpeaking;
 
   const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#ef4444" : MUTED;
   const micBg        = agentSpeaking ? "#eff6ff" : userSpeaking ? "#fef2f2" : "#f8fafc";
@@ -232,7 +222,7 @@ function SpeakingSessionInner() {
           {elapsed}
         </div>
 
-        {/* Microphone button */}
+        {/* Microphone circle */}
         <div style={{ position: "relative", marginBottom: 28 }}>
           {agentSpeaking && (
             <div style={{
