@@ -1410,7 +1410,6 @@ export default function ListeningModule({
                         {subs.map(sub => {
                           const type = sub.subsection_type;
                           const props = {
-                            key: sub.id,
                             sectionId: section.id,
                             sub,
                             answers,
@@ -1419,10 +1418,10 @@ export default function ListeningModule({
                             numbering: reviewNumbering,
                             disabled: true,
                           };
-                          if (type === "form")  return <FormSubsection  {...props} />;
-                          if (type === "grid")  return <GridSubsection  {...props} />;
-                          if (type === "table") return <TableSubsection {...props} />;
-                          return <RegularSubsection {...props} />;
+                          if (type === "form")  return <FormSubsection  key={sub.id} {...props} />;
+                          if (type === "grid")  return <GridSubsection  key={sub.id} {...props} />;
+                          if (type === "table") return <TableSubsection key={sub.id} {...props} />;
+                          return <RegularSubsection key={sub.id} {...props} />;
                         })}
                       </div>
                     </div>
