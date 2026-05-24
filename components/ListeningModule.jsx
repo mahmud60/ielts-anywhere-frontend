@@ -496,7 +496,11 @@ function MCQOpts({ question, value, onChange, result, disabled }) {
     <div style={{ marginTop: 10 }}>
       {opts.map((opt, oi) => {
         const sel   = value === opt.order;
-        const isOk  = result && opt.order === result.correct_answer;
+        const isOk  = result && (
+          Array.isArray(result.correct_answer)
+            ? result.correct_answer.some(a => String(a).toLowerCase().trim() === String(opt.option).toLowerCase().trim())
+            : opt.order === result.correct_answer
+        );
         const isBad = result && sel && !result.is_correct;
         return (
           <label key={`option-${question.id}-${opt.order ?? oi}-${oi}`} className={`lm-opt${isOk ? " ok" : isBad ? " bad" : sel ? " sel" : ""}`}>
@@ -530,7 +534,7 @@ function MultiSelectOpts({ question, value = [], onChange, result, disabled }) {
   );
   const sel     = new Set(Array.isArray(value) ? value : []);
   const correct = result
-    ? new Set(Array.isArray(result.correct_answer) ? result.correct_answer.map(String) : [])
+    ? new Set((Array.isArray(result.correct_answer) ? result.correct_answer : [result.correct_answer]).map(a => String(a).toLowerCase().trim()))
     : null;
 
   const toggle = order => {
@@ -546,7 +550,7 @@ function MultiSelectOpts({ question, value = [], onChange, result, disabled }) {
     <div style={{ marginTop: 10 }}>
       {opts.map((opt, oi) => {
         const isSel = sel.has(opt.order);
-        const isOk  = result && correct?.has(String(opt.order));
+        const isOk  = result && correct?.has(String(opt.option).toLowerCase().trim());
         const isBad = result && isSel && !isOk;
         return (
           <label
@@ -952,6 +956,46 @@ function BottomNav({
   );
 }
 
+// ─── Results helpers ─────────────────────────────────────────────────────────
+function formatAnswer(ca) {
+  if (Array.isArray(ca)) return ca.join(", ");
+  if (ca === null || ca === undefined) return "—";
+  return String(ca);
+}
+
+function getCEFR(band) {
+  if (band >= 8.5) return "C2";
+  if (band >= 7.0) return "C1";
+  if (band >= 5.5) return "B2";
+  if (band >= 4.5) return "B1";
+  if (band >= 3.5) return "A2";
+  return "A1";
+}
+
+function LMAnswerKeyItem({ num, qResult }) {
+  const isCorrect = qResult?.is_correct;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", minWidth: 0 }}>
+      <span style={{
+        width: 22, height: 22, borderRadius: "50%",
+        background: isCorrect ? GREEN : PRIMARY,
+        color: "#fff", fontSize: 10, fontWeight: 700, flexShrink: 0,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+      }}>{num}</span>
+      <span style={{ fontSize: 13, color: TEXT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {formatAnswer(qResult?.correct_answer)}
+      </span>
+      <span style={{ color: "#94A3B8", fontSize: 12, flexShrink: 0 }}>—</span>
+      <span style={{
+        width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+        background: isCorrect ? GREEN : RED,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontSize: 10, fontWeight: 700,
+      }}>{isCorrect ? "✓" : "✗"}</span>
+    </div>
+  );
+}
+
 // ─── Results panel ────────────────────────────────────────────────────────────
 function ResultsPanel({ result }) {
   const bandColor = b => b >= 7 ? GREEN : b >= 5.5 ? "#d97706" : RED;
@@ -1218,24 +1262,101 @@ export default function ListeningModule({
     );
   }
 
+  const handleBack = onBack ?? (() => { if (typeof window !== "undefined") window.history.back(); });
+
   // ── Results view ──
   if (view === "results" && result) {
+    const band = result.overall_band ?? 0;
+    const bc = b => b >= 7 ? GREEN : b >= 5.5 ? "#d97706" : RED;
+    const cefr = getCEFR(band);
+    const qNumMap = getQuestionNumbering(test);
+    const qResultMap = Object.fromEntries((result.question_results ?? []).map(r => [r.question_id, r]));
+
+    // Group questions by part using test structure
+    const answerKeyParts = (test.sections ?? [])
+      .slice()
+      .sort((a, b) => (a.part ?? 0) - (b.part ?? 0))
+      .map(section => {
+        const sc = result.section_scores?.[String(section.part)] ?? {};
+        const items = sectionQs(section).map(q => ({
+          qNum: qNumMap.questionNumberStartById[q.id],
+          qResult: qResultMap[String(q.id)],
+        }));
+        return { part: section.part, sc, items };
+      });
+
     return (
-      <div className="lm">
+      <div className="lm" style={{ height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
         <div style={{
-          position: "sticky", top: 0, zIndex: 100,
-          background: "#fff", borderBottom: `1px solid ${BORDER}`,
-          padding: "0 20px", height: 52,
+          flexShrink: 0, background: "#fff", borderBottom: `1px solid ${BORDER}`,
+          padding: "0 20px", height: 56,
           display: "flex", alignItems: "center", gap: 12,
         }}>
-          <button
-            onClick={() => { setView("test"); setResult(null); setAnswers({}); setActiveSection(0); }}
-            style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px" }}
-          >←</button>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Results — {test.title}</span>
+          <button onClick={handleBack} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", color: MUTED, padding: "4px 6px", borderRadius: 8 }}>
+            <ChevronLeft size={20} strokeWidth={2} />
+          </button>
+          <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Listening Results</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={handleBack} style={{ padding: "7px 16px", borderRadius: 8, background: PRIMARY, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            Back to Tests
+          </button>
         </div>
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px 48px" }}>
-          <ResultsPanel result={result} />
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+
+          {/* Stats bar */}
+          <div style={{ display: "flex", background: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+            {[
+              { label: "Overall Band Score", value: `${band.toFixed(1)}/9.0`, color: bc(band) },
+              { label: "CEFR Level", value: cefr, color: TEXT },
+              { label: "Correct Answers", value: `${result.correct}/${result.total}`, color: TEXT },
+            ].map((s, i) => (
+              <div key={i} style={{ flex: 1, padding: "18px 24px", borderRight: i < 2 ? `1px solid ${BORDER}` : "none" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 24px 56px" }}>
+
+            {/* Answer Key */}
+            <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 24, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, fontWeight: 700, fontSize: 15, color: TEXT }}>
+                Answer Key
+              </div>
+              {answerKeyParts.map(({ part, sc, items }) => (
+                <div key={part} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ padding: "10px 20px 6px", fontWeight: 600, fontSize: 13, color: TEXT_SUB }}>
+                    Part {part}: {sc.correct ?? 0}/{sc.total ?? items.length} correct
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "0 12px 10px", gap: "2px 16px" }}>
+                    {items.map(({ qNum, qResult }) => qNum && (
+                      <LMAnswerKeyItem key={qNum} num={qNum} qResult={qResult} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Improvement tips */}
+            {result.improvement_tips?.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  Improvement Tips
+                </div>
+                {result.improvement_tips.map((tip, i) => (
+                  <div key={i} style={{
+                    padding: "10px 14px", marginBottom: 8, borderRadius: 8,
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                    fontSize: 13.5, color: "#78350f", lineHeight: 1.65,
+                  }}>{tip}</div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
