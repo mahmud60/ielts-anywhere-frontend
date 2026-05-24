@@ -27,7 +27,6 @@ export default function StandaloneListeningPage() {
       apiBase={process.env.NEXT_PUBLIC_API_BASE}
       getToken={getToken}
       testId={testId}
-      onComplete={() => router.push("/listening")}
       onBack={() => router.push("/listening")}
     />
   );

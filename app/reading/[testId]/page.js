@@ -27,7 +27,6 @@ export default function StandaloneReadingPage() {
       apiBase={process.env.NEXT_PUBLIC_API_BASE}
       getToken={getToken}
       testId={testId}
-      onComplete={() => router.push("/reading")}
       onBack={() => router.push("/reading")}
     />
   );

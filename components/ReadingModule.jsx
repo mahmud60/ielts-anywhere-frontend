@@ -274,6 +274,21 @@ function correctStr(ca) {
   return String(ca ?? "");
 }
 
+function formatAnswer(ca) {
+  if (Array.isArray(ca)) return ca.join(", ");
+  if (ca === null || ca === undefined) return "—";
+  return String(ca);
+}
+
+function getCEFR(band) {
+  if (band >= 8.5) return "C2";
+  if (band >= 7.0) return "C1";
+  if (band >= 5.5) return "B2";
+  if (band >= 4.5) return "B1";
+  if (band >= 3.5) return "A2";
+  return "A1";
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Spinner() {
@@ -908,45 +923,28 @@ function QuestionGroup({ group, qOffset, numbering, answers, setAnswers, resultM
   );
 }
 
-// ─── Results summary ──────────────────────────────────────────────────────────
-function ResultsSummary({ result }) {
-  const bc = b => b >= 7 ? GREEN : b >= 5.5 ? GOLD : RED;
+// ─── Answer key item ─────────────────────────────────────────────────────────
+function AnswerKeyItem({ num, qResult }) {
+  const isCorrect = qResult?.is_correct;
+  const answer = formatAnswer(qResult?.correct_answer);
+  const numBg = isCorrect ? GREEN : PRIMARY;
   return (
-    <div className="rm-band-card">
-      <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Overall band</div>
-          <div style={{ fontSize: 52, fontWeight: 700, color: bc(result.overall_band), fontFamily: "monospace", lineHeight: 1 }}>
-            {result.overall_band.toFixed(1)}
-          </div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>{result.correct} / {result.total} correct</div>
-        </div>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          {result.passage_results.map(p => (
-            <div key={p.passage_number} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                <span style={{ fontSize: 12, color: MUTED }}>Passage {p.passage_number} — {p.passage_title}</span>
-                <span style={{ fontSize: 12, color: bc(p.band), fontFamily: "monospace" }}>
-                  {p.correct}/{p.total} — Band {p.band.toFixed(1)}
-                </span>
-              </div>
-              <div style={{ height: 5, background: BORDER, borderRadius: 4 }}>
-                <div style={{ width: `${(p.correct / p.total) * 100}%`, height: "100%", background: bc(p.band), borderRadius: 4 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {result.improvement_tips?.length > 0 && (
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BORDER}` }}>
-          <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
-            Improvement tips
-          </div>
-          {result.improvement_tips.map((tip, i) => (
-            <div key={i} className="rm-tip" style={{ marginTop: 6, marginBottom: 0 }}>{tip}</div>
-          ))}
-        </div>
-      )}
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", minWidth: 0 }}>
+      <span style={{
+        width: 22, height: 22, borderRadius: "50%", background: numBg,
+        color: "#fff", fontSize: 10, fontWeight: 700, flexShrink: 0,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+      }}>{num}</span>
+      <span style={{ fontSize: 13, color: TEXT, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {answer}
+      </span>
+      <span style={{ color: MUTED_LIGHT, fontSize: 12, flexShrink: 0 }}>—</span>
+      <span style={{
+        width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+        background: isCorrect ? GREEN : RED,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontSize: 10, fontWeight: 700,
+      }}>{isCorrect ? "✓" : "✗"}</span>
     </div>
   );
 }
@@ -1089,49 +1087,123 @@ export default function ReadingModule({
 
   // ── Results view ──
   if (view === "results") {
+    const band = result?.overall_band ?? 0;
+    const bc = b => b >= 7 ? GREEN : b >= 5.5 ? GOLD : RED;
+    const cefr = getCEFR(band);
+
+    // Build answer key: passage → list of { qNum, qResult }
+    const answerKeyPassages = (test.passages ?? []).map(passage => {
+      const passResult = result?.passage_results?.find(p => p.passage_number === passage.passage_number);
+      const items = [];
+      for (const group of passage.question_groups ?? []) {
+        for (const q of group.questions ?? []) {
+          const qNum = numbering?.questionNumberStartById[q.id];
+          const qResult = resultMap?.[String(q.id)];
+          if (qNum) items.push({ qNum, qResult });
+        }
+      }
+      return { passage, passResult, items };
+    });
+
     return (
       <div className="rm">
-        {/* Header */}
-        <div className="rm-header">
-          <button onClick={() => { setView("test"); setResult(null); setAnswers({}); }}
-            style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px" }}>
-            ←
-          </button>
-          <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Reading results</span>
-        </div>
+        {/* Topbar */}
+        <header className="rm-exam-topbar">
+          <div className="rm-exam-topbar-inner">
+            <span className="rm-exam-brand" aria-label="IELTSAnywhere">
+              <span className="rm-exam-brand-ielts">IELTS</span>
+              <span className="rm-exam-brand-anywhere">Anywhere</span>
+            </span>
+            <span className="rm-exam-brand-sep" aria-hidden="true" />
+            <button type="button" className="rm-exam-back" onClick={handleBack} aria-label="Back to tests">
+              <ChevronLeft size={20} strokeWidth={2} />
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Reading Results</span>
+            <span className="rm-exam-spacer" />
+            <button type="button" className="rm-btn-finish" onClick={handleBack}>Back to Tests</button>
+          </div>
+        </header>
 
-        {/* Results body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
-          {result && <ResultsSummary result={result} />}
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
 
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, marginTop: 24 }}>Review your answers</h3>
-          {test.passages.map((p, pi) => {
-            const pOff = passageSlotOffset(pi);
-            return (
-              <div key={p.id} style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
-                  Passage {p.passage_number} — {p.title}
+          {/* Stats bar */}
+          <div style={{ display: "flex", background: SURFACE, borderBottom: `1px solid ${BORDER}` }}>
+            {[
+              { label: "Overall Band Score", value: `${band.toFixed(1)}/9.0`, color: bc(band) },
+              { label: "CEFR Level", value: cefr, color: TEXT },
+              { label: "Correct Answers", value: `${result.correct}/${result.total}`, color: TEXT },
+            ].map((s, i) => (
+              <div key={i} style={{
+                flex: 1, padding: "18px 24px",
+                borderRight: i < 2 ? `1px solid ${BORDER}` : "none",
+              }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
+                  {s.value}
                 </div>
-                <div className="rm-review-split">
-                  <div className="rm-review-pane">
-                    <Passage passage={p} />
-                  </div>
-                  <div className="rm-review-pane" style={{ padding: "16px" }}>
-                    {p.question_groups.map((g, gi) => {
-                      const gOff = pOff + p.question_groups.slice(0, gi).reduce((a, x) => a + getGroupSlotCount(x), 0);
-                      return (
-                        <QuestionGroup
-                          key={g.id} group={g} qOffset={gOff} numbering={numbering}
-                          answers={answers} setAnswers={() => {}}
-                          resultMap={resultMap} submitted
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
+                <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>{s.label}</div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 28px 56px" }}>
+
+            {/* Answer Key */}
+            <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 28, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, fontWeight: 700, fontSize: 15, color: TEXT }}>
+                Answer Key
+              </div>
+              {answerKeyPassages.map(({ passage, passResult, items }) => (
+                <div key={passage.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                  <div style={{ padding: "10px 20px 6px", fontWeight: 600, fontSize: 13, color: TEXT_SUB }}>
+                    Part {passage.passage_number}: {passResult?.correct ?? 0}/{passResult?.total ?? items.length} correct
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "0 12px 10px", gap: "2px 16px" }}>
+                    {items.map(({ qNum, qResult }) => (
+                      <AnswerKeyItem key={qNum} num={qNum} qResult={qResult} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Improvement tips */}
+            {result.improvement_tips?.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  Improvement Tips
+                </div>
+                {result.improvement_tips.map((tip, i) => (
+                  <div key={i} className="rm-tip" style={{ marginBottom: 6 }}>{tip}</div>
+                ))}
+              </div>
+            )}
+
+            {/* Review split pane */}
+            <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>Review your answers</div>
+            {test.passages.map((p, pi) => {
+              const pOff = passageSlotOffset(pi);
+              return (
+                <div key={p.id} style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+                    Part {p.passage_number} — {p.title}
+                  </div>
+                  <div className="rm-review-split">
+                    <div className="rm-review-pane"><Passage passage={p} /></div>
+                    <div className="rm-review-pane" style={{ padding: 16 }}>
+                      {p.question_groups.map((g, gi) => {
+                        const gOff = pOff + p.question_groups.slice(0, gi).reduce((a, x) => a + getGroupSlotCount(x), 0);
+                        return (
+                          <QuestionGroup key={g.id} group={g} qOffset={gOff} numbering={numbering}
+                            answers={answers} setAnswers={() => {}} resultMap={resultMap} submitted />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
