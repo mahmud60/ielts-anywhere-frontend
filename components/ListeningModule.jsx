@@ -1163,6 +1163,7 @@ export default function ListeningModule({
   const [result, setResult]                 = useState(null);
   const [view, setView]                     = useState("test");
   const [activeQuestionId, setActiveQuestionId] = useState(null);
+  const [reviewPart, setReviewPart]             = useState(1);
 
   // ── Load test ──
   useEffect(() => {
@@ -1356,6 +1357,79 @@ export default function ListeningModule({
                 ))}
               </div>
             )}
+
+            {/* Review split pane */}
+            <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 14 }}>Review your answers</div>
+
+            {/* Part tabs */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+              {answerKeyParts.map(({ part }) => (
+                <button key={part} onClick={() => setReviewPart(part)} style={{
+                  padding: "6px 18px", borderRadius: 999, cursor: "pointer", fontWeight: 600, fontSize: 13,
+                  border: `1px solid ${reviewPart === part ? PRIMARY : BORDER}`,
+                  background: reviewPart === part ? PRIMARY : SURFACE,
+                  color: reviewPart === part ? "#fff" : TEXT_SUB,
+                }}>
+                  Part {part}
+                </button>
+              ))}
+            </div>
+
+            {(() => {
+              const section = test.sections.find(s => s.part === reviewPart);
+              if (!section) return null;
+              const reviewNumbering = getQuestionNumbering(test);
+              const { first: rFirst, last: rLast } = getSectionNumberRange(section, reviewNumbering);
+              const subs = (section.subsections ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+              return (
+                <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden", marginBottom: 40 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 400 }}>
+                    {/* Transcript */}
+                    <div style={{ borderRight: `1px solid ${BORDER}`, overflowY: "auto", maxHeight: 560 }}>
+                      <div style={{ padding: "12px 18px", borderBottom: `1px solid ${BORDER}`, background: SURFACE_ALT }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          Part {section.part} Transcript
+                        </span>
+                      </div>
+                      <div style={{ padding: "16px 18px" }}>
+                        {section.transcript
+                          ? section.transcript.split(/\n{2,}/).map((para, i) => (
+                              <p key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.85, marginBottom: 12 }}>{para}</p>
+                            ))
+                          : <p style={{ fontSize: 13, color: MUTED, fontStyle: "italic" }}>Transcript not available for this part.</p>
+                        }
+                      </div>
+                    </div>
+
+                    {/* Questions */}
+                    <div style={{ overflowY: "auto", maxHeight: 560 }}>
+                      <div style={{ padding: "12px 18px", borderBottom: `1px solid ${BORDER}`, background: SURFACE_ALT }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Questions {rFirst}–{rLast}</span>
+                      </div>
+                      <div style={{ padding: "16px 16px" }}>
+                        {subs.map(sub => {
+                          const type = sub.subsection_type;
+                          const props = {
+                            key: sub.id,
+                            sectionId: section.id,
+                            sub,
+                            answers,
+                            setAnswers: () => {},
+                            results: qResultMap,
+                            numbering: reviewNumbering,
+                            disabled: true,
+                          };
+                          if (type === "form")  return <FormSubsection  {...props} />;
+                          if (type === "grid")  return <GridSubsection  {...props} />;
+                          if (type === "table") return <TableSubsection {...props} />;
+                          return <RegularSubsection {...props} />;
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
