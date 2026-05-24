@@ -545,6 +545,7 @@ export default function SessionPage() {
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
+            onBack={() => router.push("/tests")}
           />
         )}
         {!showExpired && !transitioning && current === "reading" && (

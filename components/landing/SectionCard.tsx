@@ -21,7 +21,7 @@ export default function SectionCard({
 }: SectionCardProps) {
   return (
     <Link
-      href="/login"
+      href="/tests"
       className={cn(
         "glass-card hover-scale group flex h-full flex-col p-6",
         `animate-slide-up opacity-0 [animation-delay:${delay}ms] [animation-fill-mode:forwards]`

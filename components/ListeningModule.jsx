@@ -11,60 +11,209 @@
  *   onBack       — optional callback for ← button
  */
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 
-const ACCENT       = "#312e81";
-const ACCENT_LIGHT = "#ede9fe";
-const BORDER       = "#e5e7eb";
-const SURFACE      = "#f9fafb";
-const TEXT         = "#111827";
-const TEXT_SUB     = "#374151";
-const MUTED        = "#6b7280";
-const MUTED_LIGHT  = "#9ca3af";
-const GREEN        = "#059669";
-const GREEN_BG     = "#ecfdf5";
-const RED          = "#dc2626";
-const RED_BG       = "#fef2f2";
+const PRIMARY       = "#0080ff";
+const PRIMARY_HOVER = "#006bd6";
+const PRIMARY_LIGHT = "#e6f2ff";
+const PRIMARY_MUTED = "#bfdbfe";
+const ACCENT        = PRIMARY;
+const ACCENT_LIGHT  = PRIMARY_LIGHT;
+const PAGE_BG       = "#F8FAFC";
+const BORDER        = "#E2E8F0";
+const SURFACE       = "#FFFFFF";
+const SURFACE_ALT   = "#F1F5F9";
+const TEXT          = "#0F172A";
+const TEXT_SUB      = "#475569";
+const MUTED         = "#64748B";
+const MUTED_LIGHT   = "#94A3B8";
+const GREEN         = "#059669";
+const GREEN_BG      = "#ECFDF5";
+const RED           = "#DC2626";
+const RED_BG        = "#FEF2F2";
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
   .lm *, .lm *::before, .lm *::after { box-sizing: border-box; margin: 0; padding: 0; }
   .lm {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #fff; color: #111827; min-height: 100vh;
+    background: ${PAGE_BG}; color: ${TEXT}; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
   .lm-blank {
-    border: 1.5px solid #d1d5db; border-radius: 6px;
-    padding: 3px 10px; font-size: 13.5px; font-family: inherit;
-    width: 120px; background: #f9fafb; vertical-align: middle;
-    display: inline-block; outline: none;
-    transition: border-color .12s, background .12s;
+    border: 1px solid ${BORDER}; border-radius: 8px;
+    padding: 4px 12px; font-size: 14px; font-family: inherit;
+    width: 128px; background: ${SURFACE}; vertical-align: middle;
+    display: inline-block; outline: none; color: ${TEXT};
+    transition: border-color .15s, box-shadow .15s, background .15s;
   }
-  .lm-blank:focus { border-color: #312e81; background: #fff; }
-  .lm-blank:disabled { cursor: default; }
-  .lm-blank.ok  { border-color: #059669 !important; background: #ecfdf5 !important; }
-  .lm-blank.bad { border-color: #dc2626 !important; background: #fef2f2 !important; }
+  .lm-blank:focus {
+    border-color: ${PRIMARY};
+    background: ${SURFACE};
+    box-shadow: 0 0 0 3px ${PRIMARY_MUTED};
+  }
+  .lm-blank:disabled { cursor: default; opacity: 0.85; }
+  .lm-blank.ok  { border-color: ${GREEN} !important; background: ${GREEN_BG} !important; box-shadow: none !important; }
+  .lm-blank.bad { border-color: ${RED} !important; background: ${RED_BG} !important; box-shadow: none !important; }
   .lm-opt {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 14px; border-radius: 8px; margin-bottom: 6px;
-    border: 1.5px solid #e5e7eb; cursor: pointer;
-    font-size: 13.5px; user-select: none;
-    transition: border-color .1s, background .1s; color: #374151;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 10px; margin-bottom: 8px;
+    border: 1px solid ${BORDER}; cursor: pointer;
+    font-size: 14px; user-select: none; background: ${SURFACE};
+    transition: border-color .15s, background .15s, box-shadow .15s; color: ${TEXT_SUB};
   }
-  label.lm-opt:hover { border-color: #a5b4fc; background: #f5f3ff; }
-  .lm-opt.sel  { border-color: #312e81; background: #ede9fe; color: #312e81; }
-  .lm-opt.ok   { border-color: #059669; background: #ecfdf5; color: #059669; }
-  .lm-opt.bad  { border-color: #dc2626; background: #fef2f2; color: #dc2626; }
+  label.lm-opt:hover { border-color: #7dd3fc; background: ${PRIMARY_LIGHT}; }
+  .lm-opt.sel  { border-color: ${PRIMARY}; background: ${PRIMARY_LIGHT}; color: ${PRIMARY}; }
+  .lm-opt.ok   { border-color: ${GREEN}; background: ${GREEN_BG}; color: ${GREEN}; }
+  .lm-opt.bad  { border-color: ${RED}; background: ${RED_BG}; color: ${RED}; }
   @keyframes lm-spin { to { transform: rotate(360deg); } }
   .lm-spinner {
-    width: 20px; height: 20px; border: 2px solid #e5e7eb;
-    border-top-color: #312e81; border-radius: 50%;
+    width: 20px; height: 20px; border: 2px solid ${BORDER};
+    border-top-color: ${PRIMARY}; border-radius: 50%;
     animation: lm-spin .7s linear infinite; display: inline-block;
   }
   @keyframes lm-fadein {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: none; }
   }
-  .lm-fadein { animation: lm-fadein .25s ease both; }
+  .lm-fadein { animation: lm-fadein .28s ease both; }
+  .lm-card {
+    background: ${SURFACE};
+    border: 1px solid ${BORDER};
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .lm-btn-primary {
+    background: ${PRIMARY}; color: #fff; border: none;
+    border-radius: 10px; padding: 8px 18px; font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: background .15s, opacity .15s;
+  }
+  .lm-btn-primary:hover:not(:disabled) { background: ${PRIMARY_HOVER}; }
+  .lm-btn-primary:disabled { opacity: 0.65; cursor: default; }
+  .lm-btn-ghost {
+    border: 1px solid ${BORDER}; background: ${SURFACE}; border-radius: 10px;
+    padding: 8px 18px; font-size: 13px; color: ${TEXT_SUB};
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .lm-btn-ghost:hover:not(:disabled) { background: ${SURFACE_ALT}; border-color: #CBD5E1; }
+  .lm-btn-ghost:disabled { color: ${MUTED_LIGHT}; cursor: default; }
+  .lm-btn-outline {
+    border: 1px solid #93c5fd; background: ${PRIMARY_LIGHT}; border-radius: 10px;
+    padding: 8px 18px; font-size: 13px; color: ${PRIMARY}; font-weight: 600;
+    cursor: pointer; transition: background .15s;
+  }
+  .lm-btn-outline:hover { background: ${PRIMARY_MUTED}; }
+  .lm-exam-topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: ${SURFACE}; border-bottom: 1px solid ${BORDER};
+  }
+  .lm-exam-topbar-inner {
+    max-width: 1200px; margin: 0 auto;
+    padding: 0 16px; height: 60px;
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: nowrap; overflow: hidden;
+  }
+  .lm-exam-context {
+    border-top: 1px solid ${BORDER};
+    background: ${SURFACE};
+  }
+  .lm-exam-context-inner {
+    max-width: 800px; margin: 0 auto;
+    padding: 9px 20px;
+    font-size: 13px; font-weight: 500; color: ${TEXT_SUB};
+  }
+  .lm-exam-brand {
+    font-size: 15px; font-weight: 700; flex-shrink: 0;
+    white-space: nowrap; letter-spacing: -0.02em; line-height: 1;
+  }
+  .lm-exam-brand-ielts { color: ${PRIMARY}; }
+  .lm-exam-brand-anywhere { color: ${TEXT}; }
+  .lm-exam-brand-sep {
+    width: 1px; height: 20px; background: ${BORDER}; flex-shrink: 0;
+  }
+  .lm-exam-answered {
+    font-size: 12px; font-weight: 600; color: ${PRIMARY};
+    background: ${PRIMARY_LIGHT}; border: 1px solid ${PRIMARY_MUTED};
+    border-radius: 999px; padding: 5px 11px; white-space: nowrap; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .lm-exam-answered-short { display: none; }
+  .lm-exam-back {
+    border: none; background: none; cursor: pointer;
+    color: ${MUTED}; padding: 6px; border-radius: 8px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color .15s, background .15s;
+  }
+  .lm-exam-back:hover { color: ${TEXT}; background: ${SURFACE_ALT}; }
+  .lm-exam-audio {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  }
+  .lm-exam-time {
+    font-size: 12px; color: ${MUTED}; font-variant-numeric: tabular-nums;
+    min-width: 36px; flex-shrink: 0; font-weight: 500;
+  }
+  .lm-exam-play {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: ${PRIMARY}; color: #fff; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .15s, opacity .15s;
+    box-shadow: 0 2px 8px rgba(0, 128, 255, 0.28);
+  }
+  .lm-exam-play:hover:not(:disabled) { background: ${PRIMARY_HOVER}; }
+  .lm-exam-play:disabled { opacity: 0.45; cursor: default; }
+  .lm-exam-play.is-error { background: ${RED}; box-shadow: none; }
+  .lm-exam-track {
+    flex: 1; min-width: 48px; height: 4px; background: ${SURFACE_ALT};
+    border-radius: 999px; position: relative; cursor: pointer;
+  }
+  .lm-exam-track-fill {
+    height: 100%; background: ${PRIMARY}; border-radius: 999px;
+    transition: width .1s linear;
+  }
+  .lm-exam-track-thumb {
+    position: absolute; top: 50%; width: 12px; height: 12px;
+    border-radius: 50%; background: ${PRIMARY};
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 3px ${PRIMARY_LIGHT};
+    transition: left .1s linear; pointer-events: none;
+  }
+  .lm-exam-volume {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .lm-exam-vol-btn {
+    border: none; background: none; cursor: pointer; color: ${MUTED};
+    padding: 4px; border-radius: 6px; display: inline-flex;
+    transition: color .15s, background .15s;
+  }
+  .lm-exam-vol-btn:hover { color: ${TEXT}; background: ${SURFACE_ALT}; }
+  .lm-vol-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 72px; height: 4px; border-radius: 999px;
+    background: ${SURFACE_ALT}; outline: none; cursor: pointer;
+  }
+  .lm-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: ${PRIMARY}; cursor: pointer;
+    box-shadow: 0 0 0 2px ${PRIMARY_LIGHT};
+  }
+  .lm-vol-slider::-moz-range-thumb {
+    width: 12px; height: 12px; border: none; border-radius: 50%;
+    background: ${PRIMARY}; cursor: pointer;
+  }
+  .lm-btn-finish {
+    border-radius: 999px; padding: 8px 16px; font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    .lm-vol-slider { display: none; }
+    .lm-exam-topbar-inner { gap: 6px; padding: 0 10px; height: 56px; }
+    .lm-btn-finish { padding: 7px 11px; font-size: 12px; }
+    .lm-exam-brand { font-size: 13px; }
+    .lm-exam-answered-long { display: none; }
+    .lm-exam-answered-short { display: inline; }
+    .lm-exam-brand-sep { display: none; }
+  }
 `;
 
 function injectCSS() {
@@ -75,26 +224,32 @@ function injectCSS() {
   document.head.appendChild(s);
 }
 
-// ─── Number bubble ────────────────────────────────────────────────────────────
-function Bubble({ n, size = 22 }) {
+// ─── Number bubble (supports single number or range e.g. "17–18") ─────────────
+function Bubble({ label, size = 22 }) {
+  const text = String(label ?? "");
+  const isRange = text.includes("–") || text.includes("-");
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: size, height: size, borderRadius: "50%",
-      background: ACCENT, color: "#fff",
-      fontSize: size <= 20 ? 9 : 11, fontWeight: 700,
+      minWidth: isRange ? 40 : size, height: size,
+      padding: isRange ? "0 8px" : 0,
+      borderRadius: isRange ? 999 : "50%",
+      background: PRIMARY, color: "#fff",
+      fontSize: isRange ? 10 : (size <= 20 ? 10 : 11), fontWeight: 700,
       flexShrink: 0, verticalAlign: "middle", lineHeight: 1,
-    }}>{n}</span>
+      boxShadow: "0 1px 2px rgba(0, 128, 255, 0.2)",
+      whiteSpace: "nowrap",
+    }}>{text}</span>
   );
 }
 
 // ─── Inline blank (number bubble + input) ─────────────────────────────────────
-function InlineBlank({ n, value, onChange, disabled, result }) {
+function InlineBlank({ label, value, onChange, disabled, result }) {
   const isOk  = result?.is_correct;
   const isBad = result && !isOk;
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle" }}>
-      <Bubble n={n} />
+      <Bubble label={label} />
       <input
         className={`lm-blank${isBad ? " bad" : isOk ? " ok" : ""}`}
         value={value ?? ""}
@@ -106,20 +261,20 @@ function InlineBlank({ n, value, onChange, disabled, result }) {
 }
 
 // ─── Stem renderer — splits on </blank> ───────────────────────────────────────
-function Stem({ text, n, value, onChange, disabled, result }) {
+function Stem({ text, label, questionId, value, onChange, disabled, result }) {
   if (!text) return null;
   const parts = text.split("</blank>");
   if (parts.length < 2) {
     return <span style={{ fontSize: 14, lineHeight: 1.75, color: TEXT_SUB }}>{text}</span>;
   }
   return (
-    <span style={{ fontSize: 14, lineHeight: 2.1, color: TEXT_SUB }}>
+    <span style={{ fontSize: 14.5, lineHeight: 2.15, color: TEXT_SUB }}>
       {parts.map((part, i) => (
-        <span key={i}>
+        <span key={`blank-part-${questionId}-${i}`}>
           {part}
           {i < parts.length - 1 && (
             <InlineBlank
-              n={n} value={value} onChange={onChange}
+              label={label} value={value} onChange={onChange}
               disabled={disabled} result={result}
             />
           )}
@@ -134,18 +289,21 @@ function Instruction({ text }) {
   if (!text) return null;
   const parts = text.split(/(\b[A-Z][A-Z /]+[A-Z]\b)/g);
   return (
-    <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.65, marginBottom: 4 }}>
+    <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.7, marginBottom: 6 }}>
       {parts.map((p, i) =>
         /^[A-Z][A-Z /]+[A-Z]$/.test(p.trim())
-          ? <strong key={i}>{p}</strong>
-          : <span key={i}>{p}</span>
+          ? <strong key={`cap-${i}`} style={{ color: TEXT, fontWeight: 700 }}>{p}</strong>
+          : <span key={`txt-${i}`}>{p}</span>
       )}
     </p>
   );
 }
 
-// ─── Audio player (compact, lives in sticky top bar) ──────────────────────────
-function AudioPlayer({ section }) {
+// ─── Exam top bar (brand + back + audio + volume + overview + finish) ────────
+function ListeningExamTopBar({
+  section, partLabel, onBack, onSubmit, submitting,
+  totalAnswered = 0, totalQuestions = 0,
+}) {
   const audioRef = useRef(null);
   const mockRef  = useRef(null);
   const hasAudio = Boolean(section?.audio);
@@ -155,6 +313,8 @@ function AudioPlayer({ section }) {
   const [duration, setDuration] = useState(section?.audio_duration_seconds || 240);
   const [ready, setReady]       = useState(!hasAudio);
   const [audioErr, setAudioErr] = useState(false);
+  const [volume, setVolume]     = useState(1);
+  const [muted, setMuted]       = useState(false);
 
   useEffect(() => {
     if (!hasAudio) return;
@@ -169,7 +329,19 @@ function AudioPlayer({ section }) {
     };
     Object.entries(h).forEach(([e, fn]) => el.addEventListener(e, fn));
     return () => Object.entries(h).forEach(([e, fn]) => el.removeEventListener(e, fn));
-  }, [hasAudio]);
+  }, [hasAudio, section?.id, section?.audio]);
+
+  useEffect(() => {
+    setTime(0);
+    setPlaying(false);
+    setAudioErr(false);
+    setDuration(section?.audio_duration_seconds || 240);
+    setReady(!section?.audio);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.load();
+    }
+  }, [section?.id, section?.audio, section?.audio_duration_seconds]);
 
   useEffect(() => {
     if (hasAudio) return;
@@ -186,7 +358,7 @@ function AudioPlayer({ section }) {
     return () => clearInterval(mockRef.current);
   }, [playing, duration, hasAudio]);
 
-  const toggle = () => {
+  const togglePlay = () => {
     if (audioErr) return;
     if (hasAudio && audioRef.current) {
       playing
@@ -203,51 +375,115 @@ function AudioPlayer({ section }) {
     if (hasAudio && audioRef.current) audioRef.current.currentTime = t;
   };
 
+  const handleVolume = e => {
+    const next = Number(e.target.value);
+    setVolume(next);
+    setMuted(next === 0);
+    if (audioRef.current) audioRef.current.volume = next;
+  };
+
+  const toggleMute = () => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    if (audioRef.current) audioRef.current.volume = nextMuted ? 0 : volume || 1;
+  };
+
   const pct = duration > 0 ? Math.min(100, (time / duration) * 100) : 0;
   const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-      {hasAudio && (
-        <audio ref={audioRef} src={section.audio} preload="metadata" style={{ display: "none" }} />
-      )}
-      <span style={{ fontSize: 13, color: MUTED, fontVariantNumeric: "tabular-nums", minWidth: 36, flexShrink: 0 }}>
-        {fmt(time)}
-      </span>
-      <button
-        onClick={toggle}
-        disabled={hasAudio && !ready}
-        style={{
-          width: 28, height: 28, borderRadius: "50%",
-          background: audioErr ? RED : ACCENT,
-          border: "none", color: "#fff", fontSize: 9,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: audioErr || (hasAudio && !ready) ? "default" : "pointer",
-          flexShrink: 0, opacity: hasAudio && !ready ? 0.5 : 1,
-        }}
-      >
-        {playing ? "⏸" : "▶"}
-      </button>
-      <div
-        style={{
-          flex: 1, height: 4, background: BORDER, borderRadius: 4,
-          position: "relative", cursor: "pointer",
-        }}
-        onClick={scrub}
-      >
-        <div style={{ width: `${pct}%`, height: "100%", background: ACCENT, borderRadius: 4 }} />
-        <div style={{
-          position: "absolute", top: "50%", left: `${pct}%`,
-          width: 12, height: 12, borderRadius: "50%", background: ACCENT,
-          transform: "translate(-50%, -50%)",
-          boxShadow: `0 0 0 3px ${ACCENT_LIGHT}`,
-          transition: "left .1s",
-        }} />
+    <header className="lm-exam-topbar">
+      <div className="lm-exam-topbar-inner">
+        <span className="lm-exam-brand" aria-label="IELTSAnywhere">
+          <span className="lm-exam-brand-ielts">IELTS</span>
+          <span className="lm-exam-brand-anywhere">Anywhere</span>
+        </span>
+
+        <span className="lm-exam-brand-sep" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="lm-exam-back"
+          onClick={onBack}
+          aria-label="Go back"
+        >
+          <ChevronLeft size={20} strokeWidth={2} />
+        </button>
+
+        <span className="lm-exam-time">{fmt(time)}</span>
+
+        <div className="lm-exam-audio">
+          {hasAudio && (
+            <audio ref={audioRef} src={section.audio} preload="metadata" style={{ display: "none" }} />
+          )}
+
+          <button
+            type="button"
+            className={`lm-exam-play${audioErr ? " is-error" : ""}`}
+            onClick={togglePlay}
+            disabled={hasAudio && !ready}
+            aria-label={playing ? "Pause audio" : "Play audio"}
+          >
+            {playing
+              ? <Pause size={16} fill="currentColor" />
+              : <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />}
+          </button>
+
+          <button
+            type="button"
+            className="lm-exam-track"
+            onClick={scrub}
+            aria-label="Seek audio"
+          >
+            <div className="lm-exam-track-fill" style={{ width: `${pct}%` }} />
+            <span className="lm-exam-track-thumb" style={{ left: `${pct}%` }} />
+          </button>
+
+          <span className="lm-exam-time" style={{ textAlign: "right" }}>{fmt(duration)}</span>
+        </div>
+
+        <div className="lm-exam-volume">
+          <button
+            type="button"
+            className="lm-exam-vol-btn"
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute audio" : "Mute audio"}
+          >
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={muted ? 0 : volume}
+            onChange={handleVolume}
+            className="lm-vol-slider"
+            aria-label="Audio volume"
+          />
+        </div>
+
+        <span className="lm-exam-answered" aria-live="polite">
+          <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} answered</span>
+          <span className="lm-exam-answered-short">{totalAnswered}/{totalQuestions}</span>
+        </span>
+
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={submitting}
+          className="lm-btn-primary lm-btn-finish"
+        >
+          {submitting ? "Submitting…" : "Finish Test"}
+        </button>
       </div>
-      <span style={{ fontSize: 12, color: MUTED_LIGHT, minWidth: 36, textAlign: "right", flexShrink: 0 }}>
-        {fmt(duration)}
-      </span>
-    </div>
+
+      {partLabel && (
+        <div className="lm-exam-context">
+          <div className="lm-exam-context-inner">{partLabel}</div>
+        </div>
+      )}
+    </header>
   );
 }
 
@@ -258,12 +494,12 @@ function MCQOpts({ question, value, onChange, result, disabled }) {
   );
   return (
     <div style={{ marginTop: 10 }}>
-      {opts.map(opt => {
+      {opts.map((opt, oi) => {
         const sel   = value === opt.order;
         const isOk  = result && opt.order === result.correct_answer;
         const isBad = result && sel && !result.is_correct;
         return (
-          <label key={opt.order} className={`lm-opt${isOk ? " ok" : isBad ? " bad" : sel ? " sel" : ""}`}>
+          <label key={`option-${question.id}-${opt.order ?? oi}-${oi}`} className={`lm-opt${isOk ? " ok" : isBad ? " bad" : sel ? " sel" : ""}`}>
             <input
               type="radio" style={{ display: "none" }}
               disabled={disabled || !!result}
@@ -299,21 +535,22 @@ function MultiSelectOpts({ question, value = [], onChange, result, disabled }) {
 
   const toggle = order => {
     if (result || disabled) return;
+    const max = Number(question.max_selected_options) || 1;
     const next = new Set(sel);
     if (next.has(order)) next.delete(order);
-    else if (!question.max_selected_options || next.size < question.max_selected_options) next.add(order);
+    else if (next.size < max) next.add(order);
     onChange([...next]);
   };
 
   return (
     <div style={{ marginTop: 10 }}>
-      {opts.map(opt => {
+      {opts.map((opt, oi) => {
         const isSel = sel.has(opt.order);
         const isOk  = result && correct?.has(String(opt.order));
         const isBad = result && isSel && !isOk;
         return (
           <label
-            key={opt.order}
+            key={`option-${question.id}-${opt.order ?? oi}-${oi}`}
             className={`lm-opt${isOk ? " ok" : isBad ? " bad" : isSel ? " sel" : ""}`}
             onClick={() => toggle(opt.order)}
           >
@@ -346,14 +583,16 @@ function DropdownOpt({ question, value, onChange, result, disabled }) {
         value={value ?? ""}
         onChange={e => !result && !disabled && onChange(e.target.value === "" ? undefined : Number(e.target.value))}
         style={{
-          border: `1.5px solid ${isBad ? RED : isOk ? GREEN : "#d1d5db"}`,
-          borderRadius: 6, padding: "3px 8px", fontSize: 13, fontFamily: "inherit",
+          border: `1px solid ${isBad ? RED : isOk ? GREEN : BORDER}`,
+          borderRadius: 8, padding: "5px 10px", fontSize: 13.5, fontFamily: "inherit",
           background: isBad ? RED_BG : isOk ? GREEN_BG : SURFACE,
           cursor: disabled || result ? "default" : "pointer", outline: "none",
+          color: TEXT,
+          transition: "border-color .15s, box-shadow .15s",
         }}
       >
         <option value="">— Select —</option>
-        {opts.map(o => <option key={o.order} value={o.order}>{o.option}</option>)}
+        {opts.map((o, oi) => <option key={`option-${question.id}-${o.order ?? oi}-${oi}`} value={o.order}>{o.option}</option>)}
       </select>
       {result && (
         <span style={{ fontSize: 12, color: isOk ? GREEN : RED }}>
@@ -367,19 +606,23 @@ function DropdownOpt({ question, value, onChange, result, disabled }) {
 }
 
 // ─── Subsection heading (Questions X–Y + instruction + title) ─────────────────
-function SubHead({ sub, qOffset }) {
-  const count = (sub.questions ?? []).length;
-  const start = qOffset + 1;
-  const end   = qOffset + count;
+function SubHead({ sub, numbering }) {
+  const qs = subsectionQuestions(sub);
+  if (qs.length === 0) return null;
+  const start = numbering.questionNumberStartById[qs[0].id];
+  const end   = numbering.questionNumberEndById[qs[qs.length - 1].id];
   const range = start === end ? `Question ${start}` : `Questions ${start}–${end}`;
   return (
-    <div style={{ marginBottom: 16 }}>
-      <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, marginBottom: 8 }}>{range}</h3>
+    <div style={{ marginBottom: 18, paddingBottom: 4 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 10, letterSpacing: "-0.01em" }}>{range}</h3>
       {sub.text && sub.text.split("\n").map((line, i) => (
-        <Instruction key={i} text={line} />
+        <Instruction key={`instr-${sub.id ?? "sub"}-${i}`} text={line} />
       ))}
       {sub.title && (
-        <p style={{ fontSize: 13, fontStyle: "italic", fontWeight: 700, color: TEXT, marginTop: 8 }}>
+        <p style={{
+          fontSize: 13, fontWeight: 700, color: TEXT, marginTop: 10,
+          letterSpacing: "0.06em", textTransform: "uppercase",
+        }}>
           {sub.title.toUpperCase()}
         </p>
       )}
@@ -389,29 +632,29 @@ function SubHead({ sub, qOffset }) {
 
 // ─── Form subsection ──────────────────────────────────────────────────────────
 // Renders questions as lines of text with inline blanks inside a bordered box.
-function FormSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
-  const qs = sub.questions ?? [];
+function FormSubsection({ sectionId, sub, answers, setAnswers, results, numbering, disabled }) {
+  const qs = subsectionQuestions(sub);
   return (
-    <div style={{ marginBottom: 36 }}>
-      <SubHead sub={sub} qOffset={qOffset} />
+    <div className="lm-card" style={{ marginBottom: 32 }}>
+      <SubHead sub={sub} numbering={numbering} />
       <div style={{
         border: `1px solid ${BORDER}`, borderRadius: 10,
-        padding: "20px 24px", background: "#fff",
-        display: "flex", flexDirection: "column", gap: 10,
+        padding: "18px 22px", background: SURFACE_ALT,
+        display: "flex", flexDirection: "column", gap: 12,
       }}>
         {sub.visual && (
           <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 6, marginBottom: 8 }} />
         )}
         {qs.map((q, i) => {
-          const n        = qOffset + i + 1;
+          const qLabel   = numbering.questionNumberLabelById[q.id] ?? String(i + 1);
           const value    = answers[q.id];
           const result   = results?.[String(q.id)];
           const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
 
           if (q.question_type === "fill_in_the_blank") {
             return (
-              <div key={q.id} style={{ lineHeight: 2.1 }}>
-                <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+              <div key={`question-${sectionId}-${sub.id ?? "root"}-${q.id}-${i}`} data-qid={q.id} style={{ lineHeight: 2.1 }}>
+                <Stem text={q.text} label={qLabel} questionId={q.id} value={value} onChange={onChange} disabled={disabled} result={result} />
                 {result && !result.is_correct && (
                   <span style={{ fontSize: 12, color: MUTED, marginLeft: 8 }}>
                     → <span style={{ color: GREEN }}>{result.correct_answer}</span>
@@ -421,8 +664,8 @@ function FormSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
             );
           }
           return (
-            <div key={q.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <div style={{ paddingTop: 2 }}><Bubble n={n} /></div>
+            <div key={`question-${sectionId}-${sub.id ?? "root"}-${q.id}-${i}`} data-qid={q.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <div style={{ paddingTop: 2 }}><Bubble label={qLabel} /></div>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.7, marginBottom: 4 }}>{q.text}</p>
                 {q.question_type === "multiple_choices" && <MCQOpts question={q} value={value} onChange={onChange} result={result} disabled={disabled} />}
@@ -439,8 +682,8 @@ function FormSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
 
 // ─── Grid subsection ──────────────────────────────────────────────────────────
 // Renders a table; cells that reference question IDs show the question stem with inline blanks.
-function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
-  const qs      = (sub.questions ?? []).slice().sort((a, b) => a.order - b.order);
+function GridSubsection({ sectionId, sub, answers, setAnswers, results, numbering, disabled }) {
+  const qs      = subsectionQuestions(sub);
   const headers = (sub.grid_headers ?? []).slice().sort((a, b) => a.order - b.order);
   const cells   = sub.grid_cells ?? [];
 
@@ -459,15 +702,15 @@ function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
   const cellStyle = { border: `1px solid ${BORDER}`, padding: "10px 14px", color: TEXT_SUB, verticalAlign: "middle", fontSize: 13.5 };
 
   return (
-    <div style={{ marginBottom: 36 }}>
-      <SubHead sub={sub} qOffset={qOffset} />
+    <div className="lm-card" style={{ marginBottom: 32 }}>
+      <SubHead sub={sub} numbering={numbering} />
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           {headers.length > 0 && (
             <thead>
               <tr>
-                {headers.map(h => (
-                  <th key={h.order} style={{ ...cellStyle, background: SURFACE, fontWeight: 600, color: TEXT_SUB }}>
+                {headers.map((h, hi) => (
+                  <th key={`header-${sub.id}-${h.order ?? hi}-${hi}`} style={{ ...cellStyle, background: SURFACE, fontWeight: 600, color: TEXT_SUB }}>
                     {h.text}
                   </th>
                 ))}
@@ -476,29 +719,29 @@ function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
           )}
           <tbody>
             {Array.from({ length: numRows }, (_, ri) => (
-              <tr key={ri}>
+              <tr key={`row-${sub.id}-${ri}`}>
                 {Array.from({ length: numCols }, (_, ci) => {
                   const cell = cellMap[`${ri + 1}-${ci + 1}`];
-                  if (!cell) return <td key={ci} style={cellStyle} />;
+                  if (!cell) return <td key={`cell-${sectionId}-${sub.id}-${ri + 1}-${ci + 1}-${ci}`} style={cellStyle} />;
 
                   const cellQs = cell.questions ?? [];
                   if (cellQs.length === 0) {
-                    return <td key={ci} style={cellStyle}>{cell.text ?? ""}</td>;
+                    return <td key={`cell-${sectionId}-${sub.id}-${cell.row}-${cell.col}-${ci}`} style={cellStyle}>{cell.text ?? ""}</td>;
                   }
                   return (
-                    <td key={ci} style={cellStyle}>
+                    <td key={`cell-${sectionId}-${sub.id}-${cell.row}-${cell.col}-${ci}`} style={cellStyle}>
                       {cell.text ? <span style={{ marginRight: 4 }}>{cell.text}</span> : null}
-                      {cellQs.map(cq => {
+                      {cellQs.map((cq, cqi) => {
                         const match = qByOrder[cq.order];
                         if (!match) return null;
-                        const { q: dbQ, i } = match;
-                        const n        = qOffset + i + 1;
+                        const { q: dbQ } = match;
+                        const qLabel   = numbering.questionNumberLabelById[dbQ.id] ?? "";
                         const value    = answers[dbQ.id];
                         const result   = results?.[String(dbQ.id)];
                         const onChange = val => setAnswers(a => ({ ...a, [dbQ.id]: val }));
                         return (
-                          <span key={cq.order}>
-                            <Stem text={cq.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                          <span key={`cell-q-${sectionId}-${sub.id}-${cell.row}-${cell.col}-${cq.order}-${cqi}`}>
+                            <Stem text={cq.text} label={qLabel} questionId={dbQ.id} value={value} onChange={onChange} disabled={disabled} result={result} />
                             {result && !result.is_correct && (
                               <span style={{ fontSize: 12, color: MUTED, marginLeft: 6 }}>
                                 → <span style={{ color: GREEN }}>{Array.isArray(result.correct_answer) ? result.correct_answer[0] : result.correct_answer}</span>
@@ -521,33 +764,33 @@ function GridSubsection({ sub, answers, setAnswers, results, qOffset, disabled }
 
 // ─── Table subsection ─────────────────────────────────────────────────────────
 // Lettered option pool + list of matching questions.
-function TableSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
-  const qs         = sub.questions ?? [];
+function TableSubsection({ sectionId, sub, answers, setAnswers, results, numbering, disabled }) {
+  const qs         = subsectionQuestions(sub);
   const sharedOpts = qs[0]?.options ?? [];
   return (
-    <div style={{ marginBottom: 36 }}>
-      <SubHead sub={sub} qOffset={qOffset} />
+    <div className="lm-card" style={{ marginBottom: 32 }}>
+      <SubHead sub={sub} numbering={numbering} />
       {sharedOpts.length > 0 && (
         <div style={{
-          border: `1px solid ${BORDER}`, borderRadius: 8,
-          padding: "12px 18px", marginBottom: 16, background: SURFACE,
+          border: `1px solid ${BORDER}`, borderRadius: 10,
+          padding: "14px 18px", marginBottom: 16, background: SURFACE_ALT,
           display: "flex", flexWrap: "wrap", gap: "8px 24px",
         }}>
-          {sharedOpts.map(o => (
-            <span key={o.order} style={{ fontSize: 13.5, color: TEXT_SUB }}>
+          {sharedOpts.map((o, oi) => (
+            <span key={`pool-opt-${sub.id}-${o.order ?? oi}-${oi}`} style={{ fontSize: 13.5, color: TEXT_SUB }}>
               <strong>{String.fromCharCode(65 + o.order)}</strong>&nbsp;&nbsp;{o.option}
             </span>
           ))}
         </div>
       )}
       {qs.map((q, i) => {
-        const n        = qOffset + i + 1;
+        const qLabel   = numbering.questionNumberLabelById[q.id] ?? String(i + 1);
         const value    = answers[q.id];
         const result   = results?.[String(q.id)];
         const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
         return (
-          <div key={q.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-            <Bubble n={n} />
+          <div key={`question-${sectionId}-${sub.id ?? "root"}-${q.id}-${i}`} data-qid={q.id} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+            <Bubble label={qLabel} />
             <span style={{ flex: 1, fontSize: 14, color: TEXT_SUB }}>{q.text}</span>
             <DropdownOpt question={q} value={value} onChange={onChange} result={result} disabled={disabled} />
           </div>
@@ -559,18 +802,18 @@ function TableSubsection({ sub, answers, setAnswers, results, qOffset, disabled 
 
 // ─── Regular subsection ───────────────────────────────────────────────────────
 // Standard question list: fill, MCQ, multi-select, dropdown with group labels.
-function RegularSubsection({ sub, answers, setAnswers, results, qOffset, disabled }) {
-  const qs = sub.questions ?? [];
+function RegularSubsection({ sectionId, sub, answers, setAnswers, results, numbering, disabled }) {
+  const qs = subsectionQuestions(sub);
   let prevGroup = null;
   return (
-    <div style={{ marginBottom: 36 }}>
-      <SubHead sub={sub} qOffset={qOffset} />
+    <div className="lm-card" style={{ marginBottom: 32 }}>
+      <SubHead sub={sub} numbering={numbering} />
       {sub.visual && (
-        <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 16 }} />
+        <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 10, marginBottom: 16 }} />
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {qs.map((q, i) => {
-          const n        = qOffset + i + 1;
+          const qLabel   = numbering.questionNumberLabelById[q.id] ?? String(i + 1);
           const value    = answers[q.id];
           const result   = results?.[String(q.id)];
           const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
@@ -579,17 +822,20 @@ function RegularSubsection({ sub, answers, setAnswers, results, qOffset, disable
           if (showLabel) prevGroup = label;
 
           return (
-            <div key={q.id}>
+            <div key={`question-${sectionId}-${sub.id ?? "root"}-${q.id}-${i}`} data-qid={q.id}>
               {showLabel && (
-                <p style={{ fontSize: 13, fontWeight: 600, color: MUTED, marginBottom: 10 }}>{label}</p>
+                <p style={{
+                  fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 10,
+                  letterSpacing: "0.05em", textTransform: "uppercase",
+                }}>{label}</p>
               )}
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 {q.question_type !== "fill_in_the_blank" && (
-                  <div style={{ paddingTop: 2, flexShrink: 0 }}><Bubble n={n} /></div>
+                  <div style={{ paddingTop: 2, flexShrink: 0 }}><Bubble label={qLabel} /></div>
                 )}
                 <div style={{ flex: 1 }}>
                   {q.question_type === "fill_in_the_blank" ? (
-                    <Stem text={q.text} n={n} value={value} onChange={onChange} disabled={disabled} result={result} />
+                    <Stem text={q.text} label={qLabel} questionId={q.id} value={value} onChange={onChange} disabled={disabled} result={result} />
                   ) : (
                     <p style={{ fontSize: 14, color: TEXT_SUB, lineHeight: 1.7 }}>{q.text}</p>
                   )}
@@ -630,59 +876,78 @@ function Subsection(props) {
 }
 
 // ─── Bottom navigation ────────────────────────────────────────────────────────
-function BottomNav({ sections, activeSection, setActiveSection, answers }) {
+function BottomNav({
+  sections, activeSection, setActiveSection, answers, numbering,
+  activeQuestionId, onScrollToQuestion,
+}) {
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
-      background: "#fff", borderTop: `1px solid ${BORDER}`,
-      padding: "10px 20px", display: "flex", alignItems: "center",
-      gap: 0, overflowX: "auto",
+      background: SURFACE, borderTop: `1px solid ${BORDER}`,
+      boxShadow: "0 -4px 20px rgba(15, 23, 42, 0.06)",
     }}>
+      <div style={{
+        maxWidth: 800, margin: "0 auto",
+        padding: "12px 20px", display: "flex", alignItems: "center",
+        gap: 0, overflowX: "auto",
+      }}>
       {sections.map((sec, si) => {
         const isActive = si === activeSection;
-        const qs       = (sec.subsections ?? []).flatMap(s => s.questions ?? []);
-        const answered = qs.filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length;
+        const sectionTotal = sectionSlotCount(sec);
+        const sectionAnswered = sectionAnsweredSlots(sec, answers);
+        const navSlots = buildSectionNavSlots(sec, numbering);
         return (
-          <div key={sec.id} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div key={`part-tab-${sec.id ?? si}-${si}`} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {si > 0 && <div style={{ width: 1, height: 20, background: BORDER, marginRight: 4 }} />}
             <button
               onClick={() => setActiveSection(si)}
               style={{
-                padding: "5px 14px", borderRadius: 99, fontWeight: 600, fontSize: 13,
-                background: isActive ? ACCENT : "transparent",
+                padding: "6px 16px", borderRadius: 999, fontWeight: 600, fontSize: 13,
+                background: isActive ? PRIMARY : SURFACE,
                 color: isActive ? "#fff" : MUTED,
-                border: `1.5px solid ${isActive ? ACCENT : BORDER}`,
+                border: `1px solid ${isActive ? PRIMARY : BORDER}`,
                 cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                transition: "background .15s, border-color .15s, color .15s",
               }}
             >
               Part {sec.part}
             </button>
             {isActive ? (
-              <div style={{ display: "flex", gap: 4 }}>
-                {qs.map((q, qi) => {
-                  const done = answers[q.id] !== undefined && answers[q.id] !== "";
+              <div style={{ display: "flex", gap: 6 }}>
+                {navSlots.map(({ question, questionId, number, slotIndex }) => {
+                  const answeredSlots = getAnsweredSlotCount(question, answers[questionId]);
+                  const done = answeredSlots > slotIndex;
+                  const isCurrent = activeQuestionId === questionId;
                   return (
-                    <span key={q.id} style={{
-                      width: 20, height: 20, borderRadius: "50%",
-                      fontSize: 9, fontWeight: 700,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: done ? ACCENT : "#f3f4f6",
-                      color: done ? "#fff" : MUTED_LIGHT,
-                      border: `1px solid ${done ? ACCENT : BORDER}`,
-                    }}>
-                      {qi + 1}
-                    </span>
+                    <button
+                      key={`qnav-${sec.id ?? si}-${questionId}-${slotIndex}-${number}`}
+                      type="button"
+                      onClick={() => onScrollToQuestion(questionId)}
+                      style={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        fontSize: 11, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: done ? PRIMARY_LIGHT : SURFACE,
+                        color: done ? PRIMARY : MUTED_LIGHT,
+                        border: `1.5px solid ${isCurrent ? PRIMARY : done ? "#C7D2FE" : BORDER}`,
+                        cursor: "pointer", padding: 0, flexShrink: 0,
+                        boxShadow: isCurrent ? `0 0 0 2px ${PRIMARY_MUTED}` : "none",
+                      }}
+                    >
+                      {number}
+                    </button>
                   );
                 })}
               </div>
             ) : (
-              <span style={{ fontSize: 12, color: MUTED_LIGHT, whiteSpace: "nowrap" }}>
-                {answered} of {qs.length}
+              <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap", fontWeight: 500 }}>
+                {sectionAnswered} of {sectionTotal}
               </span>
             )}
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -736,9 +1001,107 @@ function ResultsPanel({ result }) {
   );
 }
 
-// ─── Helper: flatten all questions in a section ───────────────────────────────
+// ─── IELTS answer-slot helpers ────────────────────────────────────────────────
+function subsectionQuestions(sub) {
+  return (sub?.questions ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
 function sectionQs(sec) {
-  return (sec?.subsections ?? []).flatMap(s => s.questions ?? []);
+  return (sec?.subsections ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .flatMap(sub => subsectionQuestions(sub));
+}
+
+function allQuestions(test) {
+  return (test?.sections ?? []).flatMap(sectionQs);
+}
+
+function getQuestionSlotCount(question) {
+  if (question?.question_type === "multiple_select") {
+    const max = Number(question.max_selected_options);
+    if (max > 1) return max;
+  }
+  return 1;
+}
+
+function getQuestionNumbering(test) {
+  const questionNumberStartById = {};
+  const questionNumberEndById = {};
+  const questionNumberLabelById = {};
+  const questionSlotNumbersById = {};
+  let number = 1;
+
+  for (const sec of test?.sections ?? []) {
+    for (const sub of (sec.subsections ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
+      for (const q of subsectionQuestions(sub)) {
+        const slotCount = getQuestionSlotCount(q);
+        const start = number;
+        const end = number + slotCount - 1;
+        questionNumberStartById[q.id] = start;
+        questionNumberEndById[q.id] = end;
+        questionNumberLabelById[q.id] = slotCount > 1 ? `${start}–${end}` : `${start}`;
+        questionSlotNumbersById[q.id] = Array.from({ length: slotCount }, (_, i) => start + i);
+        number += slotCount;
+      }
+    }
+  }
+
+  return {
+    questionNumberStartById,
+    questionNumberEndById,
+    questionNumberLabelById,
+    questionSlotNumbersById,
+    totalSlots: Math.max(0, number - 1),
+  };
+}
+
+function isAnswerComplete(question, answer) {
+  if (question?.question_type === "multiple_select") {
+    const expected = Number(question.max_selected_options) || 1;
+    const selected = Array.isArray(answer) ? answer.length : 0;
+    return selected >= expected;
+  }
+  if (Array.isArray(answer)) return answer.length > 0;
+  return answer !== undefined && answer !== "";
+}
+
+function getAnsweredSlotCount(question, answer) {
+  if (question?.question_type === "multiple_select") {
+    const expected = Number(question.max_selected_options) || 1;
+    const selectedCount = Array.isArray(answer) ? answer.length : 0;
+    return Math.min(selectedCount, expected);
+  }
+  return isAnswerComplete(question, answer) ? 1 : 0;
+}
+
+function sectionSlotCount(sec) {
+  return sectionQs(sec).reduce((sum, q) => sum + getQuestionSlotCount(q), 0);
+}
+
+function sectionAnsweredSlots(sec, answers) {
+  return sectionQs(sec).reduce((sum, q) => sum + getAnsweredSlotCount(q, answers[q.id]), 0);
+}
+
+function getSectionNumberRange(section, numbering) {
+  const qs = sectionQs(section);
+  if (!qs.length) return { first: 0, last: 0 };
+  return {
+    first: numbering.questionNumberStartById[qs[0].id],
+    last: numbering.questionNumberEndById[qs[qs.length - 1].id],
+  };
+}
+
+function buildSectionNavSlots(sec, numbering) {
+  return sectionQs(sec).flatMap(question => {
+    const slotNumbers = numbering.questionSlotNumbersById[question.id] ?? [];
+    return slotNumbers.map((number, slotIndex) => ({
+      question,
+      questionId: question.id,
+      number,
+      slotIndex,
+    }));
+  });
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -755,6 +1118,7 @@ export default function ListeningModule({
   const [submitting, setSubmitting]         = useState(false);
   const [result, setResult]                 = useState(null);
   const [view, setView]                     = useState("test");
+  const [activeQuestionId, setActiveQuestionId] = useState(null);
 
   // ── Load test ──
   useEffect(() => {
@@ -814,6 +1178,13 @@ export default function ListeningModule({
     if (autoSubmitRef) autoSubmitRef.current = handleSubmit;
   }, [autoSubmitRef, handleSubmit]);
 
+  const scrollToQuestion = useCallback(questionId => {
+    setActiveQuestionId(questionId);
+    const el = document.querySelector(`[data-qid="${questionId}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+
   const fmtTime = s => s != null ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : null;
 
   // ── Loading ──
@@ -872,88 +1243,50 @@ export default function ListeningModule({
   // ── Test view ──
   const section = test.sections[activeSection];
 
-  // Global question offset for this section (questions in earlier sections come first)
-  const globalOffset = test.sections
-    .slice(0, activeSection)
-    .reduce((a, s) => a + sectionQs(s).length, 0);
+  const numbering = getQuestionNumbering(test);
+  const { first: secFirst, last: secLast } = getSectionNumberRange(section, numbering);
 
-  const secQs   = sectionQs(section);
-  const secFirst = globalOffset + 1;
-  const secLast  = globalOffset + secQs.length;
+  const subsWithOffset = (section?.subsections ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map(sub => ({ sub }));
 
-  // Per-subsection offsets (within the global numbering)
-  let subOffset = globalOffset;
-  const subsWithOffset = (section?.subsections ?? []).map(sub => {
-    const off = subOffset;
-    subOffset += (sub.questions ?? []).length;
-    return { sub, offset: off };
-  });
-
-  const totalQ        = test.sections.reduce((a, s) => a + sectionQs(s).length, 0);
-  const totalAnswered = test.sections.reduce(
-    (a, s) => a + sectionQs(s).filter(q => answers[q.id] !== undefined && answers[q.id] !== "").length,
+  const totalQ = numbering.totalSlots;
+  const totalAnswered = allQuestions(test).reduce(
+    (sum, q) => sum + getAnsweredSlotCount(q, answers[q.id]),
     0
   );
 
   return (
-    <div className="lm" style={{ minHeight: "100vh", paddingBottom: 72 }}>
+    <div className="lm" style={{ minHeight: "100vh", paddingBottom: 88, background: PAGE_BG }}>
 
-      {/* ── Sticky top bar ── */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 100,
-        background: "#fff", borderBottom: `1px solid ${BORDER}`,
-        padding: "0 20px", height: 52,
-        display: "flex", alignItems: "center", gap: 12,
-      }}>
-        <button
-          onClick={onBack}
-          style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px", flexShrink: 0 }}
-        >←</button>
-
-        {timeLeft != null && (
-          <span style={{ fontSize: 13, color: MUTED, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-            {fmtTime(timeLeft)}
-          </span>
-        )}
-
-        {section && <AudioPlayer key={section.id} section={section} />}
-
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          style={{
-            background: ACCENT, color: "#fff", border: "none",
-            borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 600,
-            cursor: submitting ? "default" : "pointer",
-            whiteSpace: "nowrap", flexShrink: 0,
-            opacity: submitting ? 0.7 : 1,
-          }}
-        >
-          {submitting ? "Submitting…" : "Finish Test"}
-        </button>
-      </div>
-
-      {/* ── Part label ── */}
-      <div style={{ padding: "8px 20px", borderBottom: `1px solid ${BORDER}` }}>
-        <span style={{ fontSize: 13, color: MUTED }}>
-          Part {section?.part} — Listen and answer questions {secFirst}–{secLast}
-        </span>
-      </div>
+      {section && (
+        <ListeningExamTopBar
+          section={section}
+          partLabel={`Part ${section.part} — Listen and answer questions ${secFirst}–${secLast}`}
+          onBack={onBack ?? (() => { if (typeof window !== "undefined") window.history.back(); })}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          totalAnswered={totalAnswered}
+          totalQuestions={totalQ}
+        />
+      )}
 
       {/* ── Scrollable content ── */}
       <div
         className="lm-fadein"
-        key={section?.id}
-        style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px 24px" }}
+        key={`section-content-${section?.id ?? activeSection}-${activeSection}`}
+        style={{ maxWidth: 800, margin: "0 auto", padding: "24px 20px 32px" }}
       >
-        {subsWithOffset.map(({ sub, offset }) => (
+        {subsWithOffset.map(({ sub }, subi) => (
           <Subsection
-            key={sub.id}
+            key={`subsection-${section.id}-${sub.id ?? subi}-${subi}`}
+            sectionId={section.id}
             sub={sub}
             answers={answers}
             setAnswers={setAnswers}
             results={null}
-            qOffset={offset}
+            numbering={numbering}
             disabled={false}
           />
         ))}
@@ -963,23 +1296,14 @@ export default function ListeningModule({
           <button
             onClick={() => setActiveSection(s => s - 1)}
             disabled={activeSection === 0}
-            style={{
-              border: `1px solid ${BORDER}`, background: "none", borderRadius: 8,
-              padding: "8px 18px", fontSize: 13,
-              color: activeSection === 0 ? MUTED_LIGHT : TEXT,
-              cursor: activeSection === 0 ? "default" : "pointer",
-            }}
+            className="lm-btn-ghost"
           >
             ← Previous
           </button>
           {activeSection < test.sections.length - 1 ? (
             <button
               onClick={() => setActiveSection(s => s + 1)}
-              style={{
-                border: `1.5px solid ${ACCENT}`, background: ACCENT_LIGHT,
-                borderRadius: 8, padding: "8px 18px", fontSize: 13,
-                color: ACCENT, fontWeight: 600, cursor: "pointer",
-              }}
+              className="lm-btn-outline"
             >
               Next Part →
             </button>
@@ -987,11 +1311,7 @@ export default function ListeningModule({
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              style={{
-                background: ACCENT, color: "#fff", border: "none",
-                borderRadius: 8, padding: "8px 18px", fontSize: 13,
-                fontWeight: 600, cursor: submitting ? "default" : "pointer",
-              }}
+              className="lm-btn-primary"
             >
               {submitting ? "Submitting…" : "Finish Test"}
             </button>
@@ -1005,6 +1325,9 @@ export default function ListeningModule({
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         answers={answers}
+        numbering={numbering}
+        activeQuestionId={activeQuestionId}
+        onScrollToQuestion={scrollToQuestion}
       />
     </div>
   );

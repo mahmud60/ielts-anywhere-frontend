@@ -12,63 +12,133 @@
  *   timerDanger     — bool (< 1 min)
  *   onBack          — optional back navigation callback
  */
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { ChevronLeft, Eye, Clock } from "lucide-react";
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const ACCENT    = "#312e81";   // deep indigo — matches listening module
-const ACCENT_BG = "#eef2ff";
-const BORDER    = "#e5e7eb";
-const SURFACE   = "#ffffff";
-const MUTED     = "#6b7280";
-const TEXT      = "#111827";
-const TEXT_SUB  = "#374151";
-const GREEN     = "#059669";
-const GREEN_BG  = "#ecfdf5";
-const RED       = "#dc2626";
-const RED_BG    = "#fef2f2";
-const GOLD      = "#d97706";
-const GOLD_BG   = "#fffbeb";
+// ─── Design tokens (aligned with Listening exam / landing page) ───────────────
+const PRIMARY       = "#0080ff";
+const PRIMARY_HOVER = "#006bd6";
+const PRIMARY_LIGHT   = "#e6f2ff";
+const PRIMARY_MUTED   = "#bfdbfe";
+const ACCENT          = PRIMARY;
+const ACCENT_BG       = PRIMARY_LIGHT;
+const PAGE_BG         = "#F8FAFC";
+const BORDER          = "#E2E8F0";
+const SURFACE         = "#FFFFFF";
+const SURFACE_ALT     = "#F1F5F9";
+const MUTED           = "#64748B";
+const MUTED_LIGHT     = "#94A3B8";
+const TEXT            = "#0F172A";
+const TEXT_SUB        = "#475569";
+const GREEN           = "#059669";
+const GREEN_BG        = "#ECFDF5";
+const RED             = "#DC2626";
+const RED_BG          = "#FEF2F2";
+const GOLD            = "#d97706";
+const GOLD_BG         = "#fffbeb";
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap');
   .rm * { box-sizing: border-box; }
-  .rm { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: ${TEXT}; background: ${SURFACE}; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  .rm { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: ${TEXT}; background: ${PAGE_BG}; height: 100vh; overflow: hidden; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
   .rm ::-webkit-scrollbar { width: 5px; height: 5px; }
-  .rm ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+  .rm ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
   .rm ::-webkit-scrollbar-track { background: transparent; }
 
-  /* Header */
-  .rm-header { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 52px; border-bottom: 1px solid ${BORDER}; background: ${SURFACE}; flex-shrink: 0; }
-  .rm-subtitle { padding: 0 24px; height: 40px; display: flex; align-items: center; border-bottom: 1px solid ${BORDER}; background: #f9fafb; flex-shrink: 0; }
+  /* Exam top bar */
+  .rm-exam-topbar { flex-shrink: 0; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
+  .rm-exam-topbar-inner {
+    padding: 0 16px; height: 60px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  }
+  .rm-exam-brand { font-size: 15px; font-weight: 700; flex-shrink: 0; white-space: nowrap; letter-spacing: -0.02em; }
+  .rm-exam-brand-ielts { color: ${PRIMARY}; }
+  .rm-exam-brand-anywhere { color: ${TEXT}; }
+  .rm-exam-brand-sep { width: 1px; height: 20px; background: ${BORDER}; flex-shrink: 0; }
+  .rm-exam-back {
+    border: none; background: none; cursor: pointer; color: ${MUTED};
+    padding: 6px; border-radius: 8px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color .15s, background .15s;
+  }
+  .rm-exam-back:hover { color: ${TEXT}; background: ${SURFACE_ALT}; }
+  .rm-exam-timer {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+    flex-shrink: 0; min-width: 72px;
+  }
+  .rm-exam-spacer { flex: 1; min-width: 8px; }
+  .rm-exam-answered {
+    font-size: 12px; font-weight: 600; color: ${PRIMARY};
+    background: ${PRIMARY_LIGHT}; border: 1px solid ${PRIMARY_MUTED};
+    border-radius: 999px; padding: 5px 11px; white-space: nowrap; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .rm-exam-answered-short { display: none; }
+  .rm-btn-finish {
+    background: ${PRIMARY}; color: #fff; border: none; border-radius: 999px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; flex-shrink: 0; transition: background .15s, opacity .15s;
+  }
+  .rm-btn-finish:hover:not(:disabled) { background: ${PRIMARY_HOVER}; }
+  .rm-btn-finish:disabled { opacity: 0.65; cursor: default; }
+  .rm-exam-context {
+    border-top: 1px solid ${BORDER}; background: ${SURFACE};
+    padding: 9px 20px; font-size: 13px; font-weight: 500; color: ${TEXT_SUB};
+  }
 
   /* Body */
   .rm-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
-  .rm-passage-pane { border-right: 1px solid ${BORDER}; overflow-y: auto; height: 100%; background: #fffdf5; }
-  .rm-questions-pane { overflow-y: auto; height: 100%; padding: 20px 22px 32px; }
+  .rm-passage-pane {
+    border-right: 1px solid ${BORDER}; overflow-y: auto; height: 100%;
+    background: ${SURFACE}; transition: background .25s ease, color .25s ease;
+  }
+  .rm-passage-pane.warm { background: #F5E6D0; }
+  .rm-passage-pane.warm .rm-passage-text { color: #4A3F35; }
+  .rm-passage-pane.warm .rm-passage-inner h2 { color: #3D3429; }
+  .rm-passage-pane.warm .rm-para-label { color: #B45309; }
+  .rm-passage-pane.warm .rm-passage-toolbar { border-bottom-color: #E8D5BC; }
+  .rm-passage-toolbar {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; border-bottom: 1px solid ${BORDER};
+    background: inherit; backdrop-filter: blur(4px);
+  }
+  .rm-passage-toolbar-label { font-size: 11px; font-weight: 600; color: ${MUTED}; text-transform: uppercase; letter-spacing: 0.06em; }
+  .rm-warm-toggle {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid ${BORDER};
+    background: ${SURFACE}; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: ${MUTED}; transition: all .15s; flex-shrink: 0;
+  }
+  .rm-warm-toggle:hover { color: ${PRIMARY}; border-color: ${PRIMARY_MUTED}; background: ${PRIMARY_LIGHT}; }
+  .rm-warm-toggle.active { color: ${PRIMARY}; background: ${PRIMARY_LIGHT}; border-color: ${PRIMARY}; box-shadow: 0 0 0 2px ${PRIMARY_MUTED}; }
+  .rm-passage-pane.warm .rm-warm-toggle { background: #FBF0E4; border-color: #E8D5BC; }
+  .rm-questions-pane { overflow-y: auto; height: 100%; padding: 20px 22px 32px; background: ${PAGE_BG}; }
 
   /* Bottom nav */
   .rm-bottom { height: 52px; border-top: 1px solid ${BORDER}; display: flex; align-items: center; padding: 0 16px; gap: 2px; overflow-x: auto; flex-shrink: 0; background: ${SURFACE}; }
   .rm-bottom::-webkit-scrollbar { height: 0; }
-  .rm-part-tab { padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: ${MUTED}; transition: all .12s; white-space: nowrap; }
-  .rm-part-tab.active { background: ${ACCENT_BG}; color: ${ACCENT}; }
-  .rm-part-tab:hover:not(.active) { background: #f3f4f6; }
-  .rm-q-dot { width: 27px; height: 27px; border-radius: 50%; border: 1.5px solid #d1d5db; background: transparent; font-size: 10.5px; font-weight: 600; cursor: pointer; color: ${TEXT_SUB}; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; }
-  .rm-q-dot.answered { background: ${ACCENT}; border-color: ${ACCENT}; color: #fff; }
-  .rm-q-dot:hover:not(.answered) { border-color: ${ACCENT}; color: ${ACCENT}; }
-  .rm-q-count { font-size: 11.5px; color: ${MUTED}; padding: 0 6px; white-space: nowrap; }
+  .rm-part-tab { padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid ${BORDER}; background: ${SURFACE}; color: ${MUTED}; transition: all .15s; white-space: nowrap; }
+  .rm-part-tab.active { background: ${PRIMARY}; border-color: ${PRIMARY}; color: #fff; }
+  .rm-part-tab:hover:not(.active) { background: ${SURFACE_ALT}; }
+  .rm-q-dot { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid ${BORDER}; background: ${SURFACE}; font-size: 11px; font-weight: 700; cursor: pointer; color: ${MUTED_LIGHT}; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; }
+  .rm-q-dot.answered { background: ${PRIMARY_LIGHT}; border-color: ${PRIMARY_MUTED}; color: ${PRIMARY}; }
+  .rm-q-dot:hover:not(.answered) { border-color: ${PRIMARY}; color: ${PRIMARY}; }
+  .rm-q-count { font-size: 12px; color: ${MUTED}; padding: 0 6px; white-space: nowrap; font-weight: 500; }
   .rm-sep { width: 1px; height: 20px; background: ${BORDER}; margin: 0 6px; flex-shrink: 0; }
 
   /* Passage */
-  .rm-passage-inner { padding: 24px 28px; max-width: 700px; }
-  .rm-passage-text { font-family: 'Lora', Georgia, serif; font-size: 14.5px; line-height: 1.9; color: #1e293b; }
+  .rm-passage-inner { padding: 20px 28px 28px; max-width: 700px; }
+  .rm-passage-text { font-family: 'Lora', Georgia, serif; font-size: 14.5px; line-height: 1.9; color: ${TEXT_SUB}; transition: color .25s ease; }
   .rm-passage-text p { margin-bottom: 0.9rem; }
-  .rm-para-label { font-weight: 700; color: #0369a1; font-family: -apple-system, sans-serif; font-size: 13px; margin-right: 6px; }
+  .rm-para-label { font-weight: 700; color: ${PRIMARY}; font-family: -apple-system, sans-serif; font-size: 13px; margin-right: 6px; }
 
   /* Group box */
-  .rm-group { border: 1px solid ${BORDER}; border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
-  .rm-group-header { font-size: 13.5px; font-weight: 700; color: ${ACCENT}; padding: 10px 16px; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
-  .rm-group-instr { padding: 8px 16px 10px; font-size: 12px; color: ${MUTED}; line-height: 1.65; white-space: pre-line; background: #f9fafb; border-bottom: 1px solid #f3f4f6; }
+  .rm-group { border: 1px solid ${BORDER}; border-radius: 12px; margin-bottom: 18px; overflow: hidden; background: ${SURFACE}; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  .rm-group-header { font-size: 13.5px; font-weight: 700; color: ${PRIMARY}; padding: 10px 16px; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
+  .rm-group-instr { padding: 8px 16px 10px; font-size: 12px; color: ${MUTED}; line-height: 1.65; white-space: pre-line; background: ${SURFACE_ALT}; border-bottom: 1px solid ${BORDER}; }
 
   /* Form completion (fill/short_answer) */
   .rm-form-title { padding: 8px 16px; font-size: 13px; font-weight: 600; color: ${TEXT}; background: ${SURFACE}; border-bottom: 1px solid ${BORDER}; }
@@ -126,11 +196,23 @@ const CSS = `
   .rm-match-select.correct { border-color: ${GREEN}; background: ${GREEN_BG}; }
   .rm-match-select.wrong   { border-color: ${RED};   background: ${RED_BG}; }
   .rm-match-grid { display: flex; gap: 6px; flex-wrap: wrap; }
-  .rm-match-pill { width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid ${BORDER}; background: ${SURFACE}; font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; }
+  .rm-match-pill { width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid ${BORDER}; background: ${SURFACE}; font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; }
   .rm-match-pill:hover:not(:disabled) { border-color: ${ACCENT}; color: ${ACCENT}; }
   .rm-match-pill.sel { background: ${ACCENT_BG}; border-color: ${ACCENT}66; color: ${ACCENT}; }
   .rm-match-pill.ok  { background: ${GREEN_BG}; border-color: ${GREEN}55; color: ${GREEN}; }
   .rm-match-pill.bad { background: ${RED_BG};   border-color: ${RED}55;   color: ${RED}; }
+  .rm-match-names { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+  .rm-match-name-btn {
+    width: 100%; padding: 8px 12px; border-radius: 8px;
+    border: 1.5px solid ${BORDER}; background: ${SURFACE};
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    text-align: left; color: ${TEXT}; line-height: 1.4;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .rm-match-name-btn:hover:not(:disabled) { border-color: ${ACCENT}; background: ${SURFACE_ALT}; }
+  .rm-match-name-btn.sel { background: ${ACCENT_BG}; border-color: ${ACCENT}66; color: ${ACCENT}; }
+  .rm-match-name-btn.ok  { background: ${GREEN_BG}; border-color: ${GREEN}55; color: ${GREEN}; cursor: default; }
+  .rm-match-name-btn.bad { background: ${RED_BG};   border-color: ${RED}55;   color: ${RED};   cursor: default; }
 
   /* Heading options */
   .rm-headings-box { background: ${GOLD_BG}; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
@@ -160,6 +242,14 @@ const CSS = `
   .rm-band-card { background: ${SURFACE}; border: 1px solid ${BORDER}; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
   .rm-review-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
   .rm-review-pane { border: 1px solid ${BORDER}; border-radius: 10px; overflow-y: auto; max-height: 520px; }
+  @media (max-width: 640px) {
+    .rm-exam-topbar-inner { gap: 6px; padding: 0 10px; height: 56px; }
+    .rm-exam-brand { font-size: 13px; }
+    .rm-exam-brand-sep { display: none; }
+    .rm-exam-answered-long { display: none; }
+    .rm-exam-answered-short { display: inline; }
+    .rm-btn-finish { padding: 7px 11px; font-size: 12px; }
+  }
 `;
 
 function injectCSS() {
@@ -188,6 +278,56 @@ function correctStr(ca) {
 
 function Spinner() {
   return <div className="rm-spinner" />;
+}
+
+function ReadingExamTopBar({
+  partLabel, onBack, onSubmit, submitting,
+  totalAnswered, totalQuestions,
+  timerFormatted, timerWarning, timerDanger,
+}) {
+  const timerColor = timerDanger ? RED : timerWarning ? GOLD : MUTED;
+
+  return (
+    <header className="rm-exam-topbar">
+      <div className="rm-exam-topbar-inner">
+        <span className="rm-exam-brand" aria-label="IELTSAnywhere">
+          <span className="rm-exam-brand-ielts">IELTS</span>
+          <span className="rm-exam-brand-anywhere">Anywhere</span>
+        </span>
+
+        <span className="rm-exam-brand-sep" aria-hidden="true" />
+
+        <button type="button" className="rm-exam-back" onClick={onBack} aria-label="Go back">
+          <ChevronLeft size={20} strokeWidth={2} />
+        </button>
+
+        <span className="rm-exam-timer" style={{ color: timerColor }}>
+          <Clock size={15} strokeWidth={2} />
+          {timerFormatted || "--:--"}
+        </span>
+
+        <span className="rm-exam-spacer" />
+
+        <span className="rm-exam-answered" aria-live="polite">
+          <span className="rm-exam-answered-long">{totalAnswered}/{totalQuestions} answered</span>
+          <span className="rm-exam-answered-short">{totalAnswered}/{totalQuestions}</span>
+        </span>
+
+        <button
+          type="button"
+          className="rm-btn-finish"
+          onClick={onSubmit}
+          disabled={submitting}
+        >
+          {submitting ? "Submitting…" : "Finish Test"}
+        </button>
+      </div>
+
+      {partLabel && (
+        <div className="rm-exam-context">{partLabel}</div>
+      )}
+    </header>
+  );
 }
 
 function QBadge({ n, result }) {
@@ -286,28 +426,32 @@ function MCQOpt({ letter, text, selected, isCorrect, isWrong, onClick, disabled 
 }
 
 // Renders one MCQ question (number + text + options)
-function MCQItem({ question, qNumber, value, onChange, result, groupType }) {
+function MCQItem({ question, qNumber, qNumberLabel, value, onChange, result, groupType, group }) {
   const opts = normalizeOptions(question.options);
   const isCathoven = opts.length > 0 && typeof question.options?.[0] === "object";
   const ca = result?.correct_answer;
   const isMultiSel = groupType === "multiple_select";
+  const displayNum = qNumberLabel ?? String(qNumber);
 
   // Multi-select uses checkboxes
   if (isMultiSel) {
     const selected = Array.isArray(value) ? value : [];
     const caArr = Array.isArray(ca) ? ca : [];
     const caNorm = caArr.map(s => String(s).toLowerCase().trim());
+    const max = Number(question.max_selected_options ?? group?.max_selected_options) || 2;
     const toggle = (opt) => {
       if (result) return;
       const next = selected.includes(opt)
         ? selected.filter(s => s !== opt)
-        : [...selected, opt];
+        : selected.length >= max
+          ? selected
+          : [...selected, opt];
       onChange(next);
     };
     return (
       <div className="rm-mcq-item" data-qid={question.id}>
         <div className="rm-mcq-q">
-          <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
+          <strong style={{ color: ACCENT }}>{displayNum}.</strong>{" "}
           {question.question_text}
         </div>
         <div className="rm-mcq-opts">
@@ -464,6 +608,7 @@ function MatchingInfoItem({ question, qNumber, groupData, value, onChange, resul
   const labels = cathovenOpts.length > 0
     ? cathovenOpts.map(o => o.option)
     : (groupData.paragraph_labels || ["A", "B", "C", "D", "E"]);
+  const isLetterLabels = labels.every(l => String(l).trim().length <= 2);
   const isCorrect = result?.is_correct;
   const ca = correctStr(result?.correct_answer);
 
@@ -473,14 +618,15 @@ function MatchingInfoItem({ question, qNumber, groupData, value, onChange, resul
         <strong style={{ color: ACCENT }}>{qNumber}.</strong>{" "}
         {question.question_text}
       </div>
-      <div className="rm-match-grid">
+      <div className={isLetterLabels ? "rm-match-grid" : "rm-match-names"}>
         {labels.map(label => {
           const selected = value === label;
           const isC = result && label.toUpperCase() === ca.toUpperCase();
           const isW = result && selected && !result.is_correct;
           const cls = isC ? "ok" : isW ? "bad" : selected ? "sel" : "";
+          const btnCls = isLetterLabels ? "rm-match-pill" : "rm-match-name-btn";
           return (
-            <button key={label} className={`rm-match-pill ${cls}`}
+            <button key={label} className={`${btnCls} ${cls}`}
               disabled={!!result}
               onClick={() => !result && onChange(label)}>
               {label}
@@ -526,12 +672,107 @@ function PlainFillItem({ question, qNumber, value, onChange, result }) {
   );
 }
 
+// ─── IELTS answer-slot helpers (Reading) ─────────────────────────────────────
+function getReadingQuestionSlotCount(question, group) {
+  const qType = group?.question_type ?? question?.question_type;
+  if (qType === "multiple_select") {
+    const max = Number(question?.max_selected_options ?? group?.max_selected_options);
+    if (max > 1) return max;
+  }
+  return 1;
+}
+
+function getGroupSlotCount(group) {
+  return (group?.questions ?? []).reduce(
+    (sum, q) => sum + getReadingQuestionSlotCount(q, group),
+    0
+  );
+}
+
+function getReadingNumbering(test) {
+  const questionNumberStartById = {};
+  const questionNumberEndById = {};
+  const questionNumberLabelById = {};
+  const questionSlotNumbersById = {};
+  let number = 1;
+
+  for (const passage of test?.passages ?? []) {
+    for (const group of passage.question_groups ?? []) {
+      for (const q of group.questions ?? []) {
+        const slotCount = getReadingQuestionSlotCount(q, group);
+        const start = number;
+        const end = number + slotCount - 1;
+        questionNumberStartById[q.id] = start;
+        questionNumberEndById[q.id] = end;
+        questionNumberLabelById[q.id] = slotCount > 1 ? `${start}–${end}` : `${start}`;
+        questionSlotNumbersById[q.id] = Array.from({ length: slotCount }, (_, i) => start + i);
+        number += slotCount;
+      }
+    }
+  }
+
+  return {
+    questionNumberStartById,
+    questionNumberEndById,
+    questionNumberLabelById,
+    questionSlotNumbersById,
+    totalSlots: Math.max(0, number - 1),
+  };
+}
+
+function isAnswerComplete(question, group, answer) {
+  if ((group?.question_type ?? question?.question_type) === "multiple_select") {
+    const expected = Number(question?.max_selected_options ?? group?.max_selected_options) || 1;
+    const selected = Array.isArray(answer) ? answer.length : 0;
+    return selected >= expected;
+  }
+  if (Array.isArray(answer)) return answer.length > 0;
+  return answer !== undefined && answer !== "";
+}
+
+function getAnsweredSlotCount(question, group, answer) {
+  if ((group?.question_type ?? question?.question_type) === "multiple_select") {
+    const expected = Number(question?.max_selected_options ?? group?.max_selected_options) || 1;
+    const selectedCount = Array.isArray(answer) ? answer.length : 0;
+    return Math.min(selectedCount, expected);
+  }
+  return isAnswerComplete(question, group, answer) ? 1 : 0;
+}
+
+function passageSlotCount(passage) {
+  return (passage?.question_groups ?? []).reduce((sum, g) => sum + getGroupSlotCount(g), 0);
+}
+
+function passageAnsweredSlots(passage, answers) {
+  return (passage?.question_groups ?? []).reduce(
+    (sum, g) => sum + (g.questions ?? []).reduce(
+      (qSum, q) => qSum + getAnsweredSlotCount(q, g, answers[String(q.id)]),
+      0
+    ),
+    0
+  );
+}
+
+function buildPassageNavSlots(passage, numbering) {
+  const slots = [];
+  for (const group of passage?.question_groups ?? []) {
+    for (const question of group.questions ?? []) {
+      const slotNumbers = numbering.questionSlotNumbersById[question.id] ?? [];
+      slotNumbers.forEach((num, slotIndex) => {
+        slots.push({ question, group, questionId: question.id, number: num, slotIndex });
+      });
+    }
+  }
+  return slots;
+}
+
 // ─── Question Group ───────────────────────────────────────────────────────────
-function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitted }) {
+function QuestionGroup({ group, qOffset, numbering, answers, setAnswers, resultMap, submitted }) {
   const qt = group.question_type;
+  const groupSlots = getGroupSlotCount(group);
   const firstQ = qOffset + 1;
-  const lastQ = qOffset + group.questions.length;
-  const rangeLabel = group.questions.length === 1
+  const lastQ = qOffset + groupSlots;
+  const rangeLabel = groupSlots === 1
     ? `Question ${firstQ}`
     : `Questions ${firstQ}–${lastQ}`;
 
@@ -569,7 +810,8 @@ function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitt
           <div className="rm-form-body">
             {group.questions.map((q, qi) => {
               const qid = String(q.id);
-              const qNum = qOffset + qi + 1;
+              const qNum = numbering?.questionNumberStartById[q.id] ?? (qOffset + qi + 1);
+              const qNumLabel = numbering?.questionNumberLabelById[q.id] ?? String(qNum);
               const value = answers[qid];
               const result = resultMap?.[qid];
               const hasBlank = (q.question_text || "").includes("</blank>");
@@ -626,13 +868,26 @@ function QuestionGroup({ group, qOffset, answers, setAnswers, resultMap, submitt
           )}
           {group.questions.map((q, qi) => {
             const qid = String(q.id);
-            const qNum = qOffset + qi + 1;
+            const qNum = numbering?.questionNumberStartById[q.id] ?? (qOffset + qi + 1);
+            const qNumLabel = numbering?.questionNumberLabelById[q.id] ?? String(qNum);
             const value = answers[qid];
             const result = resultMap?.[qid];
             const cb = val => onChange(qid, val);
 
             if (qt === "mcq" || qt === "multiple_select") {
-              return <MCQItem key={q.id} question={q} qNumber={qNum} value={value} onChange={cb} result={result} groupType={qt} />;
+              return (
+                <MCQItem
+                  key={q.id}
+                  question={q}
+                  qNumber={qNum}
+                  qNumberLabel={qNumLabel}
+                  value={value}
+                  onChange={cb}
+                  result={result}
+                  groupType={qt}
+                  group={group}
+                />
+              );
             }
             if (qt === "tfng") {
               return <TFNGItem key={q.id} question={q} qNumber={qNum} value={value} onChange={cb} result={result} />;
@@ -710,6 +965,7 @@ export default function ReadingModule({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [view, setView] = useState("test");
+  const [warmPassage, setWarmPassage] = useState(false);
 
   const questionsRef = useRef(null);
 
@@ -733,27 +989,29 @@ export default function ReadingModule({
     if (sessionId && apiBase) load();
   }, [apiBase, sessionId, getToken]);
 
-  // Answer helpers
-  const allQuestions = test
-    ? test.passages.flatMap(p => p.question_groups.flatMap(g => g.questions))
-    : [];
-  const answered = q => {
-    const a = answers[String(q.id)];
-    return a !== undefined && a !== "" && a !== null && !(Array.isArray(a) && a.length === 0);
-  };
-  const totalAnswered = allQuestions.filter(answered).length;
-  const totalQuestions = allQuestions.length;
+  // Answer helpers (slot-based for IELTS numbering)
+  const numbering = useMemo(() => (test ? getReadingNumbering(test) : null), [test]);
+
+  const totalAnswered = useMemo(() => {
+    if (!test) return 0;
+    return test.passages.reduce(
+      (sum, p) => sum + passageAnsweredSlots(p, answers),
+      0
+    );
+  }, [test, answers]);
+
+  const totalQuestions = numbering?.totalSlots ?? 0;
 
   // Result map
   const resultMap = result
     ? Object.fromEntries(result.question_results.map(r => [r.question_id, r]))
     : null;
 
-  // Question offset for a passage index
-  const passageQOffset = useCallback((pi) => {
+  // Slot offset for a passage index
+  const passageSlotOffset = useCallback((pi) => {
     if (!test) return 0;
     return test.passages.slice(0, pi).reduce(
-      (acc, p) => acc + p.question_groups.reduce((a, g) => a + g.questions.length, 0),
+      (acc, p) => acc + passageSlotCount(p),
       0
     );
   }, [test]);
@@ -819,13 +1077,13 @@ export default function ReadingModule({
   if (!test) return <div className="rm" />;
 
   const passage = test.passages[activePassage];
-  const pOffset = passageQOffset(activePassage);
+  const pOffset = passageSlotOffset(activePassage);
 
-  // Question range for subtitle
+  // Question range for subtitle (slot-based)
   const firstQNum = pOffset + 1;
-  const lastQNum = pOffset + passage.question_groups.reduce((a, g) => a + g.questions.length, 0);
+  const lastQNum = pOffset + passageSlotCount(passage);
 
-  const timerColor = timerDanger ? RED : timerWarning ? GOLD : MUTED;
+  const handleBack = onBack ?? (() => { if (typeof window !== "undefined") window.history.back(); });
 
   // ── Results view ──
   if (view === "results") {
@@ -846,7 +1104,7 @@ export default function ReadingModule({
 
           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, marginTop: 24 }}>Review your answers</h3>
           {test.passages.map((p, pi) => {
-            const pOff = passageQOffset(pi);
+            const pOff = passageSlotOffset(pi);
             return (
               <div key={p.id} style={{ marginBottom: 28 }}>
                 <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
@@ -858,10 +1116,10 @@ export default function ReadingModule({
                   </div>
                   <div className="rm-review-pane" style={{ padding: "16px" }}>
                     {p.question_groups.map((g, gi) => {
-                      const gOff = pOff + p.question_groups.slice(0, gi).reduce((a, x) => a + x.questions.length, 0);
+                      const gOff = pOff + p.question_groups.slice(0, gi).reduce((a, x) => a + getGroupSlotCount(x), 0);
                       return (
                         <QuestionGroup
-                          key={g.id} group={g} qOffset={gOff}
+                          key={g.id} group={g} qOffset={gOff} numbering={numbering}
                           answers={answers} setAnswers={() => {}}
                           resultMap={resultMap} submitted
                         />
@@ -880,45 +1138,35 @@ export default function ReadingModule({
   // ── Test view ──
   return (
     <div className="rm">
-      {/* ── Header bar ── */}
-      <div className="rm-header">
-        <button onClick={onBack}
-          style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: MUTED, padding: "4px 8px", flexShrink: 0 }}>
-          ←
-        </button>
-
-        {/* Timer — centre */}
-        <span style={{
-          marginLeft: "auto", marginRight: "auto",
-          fontSize: 16, fontWeight: 600, fontVariantNumeric: "tabular-nums",
-          color: timerColor, flexShrink: 0,
-          display: "flex", alignItems: "center", gap: 6,
-        }}>
-          ⏱ {timerFormatted || "--:--"}
-        </span>
-
-        <button onClick={handleSubmit} disabled={submitting}
-          style={{
-            background: ACCENT, color: "#fff", border: "none",
-            borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 600,
-            cursor: submitting ? "default" : "pointer", flexShrink: 0,
-            opacity: submitting ? 0.7 : 1, whiteSpace: "nowrap",
-          }}>
-          {submitting ? "Submitting…" : "Finish Test"}
-        </button>
-      </div>
-
-      {/* ── Subtitle bar ── */}
-      <div className="rm-subtitle">
-        <span style={{ fontSize: 13, color: MUTED }}>
-          Part {activePassage + 1} — Read the text and answer questions {firstQNum}–{lastQNum}
-        </span>
-      </div>
+      <ReadingExamTopBar
+        partLabel={`Part ${activePassage + 1} — Read the text and answer questions ${firstQNum}–${lastQNum}`}
+        onBack={handleBack}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+        totalAnswered={totalAnswered}
+        totalQuestions={totalQuestions}
+        timerFormatted={timerFormatted}
+        timerWarning={timerWarning}
+        timerDanger={timerDanger}
+      />
 
       {/* ── Main split pane ── */}
       <div className="rm-body">
         {/* Passage */}
-        <div className="rm-passage-pane">
+        <div className={`rm-passage-pane${warmPassage ? " warm" : ""}`}>
+          <div className="rm-passage-toolbar">
+            <span className="rm-passage-toolbar-label">Reading passage</span>
+            <button
+              type="button"
+              className={`rm-warm-toggle${warmPassage ? " active" : ""}`}
+              onClick={() => setWarmPassage(w => !w)}
+              aria-pressed={warmPassage}
+              aria-label={warmPassage ? "Turn off warm reading mode" : "Turn on warm reading mode for eye comfort"}
+              title={warmPassage ? "Warm mode on" : "Warm mode for eyes"}
+            >
+              <Eye size={16} strokeWidth={2} />
+            </button>
+          </div>
           <Passage passage={passage} key={passage.id} />
         </div>
 
@@ -927,10 +1175,10 @@ export default function ReadingModule({
           {passage.question_groups.map((g, gi) => {
             const gOff = pOffset + passage.question_groups
               .slice(0, gi)
-              .reduce((a, x) => a + x.questions.length, 0);
+              .reduce((a, x) => a + getGroupSlotCount(x), 0);
             return (
               <QuestionGroup
-                key={g.id} group={g} qOffset={gOff}
+                key={g.id} group={g} qOffset={gOff} numbering={numbering}
                 answers={answers} setAnswers={setAnswers}
                 resultMap={null} submitted={false}
               />
@@ -943,51 +1191,42 @@ export default function ReadingModule({
       <div className="rm-bottom">
         {test.passages.map((p, pi) => {
           const isActive = pi === activePassage;
-          const pQs = p.question_groups.flatMap(g => g.questions);
-          const pAnswered = pQs.filter(answered).length;
-          const pOff = passageQOffset(pi);
+          const pTotal = passageSlotCount(p);
+          const pAnswered = passageAnsweredSlots(p, answers);
+          const navSlots = buildPassageNavSlots(p, numbering);
 
           return (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
-              {/* Separator between parts */}
               {pi > 0 && <span className="rm-sep" />}
 
-              {/* Part tab */}
               <button
                 className={`rm-part-tab ${isActive ? "active" : ""}`}
                 onClick={() => setActivePassage(pi)}>
                 Part {p.passage_number}
               </button>
 
-              {/* Inactive: show count */}
               {!isActive && (
                 <span className="rm-q-count">
-                  {pAnswered} of {pQs.length}
+                  {pAnswered} of {pTotal}
                 </span>
               )}
 
-              {/* Active: show individual question circles */}
-              {isActive && pQs.map((q, qi) => {
-                const qNum = pOff + qi + 1;
-                const isAns = answered(q);
+              {isActive && navSlots.map(({ question, group, questionId, number, slotIndex }) => {
+                const answeredSlots = getAnsweredSlotCount(question, group, answers[String(questionId)]);
+                const done = answeredSlots > slotIndex;
                 return (
                   <button
-                    key={q.id}
-                    className={`rm-q-dot ${isAns ? "answered" : ""}`}
-                    onClick={() => scrollToQuestion(q.id)}
-                    title={`Question ${qNum}`}>
-                    {qNum}
+                    key={`qnav-${p.id}-${questionId}-${slotIndex}-${number}`}
+                    className={`rm-q-dot ${done ? "answered" : ""}`}
+                    onClick={() => scrollToQuestion(questionId)}
+                    title={`Question ${number}`}>
+                    {number}
                   </button>
                 );
               })}
             </div>
           );
         })}
-
-        {/* Total count right side */}
-        <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED, flexShrink: 0, paddingLeft: 12 }}>
-          {totalAnswered} of {totalQuestions} answered
-        </span>
       </div>
     </div>
   );
