@@ -465,9 +465,10 @@ function MCQItem({ question, qNumber, qNumberLabel, value, onChange, result, gro
             else if (isSel) cls += " rm-opt-sel";
             if (result) cls += " rm-opt-dis";
             const cbCls = isC ? "ok" : isW ? "bad" : isSel ? "sel" : "";
+            const optIsLetter = opt.option === LETTERS[oi];
             return (
               <div key={oi} className={cls} onClick={() => toggle(opt.option)}>
-                <span className="rm-letter">{LETTERS[oi]}</span>
+                {!optIsLetter && <span className="rm-letter">{LETTERS[oi]}</span>}
                 <span className={`rm-checkbox ${cbCls}`}>
                   {(isSel || isC || isW) && <span style={{ width: 8, height: 2, background: "#fff", borderRadius: 1 }} />}
                 </span>
@@ -952,7 +953,7 @@ function ResultsSummary({ result }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ReadingModule({
-  apiBase, getToken, sessionId, onComplete, autoSubmitRef,
+  apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef,
   timerFormatted, timerWarning, timerDanger, onBack,
 }) {
   useEffect(injectCSS, []);
@@ -974,9 +975,10 @@ export default function ReadingModule({
     async function load() {
       try {
         const token = await getToken();
-        const res = await fetch(`${apiBase}/reading/for-session/${sessionId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const url = testId
+          ? `${apiBase}/reading/tests/${testId}`
+          : `${apiBase}/reading/for-session/${sessionId}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
         const payload = await res.json();
         setTest(payload.data ?? payload);
@@ -986,8 +988,8 @@ export default function ReadingModule({
         setLoading(false);
       }
     }
-    if (sessionId && apiBase) load();
-  }, [apiBase, sessionId, getToken]);
+    if ((sessionId || testId) && apiBase) load();
+  }, [apiBase, sessionId, testId, getToken]);
 
   // Answer helpers (slot-based for IELTS numbering)
   const numbering = useMemo(() => (test ? getReadingNumbering(test) : null), [test]);

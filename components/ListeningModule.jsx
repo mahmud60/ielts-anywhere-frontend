@@ -1106,7 +1106,7 @@ function buildSectionNavSlots(sec, numbering) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function ListeningModule({
-  apiBase, getToken, sessionId, onComplete, autoSubmitRef, timeLeft, onBack,
+  apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef, timeLeft, onBack,
 }) {
   useEffect(injectCSS, []);
 
@@ -1123,7 +1123,7 @@ export default function ListeningModule({
   // ── Load test ──
   useEffect(() => {
     async function load() {
-      if (!apiBase || !sessionId) {
+      if (!apiBase || (!sessionId && !testId)) {
         await new Promise(r => setTimeout(r, 400));
         setTest(MOCK_TEST);
         setLoading(false);
@@ -1131,9 +1131,10 @@ export default function ListeningModule({
       }
       try {
         const token = await getToken();
-        const res   = await fetch(`${apiBase}/listening/for-session/${sessionId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const url = testId
+          ? `${apiBase}/listening/tests/${testId}`
+          : `${apiBase}/listening/for-session/${sessionId}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) throw new Error(await res.text());
         const payload = await res.json();
         setTest(payload.data ?? payload);
@@ -1144,13 +1145,13 @@ export default function ListeningModule({
       }
     }
     load();
-  }, [apiBase, sessionId]);
+  }, [apiBase, sessionId, testId]);
 
   // ── Submit ──
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
-      if (!apiBase || !sessionId) {
+      if (!apiBase || (!sessionId && !testId)) {
         await new Promise(r => setTimeout(r, 800));
         setResult(buildMockResult(test, answers));
         setView("results");
@@ -1172,7 +1173,7 @@ export default function ListeningModule({
     } finally {
       setSubmitting(false);
     }
-  }, [apiBase, sessionId, getToken, test, answers, onComplete]);
+  }, [apiBase, sessionId, testId, getToken, test, answers, onComplete]);
 
   useEffect(() => {
     if (autoSubmitRef) autoSubmitRef.current = handleSubmit;
