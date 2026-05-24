@@ -50,9 +50,7 @@ const PARTS = [
 export default function SpeakingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [history, setHistory]   = useState([]);
-  const [starting, setStarting] = useState(false);
-  const [error, setError]       = useState(null);
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -63,17 +61,8 @@ export default function SpeakingPage() {
     api.getSpeakingHistory().then(setHistory).catch(() => {});
   }, [user]);
 
-  async function startTest() {
-    setStarting(true);
-    setError(null);
-    try {
-      const { signed_url, session_id } = await api.getSpeakingSessionToken();
-      sessionStorage.setItem(`speaking_token_${session_id}`, signed_url);
-      router.push(`/speaking/${session_id}`);
-    } catch (e) {
-      setError(e.message ?? "Could not start session. Please try again.");
-      setStarting(false);
-    }
+  function startTest() {
+    router.push("/speaking/start");
   }
 
   if (loading) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading…</p>;
@@ -129,28 +118,17 @@ export default function SpeakingPage() {
         <span>Make sure you are in a quiet place and your microphone is working. The AI examiner will guide you through all three parts.</span>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div style={{
-          background: "#fef2f2", border: `1px solid #fecaca`, borderRadius: 10,
-          padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#b91c1c",
-        }}>
-          {error}
-        </div>
-      )}
-
       {/* CTA */}
       <button
         onClick={startTest}
-        disabled={starting}
         style={{
           width: "100%", padding: "14px 24px", borderRadius: 10,
-          background: starting ? "#93c5fd" : PRIMARY, border: "none",
-          color: "#fff", fontWeight: 700, fontSize: 15, cursor: starting ? "not-allowed" : "pointer",
-          marginBottom: 40, transition: "background .15s",
+          background: PRIMARY, border: "none",
+          color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer",
+          marginBottom: 40,
         }}
       >
-        {starting ? "Starting…" : "Start Speaking Test"}
+        Start Speaking Test
       </button>
 
       {/* Past attempts */}

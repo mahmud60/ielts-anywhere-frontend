@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { useConversation } from "@elevenlabs/react";
 import { api } from "@/lib/api";
+
+const AGENT_ID = "agent_9801ksdjxvqqfkdvsh8acxc4xge5";
 
 const PRIMARY = "#0080ff";
 const BORDER  = "#e2e8f0";
 const TEXT    = "#0f172a";
 const MUTED   = "#94a3b8";
+const GREEN   = "#059669";
+const AMBER   = "#d97706";
 
 /* ─── Mic icon ─────────────────────────────────────────────────────────── */
 function MicIcon({ size = 28, color = "currentColor" }) {
@@ -51,25 +55,23 @@ function useElapsedTimer(running) {
 
 /* ─── Main page ─────────────────────────────────────────────────────────── */
 export default function SpeakingSessionPage() {
-  const { sessionId } = useParams();
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Conversation state
   const [phase, setPhase]       = useState("idle"); // idle | connecting | live | ending | scoring | error
   const [errorMsg, setErrorMsg] = useState(null);
   const [transcript, setTranscript] = useState([]);
-  const elSessionId = useRef(null);
-  const submittedRef = useRef(false);
+  const elSessionId   = useRef(null);
+  const submittedRef  = useRef(false);
   const transcriptRef = useRef([]);
 
   const timerRunning = phase === "live";
   const elapsed = useElapsedTimer(timerRunning);
 
-  // Keep transcriptRef in sync so callbacks always see latest messages
+  // Keep transcriptRef current so callbacks always see the latest messages
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-  /* ── Submit transcript & navigate to results ── */
+  /* ── Submit transcript → score with Claude → navigate to results ── */
   const submitAndRedirect = useCallback(async () => {
     if (submittedRef.current) return;
     submittedRef.current = true;
@@ -77,19 +79,18 @@ export default function SpeakingSessionPage() {
 
     const msgs = transcriptRef.current;
     if (msgs.length === 0) {
-      // Nothing was said — go back to landing page
       router.push("/speaking");
       return;
     }
 
     try {
-      await api.elSubmitSpeaking(sessionId, msgs, elSessionId.current);
-      router.push(`/speaking/results/${sessionId}`);
+      const { session_id } = await api.elSubmitSpeaking(msgs, elSessionId.current);
+      router.push(`/speaking/results/${session_id}`);
     } catch (e) {
       setPhase("error");
       setErrorMsg(e.message ?? "Scoring failed. Please try again.");
     }
-  }, [sessionId, router]);
+  }, [router]);
 
   /* ── ElevenLabs conversation hook ── */
   const conversation = useConversation({
@@ -98,17 +99,16 @@ export default function SpeakingSessionPage() {
       setPhase("live");
     },
     onDisconnect: () => {
-      // submittedRef guards against double-submission if both agent
-      // goodbye and manual End Test both fire onDisconnect
+      // submittedRef prevents double-submission when both agent
+      // goodbye and manual End Test trigger onDisconnect
       submitAndRedirect();
     },
     onMessage: ({ message, source }) => {
-      const entry = {
+      setTranscript(prev => [...prev, {
         role: source === "ai" ? "agent" : "user",
         text: message,
         timestamp: Date.now(),
-      };
-      setTranscript(prev => [...prev, entry]);
+      }]);
     },
     onError: (msg) => {
       setPhase("error");
@@ -120,17 +120,11 @@ export default function SpeakingSessionPage() {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  /* ── Start the conversation ── */
+  /* ── Connect to ElevenLabs agent directly (public agent, no API key needed) ── */
   async function handleStart() {
-    const signedUrl = sessionStorage.getItem(`speaking_token_${sessionId}`);
-    if (!signedUrl) {
-      setPhase("error");
-      setErrorMsg("Session token not found. Please start a new test from the Speaking page.");
-      return;
-    }
     setPhase("connecting");
     try {
-      await conversation.startSession({ signedUrl });
+      await conversation.startSession({ agentId: AGENT_ID });
     } catch (e) {
       const msg = e?.message ?? String(e);
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
@@ -148,7 +142,7 @@ export default function SpeakingSessionPage() {
     try {
       await conversation.endSession();
     } catch {
-      // onDisconnect will still fire; submitAndRedirect handles it
+      // onDisconnect fires regardless; submitAndRedirect handles the rest
     }
   }
 
@@ -174,15 +168,14 @@ export default function SpeakingSessionPage() {
   }
 
   /* ─── Main UI ─────────────────────────────────────────────────────────── */
-  const isLive        = phase === "live";
-  const isConnecting  = phase === "connecting" || phase === "ending";
+  const isLive       = phase === "live";
+  const isConnecting = phase === "connecting" || phase === "ending";
   const agentSpeaking = isLive && conversation.isSpeaking;
   const userSpeaking  = isLive && !conversation.isSpeaking;
 
-  // Mic button ring color
-  const ringColor = agentSpeaking ? PRIMARY : userSpeaking ? "#ef4444" : MUTED;
-  const micBg     = agentSpeaking ? "#eff6ff" : userSpeaking ? "#fef2f2" : "#f8fafc";
-  const micIconColor = agentSpeaking ? PRIMARY : userSpeaking ? "#ef4444" : MUTED;
+  const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#ef4444" : MUTED;
+  const micBg        = agentSpeaking ? "#eff6ff" : userSpeaking ? "#fef2f2" : "#f8fafc";
+  const micIconColor = agentSpeaking ? PRIMARY   : userSpeaking ? "#ef4444" : MUTED;
 
   return (
     <div style={{
@@ -203,10 +196,10 @@ export default function SpeakingSessionPage() {
           ←
         </button>
         <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>IELTS Speaking Test</span>
-        {/* Status pill */}
         <div style={{
           display: "flex", alignItems: "center", gap: 6,
-          fontSize: 12, fontWeight: 600, color: isLive ? GREEN : isConnecting ? AMBER : MUTED,
+          fontSize: 12, fontWeight: 600,
+          color: isLive ? GREEN : isConnecting ? AMBER : MUTED,
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: "50%",
@@ -233,7 +226,6 @@ export default function SpeakingSessionPage() {
 
         {/* Microphone button */}
         <div style={{ position: "relative", marginBottom: 28 }}>
-          {/* Outer pulsing ring — shows when agent is speaking */}
           {agentSpeaking && (
             <div style={{
               position: "absolute", inset: -12, borderRadius: "50%",
@@ -262,9 +254,9 @@ export default function SpeakingSessionPage() {
           {phase === "error"      && "Connection error"}
         </p>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 32, textAlign: "center", maxWidth: 360 }}>
-          {phase === "idle"   && "Click Start to begin. The AI examiner will guide you through all three parts."}
-          {phase === "live"   && (agentSpeaking ? "Listen carefully and respond when the examiner finishes." : "Speak clearly into your microphone.")}
-          {phase === "error"  && (errorMsg ?? "")}
+          {phase === "idle"  && "Click Start to begin. The AI examiner will guide you through all three parts."}
+          {phase === "live"  && (agentSpeaking ? "Listen carefully and respond when the examiner finishes." : "Speak clearly into your microphone.")}
+          {phase === "error" && (errorMsg ?? "")}
         </p>
 
         {/* Action buttons */}
@@ -277,6 +269,18 @@ export default function SpeakingSessionPage() {
             }}
           >
             Start Session
+          </button>
+        )}
+
+        {phase === "error" && (
+          <button
+            onClick={() => { submittedRef.current = false; setPhase("idle"); setErrorMsg(null); }}
+            style={{
+              padding: "11px 28px", borderRadius: 8, background: PRIMARY, border: "none",
+              color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 8,
+            }}
+          >
+            Try Again
           </button>
         )}
 
@@ -298,7 +302,7 @@ export default function SpeakingSessionPage() {
             onClick={handleEnd}
             style={{
               padding: "11px 28px", borderRadius: 8, background: "#fff",
-              border: `1px solid #fca5a5`, color: "#dc2626", fontWeight: 600,
+              border: "1px solid #fca5a5", color: "#dc2626", fontWeight: 600,
               fontSize: 14, cursor: "pointer", marginBottom: 24,
             }}
           >
@@ -322,11 +326,10 @@ export default function SpeakingSessionPage() {
               }}>
                 <div style={{
                   maxWidth: "80%", padding: "10px 14px", borderRadius: 12,
-                  fontSize: 13, lineHeight: 1.55,
+                  fontSize: 13, lineHeight: 1.55, color: TEXT,
                   background: msg.role === "user" ? "#eff6ff" : "#f1f5f9",
-                  color: TEXT,
                   borderBottomRightRadius: msg.role === "user" ? 4 : 12,
-                  borderBottomLeftRadius: msg.role === "agent" ? 4 : 12,
+                  borderBottomLeftRadius:  msg.role === "agent" ? 4 : 12,
                 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     {msg.role === "agent" ? "Examiner" : "You"}
@@ -340,13 +343,9 @@ export default function SpeakingSessionPage() {
       </div>
 
       <style>{`
-        @keyframes ping {
-          75%, 100% { transform: scale(1.5); opacity: 0; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
+        @keyframes ping  { 75%, 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes spin  { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
