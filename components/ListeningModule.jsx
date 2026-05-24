@@ -964,6 +964,7 @@ function formatAnswer(ca) {
 }
 
 function getCEFR(band) {
+  if (band <= 0)   return "—";
   if (band >= 8.5) return "C2";
   if (band >= 7.0) return "C1";
   if (band >= 5.5) return "B2";
