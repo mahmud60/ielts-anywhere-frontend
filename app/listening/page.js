@@ -9,19 +9,6 @@ const PRIMARY = "#0080ff";
 const BORDER  = "#e2e8f0";
 const TEXT    = "#0f172a";
 const MUTED   = "#94a3b8";
-const GREEN   = "#059669";
-const AMBER   = "#d97706";
-const RED     = "#dc2626";
-
-function bandColor(b) {
-  if (!b || b <= 0) return MUTED;
-  return b >= 7 ? GREEN : b >= 5.5 ? AMBER : RED;
-}
-
-function fmtDate(iso) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 const s = {
   wrap:  { maxWidth: 760, margin: "0 auto", padding: "48px 24px", fontFamily: "system-ui" },
@@ -44,7 +31,6 @@ export default function ListeningTestsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [tests,    setTests]    = useState([]);
-  const [attempts, setAttempts] = useState([]);
   const [starting, setStarting] = useState(null);
 
   useEffect(() => {
@@ -54,7 +40,6 @@ export default function ListeningTestsPage() {
   useEffect(() => {
     if (!user) return;
     api.getListeningTests().then(setTests).catch(console.error);
-    api.getListeningAttempts().then(setAttempts).catch(() => {});
   }, [user]);
 
   if (loading) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading…</p>;
@@ -87,29 +72,11 @@ export default function ListeningTestsPage() {
         </div>
       ))}
 
-      {/* Recent results */}
-      {attempts.length > 0 && (
-        <div style={{ marginTop: 40 }}>
-          <div style={s.sectionLabel}>Recent Results</div>
-          {attempts.map(a => (
-            <div key={a.id} style={s.card}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={s.title}>{a.test_title ?? "Listening Test"}</div>
-                <div style={s.meta}>{fmtDate(a.created_at)}</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0, marginRight: 16 }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: bandColor(a.overall_band), lineHeight: 1 }}>
-                  {a.overall_band > 0 ? a.overall_band.toFixed(1) : "0.0"}
-                </div>
-                <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{a.correct}/{a.total} correct</div>
-              </div>
-              <button style={s.btnOutline} onClick={() => router.push(`/listening/results/${a.id}`)}>
-                View Report
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ marginTop: 24, textAlign: "center" }}>
+        <button style={{ ...s.btnOutline, fontSize: 13 }} onClick={() => router.push("/reports")}>
+          View past results →
+        </button>
+      </div>
     </div>
   );
 }
