@@ -99,8 +99,19 @@ export default function SpeakingSession() {
     // Capture the latest submitAndRedirect so the onDisconnect closure stays fresh.
     const doSubmit = submitAndRedirect;
     try {
+      // Fetch a short-lived signed URL from the backend (keeps the ElevenLabs
+      // API key off the frontend and gives authenticated, higher-quality ASR).
+      let sessionOpts;
+      try {
+        const { signed_url } = await api.elGetSignedUrl();
+        sessionOpts = { signedUrl: signed_url };
+      } catch {
+        // If the backend isn't configured yet, fall back to the public agent.
+        sessionOpts = { agentId: AGENT_ID };
+      }
+
       const conv = await Conversation.startSession({
-        agentId: AGENT_ID,
+        ...sessionOpts,
         onConnect: ({ conversationId }) => {
           elSessionId.current = conversationId;
           setPhase("live");
