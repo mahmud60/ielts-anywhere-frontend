@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/firebase";
 import { api } from "@/lib/api";
+import { getClientApiBase } from "@/lib/clientApiBase";
 import { useModuleTimer } from "@/lib/useModuleTimer";
 import ModuleTimer from "@/components/ModuleTimer";
 import ListeningModule from "@/components/ListeningModule";
@@ -541,7 +542,7 @@ export default function SessionPage() {
         {!showExpired && !transitioning && current === "listening" && (
           <ListeningModule
             key={moduleKey}
-            apiBase={process.env.NEXT_PUBLIC_API_BASE}
+            apiBase={getClientApiBase()}
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
@@ -551,7 +552,7 @@ export default function SessionPage() {
         {!showExpired && !transitioning && current === "reading" && (
           <ReadingModule
             key={moduleKey}
-            apiBase={process.env.NEXT_PUBLIC_API_BASE}
+            apiBase={getClientApiBase()}
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
@@ -564,7 +565,7 @@ export default function SessionPage() {
         {!showExpired && !transitioning && current === "writing" && (
           <WritingModule
             key={moduleKey}
-            apiBase={process.env.NEXT_PUBLIC_API_BASE}
+            apiBase={getClientApiBase()}
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
@@ -573,7 +574,7 @@ export default function SessionPage() {
         {!showExpired && !transitioning && current === "speaking" && (
           <SpeakingModule
             key={moduleKey}
-            apiBase={process.env.NEXT_PUBLIC_API_BASE}
+            apiBase={getClientApiBase()}
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}

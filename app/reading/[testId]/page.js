@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/firebase";
 import { useEffect } from "react";
 import ReadingModule from "@/components/ReadingModule";
+import { getClientApiBase } from "@/lib/clientApiBase";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -24,7 +25,7 @@ export default function StandaloneReadingPage() {
 
   return (
     <ReadingModule
-      apiBase={process.env.NEXT_PUBLIC_API_BASE}
+      apiBase={getClientApiBase()}
       getToken={getToken}
       testId={testId}
       onBack={() => router.push("/reading")}

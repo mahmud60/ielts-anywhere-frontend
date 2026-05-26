@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import ReadingModule from "@/components/ReadingModule";
+import { getClientApiBase } from "@/lib/clientApiBase";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -35,7 +36,7 @@ export default function ReadingResultPage() {
 
   return (
     <ReadingModule
-      apiBase={process.env.NEXT_PUBLIC_API_BASE}
+      apiBase={getClientApiBase()}
       getToken={getToken}
       testId={attempt.test_id}
       initialResult={attempt}

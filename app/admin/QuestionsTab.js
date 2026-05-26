@@ -442,7 +442,33 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
     typeof o === "string" ? { order: i + 1, option: o } : o
   );
   const [f, setF] = useState({ ...q, options: defaultOpts });
+  const [answerKeyJson, setAnswerKeyJson] = useState(() =>
+    Array.isArray(q.answer_key) ? JSON.stringify(q.answer_key) : (q.answer_key || "[]")
+  );
+  const [answerKeyError, setAnswerKeyError] = useState("");
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const handleAnswerKeyJsonChange = (v) => {
+    setAnswerKeyJson(v);
+    try {
+      const parsed = JSON.parse(v);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Answer key must be a JSON array, e.g. [1, 3]");
+      }
+      set("answer_key", parsed);
+      setAnswerKeyError("");
+    } catch (e) {
+      setAnswerKeyError(e.message || "Invalid JSON. Use an array of option orders, e.g. [1, 3]");
+    }
+  };
+
+  const handleSave = () => {
+    if (f.question_type === "multiple_select" && answerKeyError) {
+      alert("Fix the answer key JSON before saving.");
+      return;
+    }
+    onSave(f);
+  };
 
   const addOption = () => {
     const next = (f.options.length > 0 ? Math.max(...f.options.map(o => o.order)) : 0) + 1;
@@ -491,10 +517,17 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
           ))}
           <SBtn variant="outline" onClick={addOption}>+ Option</SBtn>
           {f.question_type === "multiple_select" && (
-            <FInput label="Answer key (JSON array of correct orders, e.g. [1,3])"
-              value={Array.isArray(f.answer_key) ? JSON.stringify(f.answer_key) : f.answer_key || "[]"}
-              onChange={v => { try { set("answer_key", JSON.parse(v)); } catch {} }}
-              placeholder="[1, 3]" />
+            <>
+              <FInput label="Answer key (JSON array of correct orders, e.g. [1,3])"
+                value={answerKeyJson}
+                onChange={handleAnswerKeyJsonChange}
+                placeholder="[1, 3]" />
+              {answerKeyError && (
+                <p style={{ fontSize: 12, color: "#dc2626", marginTop: -8, marginBottom: 8 }}>
+                  {answerKeyError}
+                </p>
+              )}
+            </>
           )}
           {f.question_type === "multiple_select" && (
             <FInput label="Max selectable options" type="number"
@@ -514,7 +547,7 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
         placeholder="Tip to help the student understand their mistake" />
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <SBtn disabled={saving} onClick={() => onSave(f)}>
+        <SBtn disabled={saving || (f.question_type === "multiple_select" && !!answerKeyError)} onClick={handleSave}>
           {saving ? "Saving…" : "Save question"}
         </SBtn>
         <SBtn variant="ghost" onClick={onCancel}>Cancel</SBtn>

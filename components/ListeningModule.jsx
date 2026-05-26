@@ -808,7 +808,16 @@ function TableSubsection({ sectionId, sub, answers, setAnswers, results, numberi
 // Standard question list: fill, MCQ, multi-select, dropdown with group labels.
 function RegularSubsection({ sectionId, sub, answers, setAnswers, results, numbering, disabled }) {
   const qs = subsectionQuestions(sub);
-  let prevGroup = null;
+  const questionRows = (() => {
+    let prevGroup = null;
+    return qs.map((q, i) => {
+      const label = q.group_label;
+      const showGroupLabel = !!(label && label !== prevGroup);
+      if (showGroupLabel) prevGroup = label;
+      return { q, i, showGroupLabel, label };
+    });
+  })();
+
   return (
     <div className="lm-card" style={{ marginBottom: 32 }}>
       <SubHead sub={sub} numbering={numbering} />
@@ -816,18 +825,15 @@ function RegularSubsection({ sectionId, sub, answers, setAnswers, results, numbe
         <img src={sub.visual} alt="" style={{ maxWidth: "100%", borderRadius: 10, marginBottom: 16 }} />
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {qs.map((q, i) => {
+        {questionRows.map(({ q, i, showGroupLabel, label }) => {
           const qLabel   = numbering.questionNumberLabelById[q.id] ?? String(i + 1);
           const value    = answers[q.id];
           const result   = results?.[String(q.id)];
           const onChange = val => setAnswers(a => ({ ...a, [q.id]: val }));
-          const label    = q.group_label;
-          const showLabel = label && label !== prevGroup;
-          if (showLabel) prevGroup = label;
 
           return (
             <div key={`question-${sectionId}-${sub.id ?? "root"}-${q.id}-${i}`} data-qid={q.id}>
-              {showLabel && (
+              {showGroupLabel && (
                 <p style={{
                   fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 10,
                   letterSpacing: "0.05em", textTransform: "uppercase",
@@ -1170,9 +1176,13 @@ export default function ListeningModule({
   // ── Load test ──
   useEffect(() => {
     async function load() {
-      if (!apiBase || (!sessionId && !testId)) {
-        await new Promise(r => setTimeout(r, 400));
-        setTest(MOCK_TEST);
+      if (!sessionId && !testId) {
+        setError("Missing test session.");
+        setLoading(false);
+        return;
+      }
+      if (!apiBase) {
+        setError("API is not configured. Set NEXT_PUBLIC_API_BASE and restart the dev server.");
         setLoading(false);
         return;
       }
@@ -1192,18 +1202,17 @@ export default function ListeningModule({
       }
     }
     load();
-  }, [apiBase, sessionId, testId]);
+  }, [apiBase, sessionId, testId, getToken]);
 
   // ── Submit ──
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
-      if (!apiBase || (!sessionId && !testId)) {
-        await new Promise(r => setTimeout(r, 800));
-        setResult(buildMockResult(test, answers));
-        setView("results");
-        onComplete?.();
-        return;
+      if (!apiBase) {
+        throw new Error("API is not configured.");
+      }
+      if (!test?.id) {
+        throw new Error("Test is not loaded.");
       }
       const token = await getToken();
       const res   = await fetch(`${apiBase}/listening/submit`, {
