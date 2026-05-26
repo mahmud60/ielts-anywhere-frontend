@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -697,7 +697,7 @@ const TABS = [
   { key: "speaking",  label: "IELTS Speaking" },
 ];
 
-export default function SampleReportsPage() {
+function SampleReportsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("academic");
@@ -760,5 +760,13 @@ export default function SampleReportsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SampleReportsPage() {
+  return (
+    <Suspense>
+      <SampleReportsContent />
+    </Suspense>
   );
 }
