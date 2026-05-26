@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 export const PRIMARY  = "#0080ff";
@@ -248,6 +249,94 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
             ? errors.map((e, i) => <ErrorItem key={i} num={i + 1} error={e} color={crit?.color ?? PRIMARY} />)
             : <p style={{ fontSize: 13, color: MUTED }}>No issues found for this criterion.</p>
           }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PaywallGate ───────────────────────────────────────────────────────────────
+export function PaywallGate({ band, module }) {
+  const router = useRouter();
+  const sampleTab = module === "speaking" ? "speaking" : "academic";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Teaser: band score */}
+      <div style={{
+        background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
+        padding: "28px 24px", display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
+      }}>
+        <div>
+          <div style={{ fontSize: 52, fontWeight: 900, color: bandColor(band), lineHeight: 1 }}>
+            {band != null ? Number(band).toFixed(1) : "–"}
+            <span style={{ fontSize: 22, fontWeight: 600, color: MUTED }}>/9.0</span>
+          </div>
+          <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 6 }}>Overall Band Score</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 6 }}>
+            Full report locked
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>
+            Your score is above. Upgrade to Pro to unlock per-criterion scores, annotated essay with error highlights, and examiner notes.
+          </p>
+        </div>
+      </div>
+
+      {/* Blurred preview */}
+      <div style={{ position: "relative", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{
+          filter: "blur(5px)", pointerEvents: "none", userSelect: "none",
+          background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "20px 24px",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {["Criterion 1", "Criterion 2", "Criterion 3", "Criterion 4"].map((label, i) => (
+              <div key={i} style={{
+                background: "#f8fafc", borderRadius: 10, padding: "14px 18px",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#e2e8f0" }} />
+                <span style={{ flex: 1, height: 14, background: "#e2e8f0", borderRadius: 4 }} />
+                <span style={{ width: 36, height: 20, background: "#e2e8f0", borderRadius: 4 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Overlay CTA */}
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          background: "rgba(248,250,252,0.7)", gap: 12, padding: 24,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, textAlign: "center" }}>
+            Unlock detailed feedback
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
+            See per-criterion band scores, highlighted errors in your essay, and actionable examiner notes.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
+            <button
+              onClick={() => router.push("/pricing")}
+              style={{
+                padding: "11px 28px", borderRadius: 9, background: PRIMARY, border: "none",
+                color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+              }}
+            >
+              Upgrade to Pro
+            </button>
+            <button
+              onClick={() => router.push(`/sample-reports?tab=${sampleTab}`)}
+              style={{
+                padding: "11px 24px", borderRadius: 9, background: "#fff",
+                border: `1px solid ${BORDER}`, color: TEXT, fontWeight: 600,
+                fontSize: 14, cursor: "pointer",
+              }}
+            >
+              See Sample Report
+            </button>
+          </div>
         </div>
       </div>
     </div>

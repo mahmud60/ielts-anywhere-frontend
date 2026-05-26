@@ -6,9 +6,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import {
   PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED, RED,
-  bandColor, bandBg, cefrLabel,
-  CriterionCard, SpeakingErrorPanel,
+  bandColor, cefrLabel,
+  CriterionCard, SpeakingErrorPanel, PaywallGate,
 } from "@/components/report/ReportComponents";
+import { isProUser } from "@/lib/landingAccess";
 
 const CRIT_COLORS = {
   fluency_coherence: "#ef4444",
@@ -52,6 +53,7 @@ export default function SpeakingResultsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [result, setResult]     = useState(null);
+  const [profile, setProfile]   = useState(null);
   const [fetching, setFetching] = useState(true);
   const [error, setError]       = useState(null);
   const [expanded, setExpanded] = useState({ fluency_coherence: true });
@@ -62,8 +64,10 @@ export default function SpeakingResultsPage() {
 
   useEffect(() => {
     if (!user) return;
-    api.getSpeakingResults(sessionId)
-      .then(r => { setResult(r); setFetching(false); })
+    Promise.all([
+      api.getSpeakingResults(sessionId),
+      api.getMe().catch(() => null),
+    ]).then(([r, p]) => { setResult(r); setProfile(p); setFetching(false); })
       .catch(e => { setError(e.message ?? "Could not load results."); setFetching(false); });
   }, [user, sessionId]);
 
@@ -116,48 +120,54 @@ export default function SpeakingResultsPage() {
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px 64px" }}>
 
-        {/* Overall band hero */}
-        <div style={{
-          background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
-          padding: "28px 24px 24px", marginBottom: 24,
-          display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap",
-        }}>
-          <div>
-            <div style={{ fontSize: 52, fontWeight: 900, color: bandColor(band), lineHeight: 1 }}>
-              {band != null ? Number(band).toFixed(1) : "–"}
-              <span style={{ fontSize: 22, fontWeight: 600, color: MUTED }}>/9.0</span>
+        {isProUser(profile) ? (
+          <>
+            {/* Overall band hero */}
+            <div style={{
+              background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
+              padding: "28px 24px 24px", marginBottom: 24,
+              display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap",
+            }}>
+              <div>
+                <div style={{ fontSize: 52, fontWeight: 900, color: bandColor(band), lineHeight: 1 }}>
+                  {band != null ? Number(band).toFixed(1) : "–"}
+                  <span style={{ fontSize: 22, fontWeight: 600, color: MUTED }}>/9.0</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(band)}</div>
+                <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
+              </div>
+              {result.examiner_summary && (
+                <p style={{ flex: 1, margin: 0, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6, minWidth: 200 }}>
+                  {result.examiner_summary}
+                </p>
+              )}
             </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(band)}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
-          </div>
-          {result.examiner_summary && (
-            <p style={{ flex: 1, margin: 0, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6, minWidth: 200 }}>
-              {result.examiner_summary}
-            </p>
-          )}
-        </div>
 
-        {/* Criterion accordion */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
-          {criteria.map(c => (
-            <CriterionCard
-              key={c.key}
-              crit={c}
-              expanded={!!expanded[c.key]}
-              onToggle={() => setExpanded(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
-            />
-          ))}
-        </div>
+            {/* Criterion accordion */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+              {criteria.map(c => (
+                <CriterionCard
+                  key={c.key}
+                  crit={c}
+                  expanded={!!expanded[c.key]}
+                  onToggle={() => setExpanded(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
+                />
+              ))}
+            </div>
 
-        {/* Transcript + errors panel */}
-        {result.transcript?.length > 0 && (
-          <SpeakingErrorPanel
-            transcript={result.transcript}
-            criteria={criteria}
-            errorsMap={errorsMap}
-          />
+            {/* Transcript + errors panel */}
+            {result.transcript?.length > 0 && (
+              <SpeakingErrorPanel
+                transcript={result.transcript}
+                criteria={criteria}
+                errorsMap={errorsMap}
+              />
+            )}
+          </>
+        ) : (
+          <PaywallGate band={band} module="speaking" />
         )}
 
         <button

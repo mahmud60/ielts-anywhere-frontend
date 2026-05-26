@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import {
-  PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED, GREEN, AMBER, RED,
-  bandColor, bandBg, cefrLabel,
-  CriterionCard, DetailedFeedback,
+  PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED, RED,
+  bandColor, cefrLabel,
+  CriterionCard, DetailedFeedback, PaywallGate,
 } from "@/components/report/ReportComponents";
+import { isProUser } from "@/lib/landingAccess";
 
 const CRIT_COLORS = {
   task_achievement:  "#ef4444",
@@ -114,6 +115,7 @@ export default function WritingResultsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [result, setResult]     = useState(null);
+  const [profile, setProfile]   = useState(null);
   const [fetching, setFetching] = useState(true);
   const [error, setError]       = useState(null);
   const [activeTask, setActiveTask] = useState(0);
@@ -124,8 +126,10 @@ export default function WritingResultsPage() {
 
   useEffect(() => {
     if (!user) return;
-    api.pollWritingAttempt(attemptId)
-      .then(r => { setResult(r); setFetching(false); })
+    Promise.all([
+      api.pollWritingAttempt(attemptId),
+      api.getMe().catch(() => null),
+    ]).then(([r, p]) => { setResult(r); setProfile(p); setFetching(false); })
       .catch(e => { setError(e.message ?? "Could not load results."); setFetching(false); });
   }, [user, attemptId]);
 
@@ -170,8 +174,8 @@ export default function WritingResultsPage() {
         </span>
       </div>
 
-      {/* Task tabs */}
-      {tasks.length > 1 && (
+      {/* Task tabs — only shown to Pro users */}
+      {isProUser(profile) && tasks.length > 1 && (
         <div style={{
           background: "#fff", borderBottom: `1px solid ${BORDER}`,
           padding: "0 24px", display: "flex",
@@ -194,24 +198,30 @@ export default function WritingResultsPage() {
       )}
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px 64px" }}>
-        {activeTaskData ? (
-          <TaskPanel key={activeTask} task={activeTaskData} />
-        ) : (
-          <p style={{ color: MUTED, fontSize: 14 }}>No results available yet.</p>
-        )}
+        {isProUser(profile) ? (
+          <>
+            {activeTaskData ? (
+              <TaskPanel key={activeTask} task={activeTaskData} />
+            ) : (
+              <p style={{ color: MUTED, fontSize: 14 }}>No results available yet.</p>
+            )}
 
-        {result.improvement_tips?.length > 0 && (
-          <div style={{
-            background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
-            padding: "20px 24px", marginTop: 24,
-          }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>Improvement Tips</div>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-              {result.improvement_tips.map((tip, i) => (
-                <li key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>{tip}</li>
-              ))}
-            </ul>
-          </div>
+            {result.improvement_tips?.length > 0 && (
+              <div style={{
+                background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
+                padding: "20px 24px", marginTop: 24,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>Improvement Tips</div>
+                <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {result.improvement_tips.map((tip, i) => (
+                    <li key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>{tip}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        ) : (
+          <PaywallGate band={result.overall_band} module="writing" />
         )}
       </div>
     </div>

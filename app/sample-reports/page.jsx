@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const PRIMARY  = "#0080ff";
@@ -699,7 +699,13 @@ const TABS = [
 
 export default function SampleReportsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("academic");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && TABS.some(t => t.key === tab)) setActiveTab(tab);
+  }, [searchParams]);
 
   return (
     <div style={{ minHeight: "100vh", background: PAGE_BG, fontFamily: "system-ui" }}>
