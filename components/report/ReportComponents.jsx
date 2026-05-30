@@ -59,16 +59,40 @@ export function segmentText(text, errors) {
   return segs;
 }
 
+// ── Sub-criteria definitions ──────────────────────────────────────────────────
+const SUBCRITERIA = {
+  task_achievement:   ["Overview", "Key features", "Data support"],
+  task_response:      ["Position", "Main ideas", "Development"],
+  coherence_cohesion: ["Flow of ideas", "Cohesive devices", "Transition", "Paragraphing"],
+  lexical_resource:   ["Range of vocabulary", "Accuracy", "Spelling"],
+  grammatical_range:  ["Range of structures", "Accuracy", "Punctuation"],
+  fluency_coherence:  ["Fluency", "Coherence", "Discourse markers"],
+  pronunciation:      ["Sounds", "Stress & rhythm", "Intelligibility"],
+};
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // ── CriterionCard ─────────────────────────────────────────────────────────────
 export function CriterionCard({ crit, expanded, onToggle }) {
+  const subLabels = SUBCRITERIA[crit.key] ?? [];
+  const sub = subLabels.map(label => ({ label, band: crit.band }));
+  const tint = hexToRgba(crit.color, 0.07);
+  const borderColor = hexToRgba(crit.color, 0.25);
+
   return (
-    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: "#fff", border: `1px solid ${borderColor}`, borderRadius: 12, overflow: "hidden" }}>
       <button
         onClick={onToggle}
         style={{
           width: "100%", padding: "14px 18px",
           display: "flex", alignItems: "center", gap: 12,
-          background: "none", border: "none", cursor: "pointer", textAlign: "left",
+          background: expanded ? tint : "#fff", border: "none", cursor: "pointer", textAlign: "left",
+          transition: "background .15s",
         }}
       >
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: crit.color, flexShrink: 0 }} />
@@ -76,28 +100,30 @@ export function CriterionCard({ crit, expanded, onToggle }) {
         <span style={{ fontSize: 18, fontWeight: 800, color: bandColor(crit.band), minWidth: 36, textAlign: "right" }}>
           {crit.band != null ? Number(crit.band).toFixed(1) : "–"}
         </span>
-        <span style={{ color: MUTED, fontSize: 16, marginLeft: 4 }}>{expanded ? "∧" : "∨"}</span>
+        <span style={{ color: MUTED, fontSize: 14, marginLeft: 6 }}>{expanded ? "∧" : "∨"}</span>
       </button>
 
       {expanded && (
-        <div style={{ padding: "0 18px 14px 18px", borderTop: `1px solid ${BORDER}` }}>
-          {crit.sub?.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 0 10px" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+        <div style={{ padding: "14px 18px 16px", borderTop: `1px solid ${borderColor}`, background: tint }}>
+          {sub.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
                 What examiners look for
               </div>
-              {crit.sub.map(s => (
-                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: crit.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: TEXT_SUB }}>{s.label}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {sub.map(s => (
+                  <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: crit.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: TEXT_SUB }}>{s.label}</span>
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: bandColor(s.band) }}>{s.band?.toFixed(1)}</span>
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: bandColor(s.band) }}>{s.band?.toFixed(1)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
-          <p style={{ margin: crit.sub?.length ? "10px 0 0" : "12px 0 0", fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB, lineHeight: 1.65 }}>
             {crit.summary ?? crit.feedback}
           </p>
         </div>
