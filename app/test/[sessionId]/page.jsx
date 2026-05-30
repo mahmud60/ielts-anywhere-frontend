@@ -7,10 +7,15 @@ import { api } from "@/lib/api";
 import { getClientApiBase } from "@/lib/clientApiBase";
 import { useModuleTimer } from "@/lib/useModuleTimer";
 import ModuleTimer from "@/components/ModuleTimer";
+import dynamic from "next/dynamic";
 import ListeningModule from "@/components/ListeningModule";
 import ReadingModule from "@/components/ReadingModule";
 import WritingModule from "@/components/WritingModule";
-import SpeakingModule from "@/components/SpeakingModule";
+
+const ElevenLabsSpeakingModule = dynamic(
+  () => import("@/components/ElevenLabsSpeakingModule"),
+  { ssr: false }
+);
 
 const MODULES   = ["listening", "reading", "writing", "speaking"];
 const MOD_COLOR = {
@@ -271,6 +276,11 @@ function TimeExpiredScreen({ moduleName, sessionId, onRestart, onRetakeAll, rest
 }
 
 // ── final results ─────────────────────────────────────────────────────────────
+const REPORT_ROUTES = {
+  writing:  id => `/writing/results/${id}`,
+  speaking: id => `/speaking/results/${id}`,
+};
+
 function Results({ sessionId, onRetakeAll, retaking }) {
   const [data, setData] = useState(null);
   const router = useRouter();
@@ -281,70 +291,91 @@ function Results({ sessionId, onRetakeAll, retaking }) {
 
   if (!data) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading results…</p>;
 
-  const { overall_band, module_bands, improvement_tips } = data;
+  const { overall_band, module_bands, improvement_tips, attempt_ids = {} } = data;
 
   return (
     <div style={{
-      maxWidth: 600, margin: "0 auto",
-      padding: "40px 24px", fontFamily: "system-ui",
+      maxWidth: 640, margin: "0 auto",
+      padding: "40px 24px 64px", fontFamily: "system-ui",
     }}>
-      <h1 style={{ marginBottom: 4 }}>Test complete</h1>
-      <p style={{ color: "#6b7280", marginBottom: 32 }}>All modules submitted.</p>
+      <h1 style={{ marginBottom: 4, fontSize: 22, fontWeight: 700 }}>Test complete</h1>
+      <p style={{ color: "#6b7280", marginBottom: 32, fontSize: 14 }}>All modules submitted.</p>
 
       {/* Overall */}
       <div style={{
         background: "#fff", border: "1px solid #e5e7eb",
-        borderRadius: 12, padding: 28,
-        textAlign: "center", marginBottom: 20,
+        borderRadius: 14, padding: "24px 28px",
+        textAlign: "center", marginBottom: 16,
       }}>
-        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
           Overall band score
         </div>
         <div style={{
-          fontSize: 72, fontWeight: 700,
+          fontSize: 72, fontWeight: 900,
           color: bandColor(overall_band), lineHeight: 1,
-          fontFamily: "monospace",
         }}>
           {overall_band?.toFixed(1) ?? "—"}
+          <span style={{ fontSize: 24, fontWeight: 600, color: "#9ca3af" }}>/9.0</span>
         </div>
       </div>
 
       {/* Module bands */}
       <div style={{
         display: "grid", gridTemplateColumns: "1fr 1fr",
-        gap: 12, marginBottom: 28,
+        gap: 10, marginBottom: 28,
       }}>
-        {MODULES.map(m => (
-          <div key={m} style={{
-            background: "#fff", border: "1px solid #e5e7eb",
-            borderRadius: 10, padding: "14px 16px",
-          }}>
-            <div style={{
-              fontSize: 12, color: "#9ca3af",
-              textTransform: "capitalize", marginBottom: 6,
+        {MODULES.map(m => {
+          const reportRoute = REPORT_ROUTES[m];
+          const attemptId = attempt_ids[m];
+          const canView = reportRoute && attemptId;
+          return (
+            <div key={m} style={{
+              background: "#fff", border: "1px solid #e5e7eb",
+              borderRadius: 12, padding: "16px 18px",
+              display: "flex", flexDirection: "column", gap: 10,
             }}>
-              {m}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{
+                  fontSize: 11, color: "#9ca3af", fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.06em",
+                }}>
+                  {m}
+                </div>
+                <div style={{
+                  fontSize: 28, fontWeight: 700,
+                  color: bandColor(module_bands?.[m]),
+                }}>
+                  {module_bands?.[m]?.toFixed(1) ?? "—"}
+                </div>
+              </div>
+              {canView && (
+                <button
+                  onClick={() => router.push(reportRoute(attemptId))}
+                  style={{
+                    width: "100%", padding: "8px 0", borderRadius: 7,
+                    border: `1px solid ${MOD_COLOR[m]}`,
+                    background: "transparent",
+                    color: MOD_COLOR[m], fontWeight: 600,
+                    cursor: "pointer", fontSize: 12,
+                  }}
+                >
+                  View Full Report →
+                </button>
+              )}
             </div>
-            <div style={{
-              fontSize: 28, fontWeight: 600,
-              color: bandColor(module_bands?.[m]),
-              fontFamily: "monospace",
-            }}>
-              {module_bands?.[m]?.toFixed(1) ?? "—"}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tips */}
       {Object.entries(improvement_tips || {}).map(([mod, tips]) =>
         tips?.length > 0 && (
-          <div key={mod} style={{ marginBottom: 16 }}>
+          <div key={mod} style={{ marginBottom: 20 }}>
             <div style={{
-              fontWeight: 500, textTransform: "capitalize",
-              marginBottom: 8, fontSize: 14,
+              fontWeight: 700, textTransform: "capitalize",
+              marginBottom: 8, fontSize: 13, color: "#374151",
             }}>
-              {mod} — improvement tips
+              {mod} — Improvement Tips
             </div>
             {tips.map((tip, i) => (
               <div key={i} style={{
@@ -352,6 +383,7 @@ function Results({ sessionId, onRetakeAll, retaking }) {
                 borderRadius: 8, fontSize: 13, color: "#4b5563",
                 marginBottom: 6,
                 borderLeft: `3px solid ${MOD_COLOR[mod]}`,
+                lineHeight: 1.6,
               }}>
                 {tip}
               </div>
@@ -361,7 +393,7 @@ function Results({ sessionId, onRetakeAll, retaking }) {
       )}
 
       {/* Actions */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
         <button
           onClick={onRetakeAll}
           disabled={retaking}
@@ -370,8 +402,7 @@ function Results({ sessionId, onRetakeAll, retaking }) {
             background: "#6366f1", border: "none",
             color: "#fff", fontWeight: 600,
             cursor: retaking ? "not-allowed" : "pointer",
-            fontSize: 14, fontFamily: "system-ui",
-            opacity: retaking ? 0.6 : 1,
+            fontSize: 14, opacity: retaking ? 0.6 : 1,
           }}
         >
           {retaking ? "Resetting…" : "Retake this test"}
@@ -382,7 +413,7 @@ function Results({ sessionId, onRetakeAll, retaking }) {
             width: "100%", padding: 12, borderRadius: 8,
             border: "1px solid #e5e7eb", background: "#fff",
             color: "#374151", fontWeight: 500,
-            cursor: "pointer", fontSize: 14, fontFamily: "system-ui",
+            cursor: "pointer", fontSize: 14,
           }}
         >
           Choose a different test
@@ -572,11 +603,9 @@ export default function SessionPage() {
           />
         )}
         {!showExpired && !transitioning && current === "speaking" && (
-          <SpeakingModule
+          <ElevenLabsSpeakingModule
             key={moduleKey}
-            apiBase={getClientApiBase()}
-            getToken={() => getIdTokenForRequest()}
-            sessionId={sessionId}
+            testSessionId={sessionId}
             onComplete={handleModuleComplete}
           />
         )}
