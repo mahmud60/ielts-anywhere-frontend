@@ -15,6 +15,26 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft, Eye, Clock } from "lucide-react";
 
+function TipOrUpgrade({ result, isWrong }) {
+  const wrong = isWrong !== undefined ? isWrong : (result && !result.is_correct);
+  if (!wrong || !result) return null;
+  if (result.tip) return <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>;
+  if (result.has_tip) return (
+    <div style={{
+      marginTop: 8, padding: "7px 12px",
+      background: "#f5f3ff", border: "1px solid #e0e7ff",
+      borderRadius: 6, fontSize: 12, color: "#6366f1",
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+    }}>
+      <span>Detailed tip available for Pro users.</span>
+      <a href="/pricing" style={{ color: "#6366f1", fontWeight: 600, fontSize: 11, whiteSpace: "nowrap", textDecoration: "none" }}>Upgrade →</a>
+    </div>
+  );
+  return null;
+}
+
+
+
 // ─── Design tokens (aligned with Listening exam / landing page) ───────────────
 const PRIMARY       = "#0080ff";
 const PRIMARY_HOVER = "#006bd6";
@@ -495,9 +515,7 @@ function MCQItem({ question, qNumber, qNumberLabel, value, onChange, result, gro
         {result && !result.is_correct && (
           <div className="rm-correct-hint">Correct: <strong>{caArr.join(", ")}</strong></div>
         )}
-        {result && !result.is_correct && result.tip && (
-          <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-        )}
+        <TipOrUpgrade result={result} />
       </div>
     );
   }
@@ -532,9 +550,7 @@ function MCQItem({ question, qNumber, qNumberLabel, value, onChange, result, gro
       {result && !result.is_correct && (
         <div className="rm-correct-hint">Correct: <strong>{correctStr(ca)}</strong></div>
       )}
-      {result && !result.is_correct && result.tip && (
-        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-      )}
+      <TipOrUpgrade result={result} />
     </div>
   );
 }
@@ -575,9 +591,7 @@ function TFNGItem({ question, qNumber, value, onChange, result }) {
       {result && !result.is_correct && (
         <div className="rm-correct-hint">Correct: <strong>{correctStr(ca)}</strong></div>
       )}
-      {result && !result.is_correct && result.tip && (
-        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-      )}
+      <TipOrUpgrade result={result} />
     </div>
   );
 }
@@ -611,9 +625,7 @@ function MatchingHeadingsItem({ question, qNumber, groupData, value, onChange, r
       {isWrong && (
         <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
       )}
-      {isWrong && result.tip && (
-        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-      )}
+      <TipOrUpgrade result={result} isWrong={isWrong} />
     </div>
   );
 }
@@ -653,9 +665,7 @@ function MatchingInfoItem({ question, qNumber, groupData, value, onChange, resul
       {result && !result.is_correct && (
         <div className="rm-correct-hint">Correct: <strong>{ca}</strong></div>
       )}
-      {result && !result.is_correct && result.tip && (
-        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-      )}
+      <TipOrUpgrade result={result} />
     </div>
   );
 }
@@ -681,9 +691,7 @@ function PlainFillItem({ question, qNumber, value, onChange, result }) {
       {isWrong && (
         <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
       )}
-      {isWrong && result.tip && (
-        <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-      )}
+      <TipOrUpgrade result={result} isWrong={isWrong} />
     </div>
   );
 }
@@ -842,9 +850,7 @@ function QuestionGroup({ group, qOffset, numbering, answers, setAnswers, resultM
                       result={result}
                       disabled={submitted}
                     />
-                    {result && !result.is_correct && result.tip && (
-                      <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-                    )}
+                    <TipOrUpgrade result={result} />
                   </div>
                 );
               }
@@ -866,9 +872,7 @@ function QuestionGroup({ group, qOffset, numbering, answers, setAnswers, resultM
                   {result && !result.is_correct && (
                     <div className="rm-correct-hint">Correct: <strong>{correctStr(result.correct_answer)}</strong></div>
                   )}
-                  {result && !result.is_correct && result.tip && (
-                    <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>
-                  )}
+                  <TipOrUpgrade result={result} />
                 </div>
               );
             })}

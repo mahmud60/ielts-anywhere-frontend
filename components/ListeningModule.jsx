@@ -865,6 +865,17 @@ function RegularSubsection({ sectionId, sub, answers, setAnswers, results, numbe
                       <strong>Tip: </strong>{result.tip}
                     </div>
                   )}
+                  {result && !result.is_correct && !result.tip && result.has_tip && (
+                    <div style={{
+                      marginTop: 8, padding: "7px 12px",
+                      background: "#f5f3ff", border: "1px solid #e0e7ff",
+                      borderRadius: 6, fontSize: 12, color: "#6366f1",
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                    }}>
+                      <span>Detailed tip available for Pro users.</span>
+                      <a href="/pricing" style={{ color: "#6366f1", fontWeight: 600, fontSize: 11, whiteSpace: "nowrap", textDecoration: "none" }}>Upgrade →</a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
