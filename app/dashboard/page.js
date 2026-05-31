@@ -202,8 +202,8 @@ function AccessFlowSection({ router, isPro }) {
         </AccessFlowCard>
 
         <AccessFlowCard
-          title="Practice Listening & Reading"
-          description="Practice Listening and Reading separately without full exam pressure."
+          title="Practice Skills"
+          description="Practice Listening, Reading, and Writing separately without full exam pressure."
           accent="#f59e0b"
         >
           <button type="button" onClick={() => router.push("/reading")} style={BTN.secondary}>
@@ -211,6 +211,19 @@ function AccessFlowSection({ router, isPro }) {
           </button>
           <button type="button" onClick={() => router.push("/listening")} style={BTN.secondary}>
             Practice Listening
+          </button>
+          <button type="button" onClick={() => router.push("/writing")} style={BTN.secondary}>
+            Practice Writing
+          </button>
+        </AccessFlowCard>
+
+        <AccessFlowCard
+          title="Sample Report"
+          description="See an example of a detailed AI-graded report — scores, criterion breakdown, feedback, and improvement tips."
+          accent="#10b981"
+        >
+          <button type="button" onClick={() => router.push("/sample-reports")} style={BTN.secondary}>
+            View Sample Report
           </button>
         </AccessFlowCard>
 

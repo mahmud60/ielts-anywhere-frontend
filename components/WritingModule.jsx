@@ -373,7 +373,7 @@ function ResultsScreen({ result, responses, onRetry }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function WritingModule({ apiBase, getToken, sessionId, onComplete, autoSubmitRef }) {
+export default function WritingModule({ apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef }) {
   // Inject CSS
   useEffect(() => {
     const id = "wm-styles";
@@ -403,7 +403,7 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
       try {
         const token = await getToken();
         const res = await fetch(
-          `${apiBase}/writing/for-session/${sessionId}`,
+          sessionId ? `${apiBase}/writing/for-session/${sessionId}` : `${apiBase}/writing/tests/${testId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) throw new Error(await res.text());
@@ -433,8 +433,8 @@ export default function WritingModule({ apiBase, getToken, sessionId, onComplete
         setLoading(false);
       }
     }
-    if (apiBase && sessionId) load();
-  }, [apiBase, sessionId]);
+    if (apiBase && (sessionId || testId)) load();
+  }, [apiBase, sessionId, testId]);
 
   // Polling loop — runs after submit until grading completes
   const startPolling = useCallback((aid) => {
