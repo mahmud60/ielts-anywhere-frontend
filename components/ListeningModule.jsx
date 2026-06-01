@@ -580,11 +580,16 @@ function DropdownOpt({ question, value, onChange, result, disabled }) {
   );
   const isOk  = result?.is_correct;
   const isBad = result && !isOk;
+  // When reviewing history, `value` (from answers state) is empty — fall back to stored user_answer
+  const displayValue = (value !== undefined && value !== "") ? value
+    : (result?.user_answer !== undefined && result?.user_answer !== null ? result.user_answer : "");
+  const correctOpt = opts.find(o => String(o.order) === String(result?.correct_answer));
+  const userOpt    = opts.find(o => String(o.order) === String(displayValue));
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, verticalAlign: "middle" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, verticalAlign: "middle", flexWrap: "wrap" }}>
       <select
         disabled={disabled || !!result}
-        value={value ?? ""}
+        value={displayValue}
         onChange={e => !result && !disabled && onChange(e.target.value === "" ? undefined : Number(e.target.value))}
         style={{
           border: `1px solid ${isBad ? RED : isOk ? GREEN : BORDER}`,
@@ -598,11 +603,12 @@ function DropdownOpt({ question, value, onChange, result, disabled }) {
         <option value="">— Select —</option>
         {opts.map((o, oi) => <option key={`option-${question.id}-${o.order ?? oi}-${oi}`} value={o.order}>{o.option}</option>)}
       </select>
-      {result && (
-        <span style={{ fontSize: 12, color: isOk ? GREEN : RED }}>
-          {isOk
-            ? "✓"
-            : `✗ → ${opts.find(o => String(o.order) === String(result.correct_answer))?.option ?? result.correct_answer}`}
+      {result && isOk && (
+        <span style={{ fontSize: 12, color: GREEN }}>✓</span>
+      )}
+      {result && !isOk && (
+        <span style={{ fontSize: 12, color: RED }}>
+          ✗{correctOpt ? ` → ${correctOpt.option}` : ""}
         </span>
       )}
     </span>
