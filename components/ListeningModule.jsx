@@ -996,6 +996,26 @@ function getCEFR(band) {
   return "A1";
 }
 
+function getBandLabel(band) {
+  if (band >= 9)   return "Expert User";
+  if (band >= 8)   return "Very Good User";
+  if (band >= 7)   return "Good User";
+  if (band >= 6)   return "Competent User";
+  if (band >= 5)   return "Modest User";
+  if (band >= 4)   return "Limited User";
+  if (band >= 3)   return "Extremely Limited User";
+  return "Non-User";
+}
+
+function getBandDetail(band) {
+  if (band >= 8)   return "You have a fully operational command of English with only occasional unsystematic inaccuracies.";
+  if (band >= 7)   return "You have an operational command of English, handling complex language well despite occasional inaccuracies.";
+  if (band >= 6)   return "You have generally effective command of the language, though inaccuracies and misunderstandings occur.";
+  if (band >= 5)   return "You have a partial command of the language and cope with overall meaning in most situations.";
+  if (band >= 4)   return "Your competence is limited to familiar situations and you frequently have difficulty understanding.";
+  return "You have basic competence limited to very familiar situations.";
+}
+
 function LMAnswerKeyItem({ num, qResult }) {
   const isCorrect = qResult?.is_correct;
   return (
@@ -1335,18 +1355,44 @@ export default function ListeningModule({
         {/* Scrollable body */}
         <div style={{ flex: 1, overflowY: "auto" }}>
 
-          {/* Stats bar */}
-          <div style={{ display: "flex", background: "#fff", borderBottom: `1px solid ${BORDER}` }}>
-            {[
-              { label: "Overall Band Score", value: `${band.toFixed(1)}/9.0`, color: bc(band) },
-              { label: "CEFR Level", value: cefr, color: TEXT },
-              { label: "Correct Answers", value: `${result.correct}/${result.total}`, color: TEXT },
-            ].map((s, i) => (
-              <div key={i} style={{ flex: 1, padding: "18px 24px", borderRight: i < 2 ? `1px solid ${BORDER}` : "none" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>{s.label}</div>
+          {/* Estimated Band Score hero */}
+          <div style={{ background: "#fff", borderBottom: `1px solid ${BORDER}`, padding: "28px 28px 24px" }}>
+            <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 16, fontWeight: 600 }}>
+              Estimated IELTS Band Score — Listening
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
+              <div style={{ textAlign: "center", minWidth: 100 }}>
+                <div style={{ fontSize: 72, fontWeight: 800, color: bc(band), lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                  {band.toFixed(1)}
+                </div>
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>out of 9.0</div>
               </div>
-            ))}
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                  <span style={{
+                    background: bc(band) + "15", color: bc(band),
+                    border: `1px solid ${bc(band)}40`,
+                    borderRadius: 999, padding: "3px 13px", fontSize: 14, fontWeight: 700,
+                  }}>{cefr}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{getBandLabel(band)}</span>
+                </div>
+                <p style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.65, marginBottom: 14 }}>
+                  {getBandDetail(band)}
+                </p>
+                <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{result.correct}/{result.total}</div>
+                    <div style={{ fontSize: 11, color: MUTED }}>Correct answers</div>
+                  </div>
+                  {Object.entries(result.section_scores ?? {}).map(([n, d]) => (
+                    <div key={n}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: bc(d.band ?? 0) }}>{(d.band ?? 0).toFixed(1)}</div>
+                      <div style={{ fontSize: 11, color: MUTED }}>Part {n}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 24px 56px" }}>
