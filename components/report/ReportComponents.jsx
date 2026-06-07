@@ -282,9 +282,10 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
 }
 
 // ── PaywallGate ───────────────────────────────────────────────────────────────
-export function PaywallGate({ band, module }) {
+export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
   const router = useRouter();
   const sampleTab = module === "speaking" ? "speaking" : "academic";
+  const ctaBg = gradient ?? accent;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -346,7 +347,7 @@ export function PaywallGate({ band, module }) {
             <button
               onClick={() => router.push("/pricing")}
               style={{
-                padding: "11px 28px", borderRadius: 9, background: PRIMARY, border: "none",
+                padding: "11px 28px", borderRadius: 9, background: ctaBg, border: "none",
                 color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
               }}
             >
@@ -409,7 +410,8 @@ export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
                 <div style={{
                   maxWidth: "85%", padding: "9px 13px", borderRadius: 12,
                   fontSize: 13, lineHeight: 1.55, color: TEXT,
-                  background: msg.role === "user" ? "#eff6ff" : "#f1f5f9",
+                  background: msg.role === "user" ? "#ede9fe" : "#f1f5f9",
+                  border: msg.role === "user" ? "1px solid #ddd6fe" : "none",
                   borderBottomRightRadius: msg.role === "user" ? 4 : 12,
                   borderBottomLeftRadius: msg.role === "agent" ? 4 : 12,
                 }}>

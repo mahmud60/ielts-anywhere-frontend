@@ -1,95 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/AuthContext";
+import { BookOpen, FileText, ListChecks, Clock, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
-
-const PRIMARY = "#0080ff";
-const BORDER  = "#e2e8f0";
-const TEXT    = "#0f172a";
-const MUTED   = "#94a3b8";
-const GREEN   = "#059669";
-const AMBER   = "#d97706";
-const RED     = "#dc2626";
-
-function bandColor(b) {
-  if (!b || b <= 0) return MUTED;
-  return b >= 7 ? GREEN : b >= 5.5 ? AMBER : RED;
-}
-
-function fmtDate(iso) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-const s = {
-  wrap:  { maxWidth: 760, margin: "0 auto", padding: "48px 24px", fontFamily: "system-ui" },
-  h1:    { fontSize: 28, fontWeight: 700, marginBottom: 6, color: TEXT },
-  sub:   { color: "#64748b", fontSize: 15, marginBottom: 36 },
-  sectionLabel: { fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 },
-  card:  {
-    background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12,
-    padding: "18px 22px", marginBottom: 10,
-    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16,
-  },
-  title: { fontWeight: 600, fontSize: 15, marginBottom: 3, color: TEXT },
-  meta:  { color: MUTED, fontSize: 13 },
-  chip:  { display: "inline-block", fontSize: 11, padding: "2px 9px", borderRadius: 99, background: "#f1f5f9", color: "#64748b", marginRight: 6, marginTop: 4 },
-  btn:   { padding: "9px 20px", borderRadius: 8, background: PRIMARY, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
-  btnOutline: { padding: "7px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${BORDER}`, color: TEXT, fontWeight: 500, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
-};
+import { READING_THEME } from "@/lib/moduleColors";
+import ExamListPage from "@/components/ExamListPage";
 
 export default function ReadingTestsPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [tests,    setTests]    = useState([]);
-  const [starting, setStarting] = useState(null);
-
-  useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [user, loading, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    api.getReadingTests().then(setTests).catch(console.error);
-  }, [user]);
-
-  if (loading) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading…</p>;
-
   return (
-    <div style={s.wrap}>
-      <h1 style={s.h1}>Reading Tests</h1>
-      <p style={s.sub}>Practice IELTS Academic Reading — choose a test below.</p>
-
-      {/* Available tests */}
-      <div style={s.sectionLabel}>Available Tests</div>
-      {tests.length === 0 && <p style={{ color: MUTED, marginBottom: 32 }}>No reading tests available yet.</p>}
-      {tests.map(t => (
-        <div key={t.id} style={s.card}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={s.title}>{t.title}</div>
-            <div style={s.meta}>{t.test_type === "academic" ? "Academic" : "General Training"}</div>
-            <div style={{ marginTop: 4 }}>
-              <span style={s.chip}>{t.passage_count} passage{t.passage_count !== 1 ? "s" : ""}</span>
-              <span style={s.chip}>{t.question_count} questions</span>
-            </div>
-          </div>
-          <button
-            style={{ ...s.btn, opacity: starting === t.id ? 0.6 : 1 }}
-            disabled={starting === t.id}
-            onClick={() => { setStarting(t.id); router.push(`/reading/${t.id}`); }}
-          >
-            {starting === t.id ? "Opening…" : "Start"}
-          </button>
-        </div>
-      ))}
-
-      <div style={{ marginTop: 24, textAlign: "center" }}>
-        <button style={{ ...s.btnOutline, fontSize: 13 }} onClick={() => router.push("/reports")}>
-          View past results →
-        </button>
-      </div>
-    </div>
+    <ExamListPage
+      moduleKey="reading"
+      title="Reading Tests"
+      subtitle="Practice IELTS Academic Reading passages with every question type and detailed answer review."
+      accent={READING_THEME.accent}
+      accentSoft={READING_THEME.soft}
+      gradient={READING_THEME.gradient}
+      icon={<BookOpen size={30} color="#fff" />}
+      duration="~60 min"
+      facts={[
+        { icon: <Clock size={12} />, label: "Duration", value: "60 min" },
+        { icon: <Sparkles size={12} />, label: "Scoring", value: "Instant band" },
+      ]}
+      fetchTests={() => api.getReadingTests()}
+      startPath={(t) => `/reading/${t.id}`}
+      getDescription={(t) => (t.test_type === "academic" ? "Academic Reading" : "General Training Reading")}
+      getMeta={(t) => [
+        { icon: <FileText size={12} />, label: `${t.passage_count} passage${t.passage_count !== 1 ? "s" : ""}` },
+        { icon: <ListChecks size={12} />, label: `${t.question_count} questions` },
+      ]}
+    />
   );
 }

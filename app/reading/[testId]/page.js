@@ -6,6 +6,8 @@ import { auth } from "@/lib/firebase";
 import { useEffect } from "react";
 import ReadingModule from "@/components/ReadingModule";
 import { getClientApiBase } from "@/lib/clientApiBase";
+import PetLoader from "@/components/PetLoader";
+import { MOD_COLORS } from "@/lib/moduleColors";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -21,7 +23,9 @@ export default function StandaloneReadingPage() {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  if (loading || !user) return null;
+  if (loading || !user) {
+    return <PetLoader fixed label="is loading your test" accent={MOD_COLORS.reading} />;
+  }
 
   return (
     <ReadingModule

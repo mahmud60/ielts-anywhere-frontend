@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import ReadingModule from "@/components/ReadingModule";
 import { getClientApiBase } from "@/lib/clientApiBase";
+import PetLoader from "@/components/PetLoader";
+import { MOD_COLORS } from "@/lib/moduleColors";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -31,7 +33,9 @@ export default function ReadingResultPage() {
       .catch(e => setErr(e.message));
   }, [user, attemptId]);
 
-  if (loading || (!attempt && !err)) return null;
+  if (loading || (!attempt && !err)) {
+    return <PetLoader fixed label="is opening your report" accent={MOD_COLORS.reading} />;
+  }
   if (err) return <p style={{ padding: 32, fontFamily: "system-ui", color: "#dc2626" }}>{err}</p>;
 
   return (
@@ -40,7 +44,7 @@ export default function ReadingResultPage() {
       getToken={getToken}
       testId={attempt.test_id}
       initialResult={attempt}
-      onBack={() => router.push("/reading")}
+      onBack={() => { if (window.history.length > 1) router.back(); else router.push("/reports"); }}
     />
   );
 }

@@ -10,6 +10,8 @@ import {
   CriterionCard, DetailedFeedback, PaywallGate,
 } from "@/components/report/ReportComponents";
 import { isProUser } from "@/lib/landingAccess";
+import PetLoader from "@/components/PetLoader";
+import { MOD_COLORS } from "@/lib/moduleColors";
 
 const CRIT_COLORS = {
   task_achievement:  "#ef4444",
@@ -31,21 +33,7 @@ function fmtDate(iso) {
 }
 
 function Spinner() {
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", fontFamily: "system-ui", gap: 16,
-      background: "#f8fafc",
-    }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: "50%",
-        border: `4px solid ${BORDER}`, borderTopColor: PRIMARY,
-        animation: "spin .8s linear infinite",
-      }} />
-      <p style={{ color: MUTED, fontSize: 14 }}>Loading results…</p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+  return <PetLoader fixed label="is opening your report" accent={MOD_COLORS.writing} />;
 }
 
 function TaskPanel({ task, attemptDate }) {

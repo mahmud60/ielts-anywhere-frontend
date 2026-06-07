@@ -2,25 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Mic, Clock, Sparkles, ArrowRight, Award, Volume2, MessageCircle,
+  Headphones, CheckCircle2, Play,
+} from "lucide-react";
+
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { SPEAKING_THEME } from "@/lib/moduleColors";
+import DashboardShell from "@/components/DashboardShell";
+import PetLoader from "@/components/PetLoader";
 
-const PRIMARY = "#0080ff";
-const BORDER  = "#e2e8f0";
-const TEXT    = "#0f172a";
-const MUTED   = "#94a3b8";
-const GREEN   = "#059669";
-const AMBER   = "#d97706";
-const RED     = "#dc2626";
+const { accent: ACCENT, soft: SOFT, gradient: GRADIENT } = SPEAKING_THEME;
 
 function bandColor(b) {
-  if (!b || b <= 0) return MUTED;
-  if (b >= 8) return PRIMARY;
-  if (b >= 6.5) return GREEN;
-  if (b >= 5) return AMBER;
-  return RED;
+  if (!b || b <= 0) return "#94a3b8";
+  return b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626";
 }
-
 function fmtDate(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -29,28 +27,38 @@ function fmtDate(iso) {
 const PARTS = [
   {
     num: 1,
-    title: "Part 1 — Introduction",
+    title: "Introduction & interview",
     duration: "4–5 min",
-    desc: "The examiner asks familiar questions about yourself, your home, family, work, studies, and interests.",
+    desc: "Short questions about familiar topics — home, work, studies, hobbies.",
+    icon: <MessageCircle size={18} />,
   },
   {
     num: 2,
-    title: "Part 2 — Long Turn",
+    title: "Individual long turn",
     duration: "3–4 min",
-    desc: "You receive a cue card with a topic and have 1 minute to prepare, then speak for 1–2 minutes.",
+    desc: "1 minute to prepare from a cue card, then speak for 1–2 minutes.",
+    icon: <Mic size={18} />,
   },
   {
     num: 3,
-    title: "Part 3 — Discussion",
+    title: "Two-way discussion",
     duration: "4–5 min",
-    desc: "A two-way discussion with the examiner on abstract themes related to the Part 2 topic.",
+    desc: "Deeper questions linked to your Part 2 topic — opinions and abstract ideas.",
+    icon: <Volume2 size={18} />,
   },
+];
+
+const STEPS = [
+  { label: "Connect", desc: "AI examiner joins via voice" },
+  { label: "Respond", desc: "Speak naturally in real time" },
+  { label: "Get scored", desc: "Band + criteria feedback" },
 ];
 
 export default function SpeakingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [history, setHistory] = useState([]);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -61,121 +69,170 @@ export default function SpeakingPage() {
     api.getSpeakingHistory().then(setHistory).catch(() => {});
   }, [user]);
 
-  function startTest() {
+  const startTest = () => {
+    setStarting(true);
     router.push("/speaking/start");
+  };
+
+  if (loading) {
+    return (
+      <DashboardShell title="Speaking">
+        <PetLoader fullScreen label="is warming up" accent={ACCENT} />
+      </DashboardShell>
+    );
   }
 
-  if (loading) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading…</p>;
-
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 24px 64px", fontFamily: "system-ui" }}>
-
-      {/* Header */}
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6, color: TEXT }}>Speaking Test</h1>
-      <p style={{ color: "#64748b", fontSize: 15, marginBottom: 36 }}>
-        Practice your IELTS Speaking with an AI examiner. The full test takes 11–14 minutes.
-      </p>
-
-      {/* Format cards */}
-      <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
-        Test Format
+    <DashboardShell title="Speaking">
+      {/* Hero */}
+      <div style={{
+        borderRadius: 20, padding: "28px 30px", marginBottom: 24, background: GRADIENT, color: "#fff",
+        display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap", boxShadow: `0 18px 40px -18px ${ACCENT}aa`,
+      }}>
+        <div style={{ width: 64, height: 64, borderRadius: 18, flexShrink: 0, background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Mic size={30} color="#fff" />
+        </div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 6px" }}>Speaking Test</h1>
+          <p style={{ fontSize: 14, lineHeight: 1.55, opacity: .92, margin: 0, maxWidth: 520 }}>
+            A full 3-part IELTS simulation with a conversational AI examiner and instant band scoring.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {[{ icon: <Clock size={12} />, label: "Duration", value: "11–14 min" }, { icon: <Sparkles size={12} />, label: "Feedback", value: "4 criteria" }].map((f) => (
+            <div key={f.label} style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 14px", minWidth: 96 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, opacity: .85, marginBottom: 4 }}>{f.icon}{f.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{f.value}</div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 36 }}>
-        {PARTS.map(p => (
-          <div key={p.num} style={{
-            background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12,
-            padding: "16px 20px", display: "flex", gap: 16, alignItems: "flex-start",
-          }}>
-            <div style={{
-              flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-              background: "#eff6ff", color: PRIMARY,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 800, fontSize: 16,
-            }}>
-              {p.num}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 18, marginBottom: 24 }}>
+
+        {/* Start card */}
+        <div className="da-card" style={{ padding: "24px 26px", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: SOFT, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Headphones size={22} color={ACCENT} />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 14, color: TEXT }}>{p.title}</span>
-                <span style={{
-                  fontSize: 11, padding: "2px 9px", borderRadius: 99,
-                  background: "#f1f5f9", color: "#64748b", fontWeight: 600,
-                }}>{p.duration}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>AI Examiner</div>
+              <div style={{ fontSize: 12.5, color: "#64748b" }}>Voice conversation · no scheduling</div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: "0 0 18px", flex: 1 }}>
+            Put on headphones, allow microphone access, and the examiner will walk you through Parts 1–3 just like a real test room.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {["Quiet environment recommended", "Microphone permission required", "Speak clearly at a natural pace"].map((t) => (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#475569" }}>
+                <CheckCircle2 size={15} color={ACCENT} />
+                {t}
               </div>
-              <p style={{ color: "#475569", fontSize: 13, margin: 0, lineHeight: 1.55 }}>{p.desc}</p>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={startTest}
+            disabled={starting}
+            style={{
+              width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", cursor: starting ? "wait" : "pointer",
+              background: GRADIENT, color: "#fff", fontWeight: 700, fontSize: 15,
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+              boxShadow: `0 14px 30px -14px ${ACCENT}`, opacity: starting ? 0.7 : 1,
+            }}
+          >
+            {starting ? "Opening…" : <><Play size={17} fill="#fff" /> Start speaking test</>}
+          </button>
+        </div>
+
+        {/* How it works */}
+        <div className="da-card" style={{ padding: "24px 26px" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 18px", color: "#0f172a" }}>How it works</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {STEPS.map((s, i) => (
+              <div key={s.label} style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: SOFT, color: ACCENT, fontWeight: 800, fontSize: 14,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {i + 1}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#0f172a", marginBottom: 2 }}>{s.label}</div>
+                  <div style={{ fontSize: 13, color: "#64748b" }}>{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 20, padding: "12px 14px", borderRadius: 11, background: "#fffbeb", border: "1px solid #fde68a", fontSize: 12.5, color: "#92400e", lineHeight: 1.55 }}>
+            Tip: Treat it like a real exam — full sentences, natural pace, and expand your answers with examples.
+          </div>
+        </div>
+      </div>
+
+      {/* Test format timeline */}
+      <h2 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 14px" }}>Test format</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14, marginBottom: 28 }}>
+        {PARTS.map((p) => (
+          <div key={p.num} className="da-pcard" style={{ padding: "20px 22px", cursor: "default" }}>
+            <div style={{ height: 4, background: GRADIENT, borderRadius: 4, margin: "-20px -22px 16px" }} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: SOFT, color: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {p.icon}
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#64748b", background: "#f4f5f9", borderRadius: 99, padding: "4px 10px" }}>{p.duration}</span>
             </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Part {p.num}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>{p.title}</div>
+            <p style={{ color: "#64748b", fontSize: 13, margin: 0, lineHeight: 1.55 }}>{p.desc}</p>
           </div>
         ))}
       </div>
 
-      {/* Microphone tip */}
-      <div style={{
-        background: "#fffbeb", border: `1px solid #fde68a`, borderRadius: 10,
-        padding: "12px 16px", marginBottom: 32, fontSize: 13, color: "#92400e",
-        display: "flex", gap: 10, alignItems: "flex-start",
-      }}>
-        <span style={{ flexShrink: 0, fontSize: 16 }}>🎤</span>
-        <span>Make sure you are in a quiet place and your microphone is working. The AI examiner will guide you through all three parts.</span>
-      </div>
-
-      {/* CTA */}
-      <button
-        onClick={startTest}
-        style={{
-          width: "100%", padding: "14px 24px", borderRadius: 10,
-          background: PRIMARY, border: "none",
-          color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer",
-          marginBottom: 40,
-        }}
-      >
-        Start Speaking Test
-      </button>
-
-      {/* Past attempts */}
+      {/* History */}
       {history.length > 0 && (
         <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
-            Past Results
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {history.map(a => (
-              <div key={a.id} style={{
-                background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12,
-                padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16,
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: TEXT, marginBottom: 2 }}>
-                    IELTS Speaking Test
-                  </div>
-                  <div style={{ fontSize: 12, color: MUTED }}>{fmtDate(a.created_at)}</div>
-                  {a.examiner_summary && (
-                    <div style={{ fontSize: 12, color: "#475569", marginTop: 4, lineHeight: 1.5, maxWidth: 460,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {a.examiner_summary}
-                    </div>
-                  )}
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: bandColor(a.overall_band), lineHeight: 1 }}>
-                    {a.overall_band != null ? Number(a.overall_band).toFixed(1) : "—"}
-                  </div>
-                  <div style={{ fontSize: 10, color: MUTED, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>Band</div>
-                </div>
-                <button
-                  onClick={() => router.push(`/speaking/results/${a.id}`)}
-                  style={{
-                    flexShrink: 0, padding: "8px 16px", borderRadius: 8,
-                    background: "#fff", border: `1px solid ${BORDER}`,
-                    color: TEXT, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                  }}
-                >
-                  View
-                </button>
-              </div>
-            ))}
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px" }}>Past results</h2>
+          <div className="da-card" style={{ overflow: "hidden", marginBottom: 24 }}>
+            <div style={{ overflowX: "auto" }}>
+              <table className="da-table">
+                <thead>
+                  <tr><th>Test</th><th>Date</th><th className="da-col-opt">Summary</th><th>Band</th><th style={{ textAlign: "right" }}>Report</th></tr>
+                </thead>
+                <tbody>
+                  {history.map((a) => (
+                    <tr key={a.id} className="clickable" onClick={() => router.push(`/speaking/results/${a.id}`)}>
+                      <td style={{ fontWeight: 600, color: "#0f172a" }}>Speaking Test</td>
+                      <td style={{ color: "#64748b", whiteSpace: "nowrap" }}>{fmtDate(a.created_at)}</td>
+                      <td className="da-col-opt" style={{ color: "#64748b", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.examiner_summary || "—"}</td>
+                      <td><span style={{ fontFamily: "monospace", fontWeight: 700, color: bandColor(a.overall_band) }}>{a.overall_band != null ? Number(a.overall_band).toFixed(1) : "—"}</span></td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="da-btn da-btn-ghost" style={{ padding: "6px 14px", fontSize: 12.5 }} onClick={(e) => { e.stopPropagation(); router.push(`/speaking/results/${a.id}`); }}>
+                          View <ArrowRight size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
-    </div>
+
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <button type="button" onClick={() => router.push("/sample-reports?tab=speaking")}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #e6e8ef", borderRadius: 11, padding: "10px 18px", fontSize: 13.5, fontWeight: 600, color: "#475569", cursor: "pointer" }}>
+          <Award size={16} color={ACCENT} /> See a sample speaking report
+        </button>
+      </div>
+    </DashboardShell>
   );
 }

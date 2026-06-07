@@ -1,18 +1,25 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { PenLine, Mic, Sparkles } from "lucide-react";
+import DashboardShell from "@/components/DashboardShell";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
-const PRIMARY  = "#0080ff";
-const BORDER   = "#e2e8f0";
+const PRIMARY  = "#6366f1";
+const BORDER   = "#edeff4";
 const TEXT     = "#0f172a";
 const TEXT_SUB = "#475569";
 const MUTED    = "#94a3b8";
-const PAGE_BG  = "#f8fafc";
 const GREEN    = "#059669";
 const AMBER    = "#d97706";
 const RED      = "#dc2626";
+
+// Module theming — identical to the rest of the app
+const MODULES = {
+  writing:  { accent: "#10b981", soft: "#d1fae5", gradient: "linear-gradient(135deg,#10b981 0%,#059669 100%)", label: "Writing",  icon: <PenLine size={26} color="#fff" /> },
+  speaking: { accent: "#8b5cf6", soft: "#ede9fe", gradient: "linear-gradient(135deg,#8b5cf6 0%,#7c3aed 100%)", label: "Speaking", icon: <Mic size={26} color="#fff" /> },
+};
 
 const CRIT_COLOR = {
   task:        "#ef4444",
@@ -284,44 +291,89 @@ const SPEAKING_SAMPLE = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function CriterionCard({ crit, expanded, onToggle }) {
+function BandHero({ band, theme, kicker, meta }) {
+  const C = 2 * Math.PI * 52;
+  const pct = Math.min(1, band / 9);
   return (
-    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{
+      borderRadius: 20, padding: "26px 28px", marginBottom: 22, background: theme.gradient, color: "#fff",
+      display: "flex", alignItems: "center", gap: 30, flexWrap: "wrap",
+      boxShadow: `0 18px 40px -18px ${theme.accent}aa`,
+    }}>
+      <div style={{ position: "relative", width: 128, height: 128, flexShrink: 0 }}>
+        <svg width="128" height="128" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="64" cy="64" r="52" fill="none" stroke="rgba(255,255,255,.22)" strokeWidth="11" />
+          <circle cx="64" cy="64" r="52" fill="none" stroke="#fff" strokeWidth="11" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - pct)} style={{ transition: "stroke-dashoffset .9s ease" }} />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 40, fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{band.toFixed(1)}</div>
+          <div style={{ fontSize: 11, opacity: .8, marginTop: 2 }}>out of 9.0</div>
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, textTransform: "uppercase", letterSpacing: ".1em", opacity: .85, marginBottom: 8, fontWeight: 600 }}>
+          <Sparkles size={13} /> Sample report
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 12px" }}>{kicker}</h2>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ background: "rgba(255,255,255,.16)", borderRadius: 12, padding: "9px 15px" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{cefrLabel(band)}</div>
+            <div style={{ fontSize: 10.5, opacity: .8, marginTop: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>CEFR</div>
+          </div>
+          {meta.map((m) => (
+            <div key={m.label} style={{ background: "rgba(255,255,255,.16)", borderRadius: 12, padding: "9px 15px" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{m.value}</div>
+              <div style={{ fontSize: 10.5, opacity: .8, marginTop: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CriterionCard({ crit, expanded, onToggle, theme }) {
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
       <button
         onClick={onToggle}
         style={{
-          width: "100%", padding: "14px 18px",
+          width: "100%", padding: "15px 18px",
           display: "flex", alignItems: "center", gap: 12,
-          background: "none", border: "none", cursor: "pointer", textAlign: "left",
+          background: expanded ? theme.soft + "55" : "none", border: "none", cursor: "pointer", textAlign: "left",
+          transition: "background .15s",
         }}
       >
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: crit.color, flexShrink: 0 }} />
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: theme.accent, flexShrink: 0 }} />
         <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT }}>{crit.label}</span>
-        <span style={{ fontSize: 18, fontWeight: 800, color: bandColor(crit.band), minWidth: 36, textAlign: "right" }}>
+        <span style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 800, color: bandColor(crit.band), minWidth: 36, textAlign: "right" }}>
           {crit.band.toFixed(1)}
         </span>
         <span style={{ color: MUTED, fontSize: 16, marginLeft: 4 }}>{expanded ? "∧" : "∨"}</span>
       </button>
 
       {expanded && (
-        <div style={{ padding: "0 18px 14px 18px", borderTop: `1px solid ${BORDER}` }}>
+        <div style={{ padding: "0 18px 16px 18px", borderTop: `1px solid ${BORDER}` }}>
           {crit.sub?.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 0 10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 0 10px" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                 What examiners look for
               </div>
               {crit.sub.map(s => (
-                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: crit.color, flexShrink: 0 }} />
+                <div key={s.label}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 5px" }}>
                     <span style={{ fontSize: 13, color: TEXT_SUB }}>{s.label}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: bandColor(s.band) }}>{s.band.toFixed(1)}</span>
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: bandColor(s.band) }}>{s.band.toFixed(1)}</span>
+                  <div style={{ height: 5, background: "#eef0f5", borderRadius: 3 }}>
+                    <div style={{ width: `${(s.band / 9) * 100}%`, height: "100%", background: theme.accent, borderRadius: 3 }} />
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          <p style={{ margin: crit.sub?.length ? "10px 0 0" : "12px 0 0", fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>
+          <p style={{ margin: crit.sub?.length ? "12px 0 0" : "14px 0 0", fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>
             {crit.summary}
           </p>
         </div>
@@ -431,47 +483,27 @@ function SpeedMeter({ wpm }) {
 
 // ── Writing report ────────────────────────────────────────────────────────────
 
-function WritingReport({ data }) {
+function WritingReport({ data, theme, kicker }) {
   const critKeys = data.criteria.map(c => c.key);
   const [expanded, setExpanded] = useState({ [critKeys[0]]: true });
   const [activeCrit, setActiveCrit] = useState(critKeys[0]);
   const [showFeedback, setShowFeedback] = useState(true);
-  const [showTask, setShowTask] = useState(false);
 
   const crit = data.criteria.find(c => c.key === activeCrit);
   const errors = data.errors[activeCrit] || [];
 
   return (
     <>
-      {/* Score hero */}
-      <div style={{
-        background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
-        padding: "24px 24px 20px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
-      }}>
-        <div>
-          <div style={{ fontSize: 52, fontWeight: 900, color: bandColor(data.band), lineHeight: 1 }}>
-            {data.band.toFixed(1)}<span style={{ fontSize: 24, fontWeight: 600, color: MUTED }}>/9.0</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 24 }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(data.band)}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{data.words}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Words</div>
-          </div>
-        </div>
-      </div>
+      <BandHero band={data.band} theme={theme} kicker={kicker} meta={[{ label: "Words", value: data.words }]} />
 
       {/* Criterion accordion */}
+      <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, margin: "0 0 12px" }}>Band breakdown</h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
         {data.criteria.map(c => (
           <CriterionCard
             key={c.key}
             crit={c}
+            theme={theme}
             expanded={!!expanded[c.key]}
             onToggle={() => setExpanded(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
           />
@@ -479,42 +511,27 @@ function WritingReport({ data }) {
       </div>
 
       {/* Detailed feedback */}
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "20px 20px 24px" }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>Detailed Feedback</div>
+      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "22px 22px 24px", boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
+        <div style={{ fontWeight: 700, fontSize: 16, color: TEXT, marginBottom: 16 }}>Detailed feedback</div>
 
-        {/* Task text toggle */}
         <div style={{
-          background: "#f8fafc", border: `1px solid ${BORDER}`, borderRadius: 10,
-          padding: "10px 14px", marginBottom: 16, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6,
+          background: theme.soft + "66", border: `1px solid ${theme.soft}`, borderRadius: 12,
+          padding: "12px 16px", marginBottom: 18, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6,
         }}>
+          <span style={{ fontWeight: 700, fontSize: 11, color: theme.accent, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 4 }}>Task prompt</span>
           {data.taskText}
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: TEXT_SUB, marginBottom: 16, cursor: "pointer", userSelect: "none" }}>
-          <span style={{
-            width: 34, height: 18, borderRadius: 9,
-            background: showTask ? PRIMARY : BORDER,
-            position: "relative", display: "inline-block", transition: "background .2s",
-          }}>
-            <span style={{
-              position: "absolute", top: 2, left: showTask ? 18 : 2,
-              width: 14, height: 14, borderRadius: "50%", background: "#fff",
-              transition: "left .2s",
-            }} />
-          </span>
-          <input type="checkbox" checked={showTask} onChange={() => setShowTask(v => !v)} style={{ display: "none" }} />
-          Show the task visual
-        </label>
 
         {/* Criterion tabs */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
           {data.criteria.map(c => (
             <button
               key={c.key}
               onClick={() => setActiveCrit(c.key)}
               style={{
-                padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                padding: "7px 15px", borderRadius: 20, fontSize: 12.5, fontWeight: 600,
                 border: "none", cursor: "pointer",
-                background: activeCrit === c.key ? c.color : "#f1f5f9",
+                background: activeCrit === c.key ? theme.accent : "#f1f3f8",
                 color: activeCrit === c.key ? "#fff" : TEXT_SUB,
                 transition: "background .15s",
               }}
@@ -525,47 +542,43 @@ function WritingReport({ data }) {
         </div>
 
         {/* Two-column: essay + errors */}
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
           {/* Left: essay */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginRight: 4 }}>Your Writing</span>
-              {["Original", "Feedback"].map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setShowFeedback(mode === "Feedback")}
-                  style={{
-                    padding: "3px 12px", borderRadius: 14, fontSize: 11, fontWeight: 600,
-                    border: "none", cursor: "pointer",
-                    background: (showFeedback ? "Feedback" : "Original") === mode ? TEXT : "#f1f5f9",
-                    color: (showFeedback ? "Feedback" : "Original") === mode ? "#fff" : MUTED,
-                  }}
-                >
-                  {mode}
-                </button>
-              ))}
+          <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: TEXT, marginRight: 4 }}>Candidate response</span>
+              <div style={{ display: "inline-flex", background: "#f1f3f8", borderRadius: 20, padding: 3 }}>
+                {["Original", "Feedback"].map(mode => {
+                  const active = (showFeedback ? "Feedback" : "Original") === mode;
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setShowFeedback(mode === "Feedback")}
+                      style={{
+                        padding: "4px 12px", borderRadius: 16, fontSize: 11, fontWeight: 600,
+                        border: "none", cursor: "pointer",
+                        background: active ? theme.accent : "transparent",
+                        color: active ? "#fff" : MUTED,
+                      }}
+                    >
+                      {mode}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div style={{
-              background: "#f8fafc", borderRadius: 10, padding: "14px 16px",
-              maxHeight: 440, overflowY: "auto",
-            }}>
-              <AnnotatedEssay
-                essay={data.essay}
-                errors={errors}
-                critKey={activeCrit}
-                showFeedback={showFeedback}
-                color={crit?.color || PRIMARY}
-              />
+            <div style={{ background: "#f8fafc", border: `1px solid ${BORDER}`, borderRadius: 12, padding: "16px 18px", maxHeight: 460, overflowY: "auto" }}>
+              <AnnotatedEssay essay={data.essay} errors={errors} critKey={activeCrit} showFeedback={showFeedback} color={theme.accent} />
             </div>
           </div>
 
           {/* Right: errors */}
-          <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
-              {crit?.label} Errors
+          <div style={{ flex: "0 1 320px", width: 320, minWidth: 260, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
+              {crit?.label} — {errors.length} note{errors.length !== 1 ? "s" : ""}
             </div>
             {errors.map((e, i) => (
-              <ErrorItem key={e.id} num={i + 1} error={e} color={crit?.color || PRIMARY} />
+              <ErrorItem key={e.id} num={i + 1} error={e} color={theme.accent} />
             ))}
             {errors.length === 0 && (
               <p style={{ fontSize: 13, color: MUTED }}>No errors detected for this criterion.</p>
@@ -579,7 +592,7 @@ function WritingReport({ data }) {
 
 // ── Speaking report ───────────────────────────────────────────────────────────
 
-function SpeakingReport({ data }) {
+function SpeakingReport({ data, theme, kicker }) {
   const critKeys = data.criteria.map(c => c.key);
   const [expanded, setExpanded] = useState({ [critKeys[0]]: true });
   const [activeCrit, setActiveCrit] = useState(critKeys[0]);
@@ -589,29 +602,16 @@ function SpeakingReport({ data }) {
 
   return (
     <>
-      {/* Score hero */}
-      <div style={{
-        background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
-        padding: "24px 24px 20px", marginBottom: 20,
-        display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap",
-      }}>
-        <div>
-          <div style={{ fontSize: 52, fontWeight: 900, color: bandColor(data.band), lineHeight: 1 }}>
-            {data.band.toFixed(1)}<span style={{ fontSize: 24, fontWeight: 600, color: MUTED }}>/9.0</span>
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(data.band)}</div>
-          <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
-        </div>
-      </div>
+      <BandHero band={data.band} theme={theme} kicker={kicker} meta={[{ label: "WPM", value: data.wpm }]} />
 
       {/* Criterion accordion */}
+      <h3 style={{ fontSize: 16, fontWeight: 700, color: TEXT, margin: "0 0 12px" }}>Band breakdown</h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
         {data.criteria.map(c => (
           <CriterionCard
             key={c.key}
             crit={c}
+            theme={theme}
             expanded={!!expanded[c.key]}
             onToggle={() => setExpanded(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
           />
@@ -619,27 +619,27 @@ function SpeakingReport({ data }) {
       </div>
 
       {/* Detailed feedback */}
-      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "20px 20px 24px", marginBottom: 20 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 14 }}>Detailed Feedback</div>
+      <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "22px 22px 24px", marginBottom: 20, boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
+        <div style={{ fontWeight: 700, fontSize: 16, color: TEXT, marginBottom: 16 }}>Detailed feedback</div>
 
         <div style={{
-          background: "#f8fafc", border: `1px solid ${BORDER}`, borderRadius: 10,
-          padding: "10px 14px", marginBottom: 16, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6,
+          background: theme.soft + "66", border: `1px solid ${theme.soft}`, borderRadius: 12,
+          padding: "12px 16px", marginBottom: 18, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6,
         }}>
-          <span style={{ fontWeight: 600, fontSize: 12, color: PRIMARY, marginRight: 8 }}>Speaking Task</span>
+          <span style={{ fontWeight: 700, fontSize: 11, color: theme.accent, textTransform: "uppercase", letterSpacing: ".06em", display: "block", marginBottom: 4 }}>Speaking task</span>
           {data.taskText}
         </div>
 
         {/* Criterion tabs */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
           {data.criteria.map(c => (
             <button
               key={c.key}
               onClick={() => setActiveCrit(c.key)}
               style={{
-                padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                padding: "7px 15px", borderRadius: 20, fontSize: 12.5, fontWeight: 600,
                 border: "none", cursor: "pointer",
-                background: activeCrit === c.key ? c.color : "#f1f5f9",
+                background: activeCrit === c.key ? theme.accent : "#f1f3f8",
                 color: activeCrit === c.key ? "#fff" : TEXT_SUB,
               }}
             >
@@ -648,17 +648,17 @@ function SpeakingReport({ data }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
           {/* Left: transcript */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 8 }}>Transcript</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" }}>
+          <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: TEXT, marginBottom: 8 }}>Transcript</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflowY: "auto" }}>
               {data.transcript.map((seg, i) => (
                 <div key={i} style={{
-                  display: "flex", gap: 10, padding: "8px 12px",
-                  background: "#f8fafc", borderRadius: 8, alignItems: "flex-start",
+                  display: "flex", gap: 10, padding: "9px 12px",
+                  background: "#f8fafc", border: `1px solid ${BORDER}`, borderRadius: 10, alignItems: "flex-start",
                 }}>
-                  <span style={{ fontSize: 11, color: MUTED, fontWeight: 600, flexShrink: 0, paddingTop: 2 }}>{seg.ts}</span>
+                  <span style={{ fontSize: 11, color: theme.accent, fontWeight: 700, flexShrink: 0, paddingTop: 2, fontVariantNumeric: "tabular-nums" }}>{seg.ts}</span>
                   <span style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.55 }}>{seg.text}</span>
                 </div>
               ))}
@@ -666,12 +666,12 @@ function SpeakingReport({ data }) {
           </div>
 
           {/* Right: errors */}
-          <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
-              {crit?.label} Notes
+          <div style={{ flex: "0 1 320px", width: 320, minWidth: 260, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
+              {crit?.label} — {errors.length} note{errors.length !== 1 ? "s" : ""}
             </div>
             {errors.map((e, i) => (
-              <ErrorItem key={e.id} num={i + 1} error={e} color={crit?.color || PRIMARY} />
+              <ErrorItem key={e.id} num={i + 1} error={e} color={theme.accent} />
             ))}
             {errors.length === 0 && (
               <p style={{ fontSize: 13, color: MUTED }}>No errors for this criterion.</p>
@@ -681,7 +681,7 @@ function SpeakingReport({ data }) {
       </div>
 
       {/* Speed meter */}
-      <div style={{ maxWidth: 360 }}>
+      <div style={{ maxWidth: 380 }}>
         <SpeedMeter wpm={data.wpm} />
       </div>
     </>
@@ -691,14 +691,13 @@ function SpeakingReport({ data }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "academic",  label: "Academic Writing Task 1" },
-  { key: "general",   label: "General Writing Task 1" },
-  { key: "task2",     label: "Writing Task 2" },
-  { key: "speaking",  label: "IELTS Speaking" },
+  { key: "academic", label: "Academic Task 1", module: "writing" },
+  { key: "general",  label: "General Task 1",  module: "writing" },
+  { key: "task2",    label: "Writing Task 2",  module: "writing" },
+  { key: "speaking", label: "Speaking",         module: "speaking" },
 ];
 
 function SampleReportsContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("academic");
 
@@ -707,65 +706,54 @@ function SampleReportsContent() {
     if (tab && TABS.some(t => t.key === tab)) setActiveTab(tab);
   }, [searchParams]);
 
-  return (
-    <div style={{ minHeight: "100vh", background: PAGE_BG, fontFamily: "system-ui" }}>
+  const activeMeta = TABS.find(t => t.key === activeTab) || TABS[0];
+  const theme = MODULES[activeMeta.module];
 
-      {/* Top bar */}
-      <div style={{
-        background: "#fff", borderBottom: `1px solid ${BORDER}`,
-        padding: "0 24px", height: 56,
-        display: "flex", alignItems: "center", gap: 14,
-      }}>
-        <button
-          onClick={() => router.push("/dashboard")}
-          style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, fontSize: 20, padding: "4px 8px" }}
-        >
-          ←
-        </button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Sample Reports</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: TEXT_SUB }}>
-          See what expert feedback looks like before you start
-        </span>
+  return (
+    <DashboardShell title="Sample Reports">
+      {/* Intro */}
+      <div style={{ marginBottom: 18 }}>
+        <h1 style={{ fontSize: 23, fontWeight: 800, color: TEXT, margin: "0 0 4px" }}>Sample Reports</h1>
+        <p style={{ fontSize: 14, color: TEXT_SUB, margin: 0 }}>
+          See exactly what expert AI feedback looks like — across Writing and Speaking — before you start.
+        </p>
       </div>
 
-      {/* Tab bar */}
-      <div style={{
-        background: "#fff", borderBottom: `1px solid ${BORDER}`,
-        padding: "0 24px",
-        display: "flex", gap: 0, overflowX: "auto",
-      }}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            style={{
-              padding: "14px 18px", fontSize: 13, fontWeight: 600,
-              border: "none", background: "none", cursor: "pointer",
-              color: activeTab === t.key ? PRIMARY : TEXT_SUB,
-              borderBottom: activeTab === t.key ? `2px solid ${PRIMARY}` : "2px solid transparent",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Tab bar — themed per module */}
+      <div className="da-seg" style={{ marginBottom: 22 }}>
+        {TABS.map(t => {
+          const active = activeTab === t.key;
+          const tMod = MODULES[t.module];
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setActiveTab(t.key)}
+              className="da-seg-item"
+              style={active ? { background: tMod.accent, color: "#fff", boxShadow: "none" } : undefined}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? "#fff" : tMod.accent }} />
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px 64px" }}>
-        {activeTab === "speaking" ? (
-          <SpeakingReport data={SPEAKING_SAMPLE} />
-        ) : (
-          <WritingReport data={SAMPLES[activeTab]} />
-        )}
-      </div>
-    </div>
+      {activeTab === "speaking" ? (
+        <SpeakingReport data={SPEAKING_SAMPLE} theme={theme} kicker="IELTS Speaking" />
+      ) : (
+        <WritingReport data={SAMPLES[activeTab]} theme={theme} kicker={SAMPLES[activeTab].tabLabel} />
+      )}
+    </DashboardShell>
   );
 }
 
 export default function SampleReportsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<DashboardShell title="Sample Reports"><div /></DashboardShell>}>
       <SampleReportsContent />
     </Suspense>
   );

@@ -10,6 +10,7 @@ import {
   getTestsPageCopy,
   parseTestsMode,
 } from "@/lib/testsMode";
+import PetLoader from "@/components/PetLoader";
 
 const MODULE_LABELS = ["Listening", "Reading", "Writing", "Speaking"];
 
@@ -149,7 +150,7 @@ function LastResult({ result }) {
 
 export default function TestsPage() {
   return (
-    <Suspense fallback={<p style={{ padding: 32, fontFamily: "system-ui" }}>Loading tests…</p>}>
+    <Suspense fallback={<PetLoader fullScreen label="is loading your tests" />}>
       <TestsPageContent />
     </Suspense>
   );
@@ -176,6 +177,10 @@ function TestsPageContent() {
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (mode === "diagnostic") router.replace("/diagnostic");
+  }, [mode, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -228,8 +233,12 @@ function TestsPageContent() {
     }
   };
 
+  if (mode === "diagnostic") {
+    return <PetLoader fullScreen label="is loading diagnostics" />;
+  }
+
   if (loading || fetching) {
-    return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading tests…</p>;
+    return <PetLoader fullScreen label="is loading your tests" />;
   }
 
   const showProGate = mode === "full_mock" && !isPro;
@@ -286,20 +295,7 @@ function TestsPageContent() {
       ))}
 
       {visibleTests.length === 0 && (
-        <p style={{ color: "#9ca3af", lineHeight: 1.6 }}>
-          {copy.emptyMessage}
-          {mode === "diagnostic" && (
-            <>
-              {" "}
-              <span
-                style={{ color: "#0ea5e9", cursor: "pointer" }}
-                onClick={() => router.push("/dashboard")}
-              >
-                Back to dashboard
-              </span>
-            </>
-          )}
-        </p>
+        <p style={{ color: "#9ca3af", lineHeight: 1.6 }}>{copy.emptyMessage}</p>
       )}
     </div>
   );

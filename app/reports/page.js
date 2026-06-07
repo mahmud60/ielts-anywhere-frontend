@@ -1,47 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Lock } from "lucide-react";
+
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { isProUser } from "@/lib/landingAccess";
+import { MOD_COLORS, MODULE_META } from "@/lib/moduleColors";
+import DashboardShell from "@/components/DashboardShell";
+import PetLoader from "@/components/PetLoader";
+import {
+  ProgressSection,
+  StudyPlanSection,
+  VocabularySection,
+} from "@/components/DashboardInsights";
 
-const PRIMARY = "#0080ff";
-const BORDER  = "#E2E8F0";
-const PAGE_BG = "#F8FAFC";
-const SURFACE = "#FFFFFF";
-const TEXT    = "#0F172A";
-const TEXT_SUB = "#475569";
-const MUTED   = "#94A3B8";
-const GREEN   = "#059669";
-const AMBER   = "#d97706";
-const RED     = "#DC2626";
-
-const MODULE_META = {
-  listening: { label: "Listening", color: "#0ea5e9", bg: "#f0f9ff" },
-  reading:   { label: "Reading",   color: "#f59e0b", bg: "#fffbeb" },
-};
+const MODULES = ["listening", "reading", "writing", "speaking"];
 
 function bandColor(b) {
-  if (!b || b <= 0) return MUTED;
-  return b >= 7 ? GREEN : b >= 5.5 ? AMBER : RED;
+  if (b == null || b <= 0) return "#94a3b8";
+  return b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626";
 }
-
 function fmtDate(iso) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
-  });
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function BandBadge({ value, size = 16 }) {
+  if (value == null) return <span style={{ color: "#94a3b8", fontSize: size }}>—</span>;
+  return <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: size, color: bandColor(value) }}>{value.toFixed(1)}</span>;
 }
 
-const FILTERS = ["All", "Listening", "Reading"];
+const TABS = [
+  { id: "reports", label: "Reports" },
+  { id: "progress", label: "Progress" },
+  { id: "studyplan", label: "Study Plan" },
+  { id: "vocabulary", label: "Vocabulary" },
+];
 
 export default function ReportsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [listeningAttempts, setListeningAttempts] = useState([]);
-  const [readingAttempts,   setReadingAttempts]   = useState([]);
-  const [fetching, setFetching] = useState(true);
+  const [tab, setTab] = useState("reports");
   const [filter, setFilter] = useState("All");
+  const [dash, setDash] = useState(null);
+  const [listening, setListening] = useState([]);
+  const [reading, setReading] = useState([]);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -49,148 +54,174 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([
-      api.getListeningAttempts().catch(() => []),
-      api.getReadingAttempts().catch(() => []),
-    ]).then(([l, r]) => {
-      setListeningAttempts(l);
-      setReadingAttempts(r);
-      setFetching(false);
-    });
+    let cancelled = false;
+    setFetching(true);
+    Promise.allSettled([
+      api.getDashboard(),
+      api.getListeningAttempts(),
+      api.getReadingAttempts(),
+    ]).then(([d, l, r]) => {
+      if (cancelled) return;
+      if (d.status === "fulfilled") setDash(d.value);
+      if (l.status === "fulfilled") setListening(l.value || []);
+      if (r.status === "fulfilled") setReading(r.value || []);
+    }).finally(() => { if (!cancelled) setFetching(false); });
+    return () => { cancelled = true; };
   }, [user]);
 
-  if (loading || fetching) {
-    return (
-      <div style={{ minHeight: "100vh", background: PAGE_BG, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
-        <p style={{ color: MUTED }}>Loading reports…</p>
-      </div>
-    );
-  }
+  const isPro = isProUser(dash);
 
-  // Merge and sort by date desc
-  const all = [
-    ...listeningAttempts.map(a => ({ ...a, module: "listening" })),
-    ...readingAttempts.map(a => ({ ...a, module: "reading" })),
-  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-  const filtered = filter === "All"
-    ? all
-    : all.filter(a => a.module === filter.toLowerCase());
+  const attempts = useMemo(() => {
+    const all = [
+      ...listening.map((a) => ({ ...a, module: "listening" })),
+      ...reading.map((a) => ({ ...a, module: "reading" })),
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return filter === "All" ? all : all.filter((a) => a.module === filter.toLowerCase());
+  }, [listening, reading, filter]);
 
   const viewReport = (a) => {
     if (a.module === "listening") router.push(`/listening/results/${a.id}`);
     else router.push(`/reading/results/${a.id}`);
   };
 
+  if (loading || (fetching && !dash)) {
+    return (
+      <DashboardShell title="My Reports">
+        <PetLoader fullScreen label="is gathering your reports" />
+      </DashboardShell>
+    );
+  }
+
   return (
-    <div style={{ minHeight: "100vh", background: PAGE_BG, fontFamily: "system-ui" }}>
-      {/* Header */}
-      <div style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "0 24px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
-        <button
-          onClick={() => router.back()}
-          style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, padding: "4px 6px", borderRadius: 8, fontSize: 20, lineHeight: 1 }}
-        >
-          ←
-        </button>
-        <span style={{ fontWeight: 700, fontSize: 16, color: TEXT }}>My Reports</span>
+    <DashboardShell title="My Reports">
+      <div className="da-seg" style={{ marginBottom: 22 }}>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`da-seg-item ${tab === t.id ? "active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+            {t.id !== "reports" && !isPro && <Lock size={12} />}
+          </button>
+        ))}
       </div>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px 64px" }}>
-
-        {/* Filter tabs */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-          {FILTERS.map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{
-              padding: "7px 18px", borderRadius: 999, cursor: "pointer",
-              fontWeight: 600, fontSize: 13,
-              border: `1px solid ${filter === f ? PRIMARY : BORDER}`,
-              background: filter === f ? PRIMARY : SURFACE,
-              color: filter === f ? "#fff" : TEXT_SUB,
-            }}>
-              {f}
-              {f !== "All" && (
-                <span style={{
-                  marginLeft: 6, fontSize: 11, fontWeight: 700,
-                  background: filter === f ? "rgba(255,255,255,0.25)" : "#f1f5f9",
-                  color: filter === f ? "#fff" : MUTED,
-                  borderRadius: 99, padding: "1px 6px",
-                }}>
-                  {f === "Listening" ? listeningAttempts.length : readingAttempts.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Empty state */}
-        {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "64px 24px", color: MUTED }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-            <div style={{ fontWeight: 600, fontSize: 15, color: TEXT_SUB, marginBottom: 6 }}>No reports yet</div>
-            <div style={{ fontSize: 14 }}>Complete a test to see your results here.</div>
+      {tab === "reports" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+            {["All", "Listening", "Reading"].map((f) => {
+              const count = f === "Listening" ? listening.length : f === "Reading" ? reading.length : null;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className="da-btn"
+                  style={{
+                    padding: "7px 16px",
+                    background: filter === f ? MOD_COLORS.listening : "#fff",
+                    color: filter === f ? "#fff" : "#475569",
+                    border: `1px solid ${filter === f ? MOD_COLORS.listening : "#edeff4"}`,
+                  }}
+                >
+                  {f}
+                  {count != null && <span style={{ marginLeft: 2, opacity: 0.8 }}>({count})</span>}
+                </button>
+              );
+            })}
           </div>
-        )}
 
-        {/* Attempt cards */}
-        {filtered.map(a => {
-          const mod = MODULE_META[a.module];
-          return (
-            <div key={a.id} style={{
-              background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 14,
-              padding: "18px 22px", marginBottom: 10,
-              display: "flex", alignItems: "center", gap: 18,
-            }}>
-              {/* Module badge */}
-              <div style={{
-                flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-                background: mod.bg, display: "flex", alignItems: "center",
-                justifyContent: "center", flexDirection: "column",
-              }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: mod.color, letterSpacing: "0.04em" }}>
-                  {mod.label.slice(0, 1)}
-                </span>
-              </div>
-
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, color: TEXT, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {a.test_title ?? `${mod.label} Test`}
-                </div>
-                <div style={{ fontSize: 12, color: MUTED, display: "flex", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontWeight: 600, color: mod.color }}>{mod.label}</span>
-                  <span>·</span>
-                  <span>{fmtDate(a.created_at)}</span>
-                  <span>·</span>
-                  <span>{a.correct ?? 0}/{a.total ?? 0} correct</span>
+          <div className="da-card" style={{ overflow: "hidden" }}>
+            {attempts.length === 0 ? (
+              <div style={{ padding: "56px 24px", textAlign: "center", color: "#94a3b8" }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                <div style={{ fontWeight: 600, fontSize: 15, color: "#475569", marginBottom: 6 }}>No reports yet</div>
+                <div style={{ fontSize: 14 }}>
+                  Complete a test to see your results here.{" "}
+                  <span style={{ color: "#6366f1", cursor: "pointer", fontWeight: 600 }} onClick={() => router.push("/diagnostic")}>
+                    Start a diagnostic →
+                  </span>
                 </div>
               </div>
-
-              {/* Band score */}
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: bandColor(a.overall_band), lineHeight: 1 }}>
-                  {a.overall_band > 0 ? a.overall_band.toFixed(1) : "—"}
-                </div>
-                <div style={{ fontSize: 10, color: MUTED, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>Band</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="da-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Task</th>
+                      <th className="da-col-opt">Result</th>
+                      <th>Score</th>
+                      <th style={{ textAlign: "right" }}>Report</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attempts.map((a) => {
+                      const mod = MODULE_META[a.module] || { label: a.module, color: "#64748b", bg: "#f1f5f9" };
+                      return (
+                        <tr key={`${a.module}-${a.id}`} className="clickable" onClick={() => viewReport(a)}>
+                          <td style={{ whiteSpace: "nowrap", color: "#64748b" }}>{fmtDate(a.created_at)}</td>
+                          <td>
+                            <span className="da-chip" style={{ background: mod.bg, color: mod.color }}>{mod.label}</span>
+                          </td>
+                          <td className="da-col-opt" style={{ color: "#64748b" }}>{(a.correct ?? 0)}/{(a.total ?? 0)} correct</td>
+                          <td><BandBadge value={a.overall_band > 0 ? a.overall_band : null} size={15} /></td>
+                          <td style={{ textAlign: "right" }}>
+                            <button className="da-btn da-btn-ghost" style={{ padding: "6px 14px", fontSize: 12.5 }} onClick={(e) => { e.stopPropagation(); viewReport(a); }}>
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            )}
+          </div>
 
-              {/* CTA */}
-              <button
-                onClick={() => viewReport(a)}
-                style={{
-                  flexShrink: 0, padding: "8px 18px", borderRadius: 8,
-                  background: "#fff", border: `1px solid ${BORDER}`,
-                  color: TEXT, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                  transition: "border-color .15s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = PRIMARY}
-                onMouseLeave={e => e.currentTarget.style.borderColor = BORDER}
-              >
-                View Report
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+          {(dash?.recent_sessions || []).length > 0 && (
+            <>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: "28px 0 14px", color: "#0f172a" }}>Full test sessions</h2>
+              <div className="da-card" style={{ overflow: "hidden" }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="da-table">
+                    <thead>
+                      <tr>
+                        <th>Test</th>
+                        {MODULES.map((m) => <th key={m} style={{ textTransform: "capitalize" }} className="da-col-opt">{m.slice(0, 3)}</th>)}
+                        <th>Overall</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dash.recent_sessions.map((s) => (
+                        <tr key={s.session_id} className="clickable" onClick={() => router.push(`/test/${s.session_id}`)}>
+                          <td>
+                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{s.test_title || "IELTS test"}</div>
+                            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                              {s.completed_at ? new Date(s.completed_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                            </div>
+                          </td>
+                          {MODULES.map((m) => (
+                            <td key={m} className="da-col-opt"><BandBadge value={s.module_bands?.[m]} size={13} /></td>
+                          ))}
+                          <td><BandBadge value={s.overall_band} size={16} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {tab === "progress" && <ProgressSection dash={dash} isPro={isPro} />}
+      {tab === "studyplan" && <StudyPlanSection dash={dash} isPro={isPro} />}
+      {tab === "vocabulary" && <VocabularySection dash={dash} isPro={isPro} />}
+    </DashboardShell>
   );
 }

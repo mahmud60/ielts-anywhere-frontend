@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import PetLoader from "@/components/PetLoader";
 
 export function TestsTab({ api }) {
   const [ieltsTests, setIeltsTests] = useState([]);
@@ -103,7 +104,7 @@ export function TestsTab({ api }) {
   };
 
   if (loading) {
-    return <p style={{ padding: 32, color: "#64748b", fontFamily: "system-ui" }}>Loading…</p>;
+    return <PetLoader label="is loading tests" />;
   }
 
   return (

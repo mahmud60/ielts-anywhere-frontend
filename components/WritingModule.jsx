@@ -17,6 +17,10 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import PetLoader from "@/components/PetLoader";
+import { MOD_COLORS } from "@/lib/moduleColors";
+
+const LOADER_ACCENT = MOD_COLORS.writing;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -57,7 +61,6 @@ const CSS = `
   @keyframes wm-dots { 0%{content:'.'} 33%{content:'..'} 66%{content:'...'} 100%{content:'.'} }
   .wm-fadeup { animation: wm-fadeup .3s ease both; }
   .wm-card { background:${C.surface}; border:1px solid ${C.border}; border-radius:12px; }
-  .wm-spinner { width:18px; height:18px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:wm-spin .7s linear infinite; display:inline-block; }
   .wm-btn { font-family:'Inter',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 20px; transition:all .15s; }
   .wm-btn-primary { background:${C.accent}; color:#fff; }
   .wm-btn-primary:hover { background:#0284c7; }
@@ -87,10 +90,6 @@ function Badge({ children, color }) {
       {children}
     </span>
   );
-}
-
-function Spinner() {
-  return <span className="wm-spinner" />;
 }
 
 // ─── Word count indicator ─────────────────────────────────────────────────────
@@ -199,10 +198,8 @@ function GradingScreen() {
 
   return (
     <div style={{ textAlign: "center", padding: "80px 24px" }}>
-      <div style={{ marginBottom: 24 }}>
-        <Spinner />
-      </div>
-      <h2 style={{ fontSize: 20, fontWeight: 500, marginBottom: 8 }}>
+      <PetLoader size={96} accent={LOADER_ACCENT} />
+      <h2 style={{ fontSize: 20, fontWeight: 500, marginBottom: 8, marginTop: 8 }}>
         Grading your writing{dots}
       </h2>
       <p style={{ color: C.muted, fontSize: 14, maxWidth: 380, margin: "0 auto", lineHeight: 1.7 }}>
@@ -524,14 +521,7 @@ export default function WritingModule({ apiBase, getToken, sessionId, testId, on
 
   // ── Loading / error ──
   if (loading) {
-    return (
-      <div className="wm" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-        <div style={{ textAlign: "center" }}>
-          <Spinner />
-          <div style={{ color: C.muted, fontSize: 13, marginTop: 12 }}>Loading writing test…</div>
-        </div>
-      </div>
-    );
+    return <PetLoader fixed label="is loading your writing test" accent={LOADER_ACCENT} />;
   }
 
   if (error) {
@@ -606,7 +596,7 @@ export default function WritingModule({ apiBase, getToken, sessionId, testId, on
             onClick={handleSubmit}
             style={{ display: "flex", alignItems: "center", gap: 8 }}
           >
-            {submitting ? <><Spinner /> Submitting…</> : "Submit for AI grading"}
+            {submitting ? "Submitting…" : "Submit for AI grading"}
           </button>
         </div>
       </div>

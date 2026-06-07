@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import ListeningModule from "@/components/ListeningModule";
 import ReadingModule from "@/components/ReadingModule";
 import WritingModule from "@/components/WritingModule";
+import PetLoader from "@/components/PetLoader";
 
 const ElevenLabsSpeakingModule = dynamic(
   () => import("@/components/ElevenLabsSpeakingModule"),
@@ -20,7 +21,7 @@ const ElevenLabsSpeakingModule = dynamic(
 const MODULES   = ["listening", "reading", "writing", "speaking"];
 const MOD_COLOR = {
   listening: "#0ea5e9",
-  reading:   "#f59e0b",
+  reading:   "#14b8a6",
   writing:   "#10b981",
   speaking:  "#8b5cf6",
 };
@@ -158,8 +159,8 @@ function TimeExpiredScreen({ moduleName, sessionId, onRestart, onRetakeAll, rest
         </div>
 
         {loadingScores ? (
-          <div style={{ color: "#9ca3af", fontSize: 14, padding: "8px 0" }}>
-            Loading…
+          <div style={{ padding: "8px 0" }}>
+            <PetLoader size={56} label="is checking" />
           </div>
         ) : moduleScore ? (
           <>
@@ -289,7 +290,7 @@ function Results({ sessionId, onRetakeAll, retaking }) {
     api.getResults(sessionId).then(setData).catch(console.error);
   }, [sessionId]);
 
-  if (!data) return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading results…</p>;
+  if (!data) return <PetLoader fixed label="is tallying your results" />;
 
   const { overall_band, module_bands, improvement_tips, attempt_ids = {} } = data;
 
@@ -509,7 +510,7 @@ export default function SessionPage() {
   });
 
   if (authLoading || pageLoading) {
-    return <p style={{ padding: 32, fontFamily: "system-ui" }}>Loading…</p>;
+    return <PetLoader fixed label="is loading your test" />;
   }
   if (!session) return null;
 

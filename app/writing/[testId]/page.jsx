@@ -7,6 +7,8 @@ import { auth } from "@/lib/firebase";
 import WritingModule from "@/components/WritingModule";
 import { getClientApiBase } from "@/lib/clientApiBase";
 import { api } from "@/lib/api";
+import PetLoader from "@/components/PetLoader";
+import { MOD_COLORS } from "@/lib/moduleColors";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -48,7 +50,9 @@ export default function StandaloneWritingPage() {
     }
   }, [profile, profileLoading, router]);
 
-  if (loading || profileLoading || !user) return null;
+  if (loading || profileLoading || !user) {
+    return <PetLoader fixed label="is loading your test" accent={MOD_COLORS.writing} />;
+  }
   if (!isProUser(profile)) return null;
 
   return (

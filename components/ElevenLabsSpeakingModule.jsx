@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Conversation } from "@elevenlabs/react";
 import { api } from "@/lib/api";
+import { SPEAKING_THEME } from "@/lib/moduleColors";
+import PetLoader from "@/components/PetLoader";
 
 const AGENT_ID = "agent_9801ksdjxvqqfkdvsh8acxc4xge5";
-const PRIMARY = "#0080ff";
+const PRIMARY = SPEAKING_THEME.accent;
 const BORDER  = "#e2e8f0";
 const TEXT    = "#0f172a";
 const MUTED   = "#94a3b8";
@@ -148,26 +150,12 @@ export default function ElevenLabsSpeakingModule({ testSessionId, onComplete }) 
   const isConnecting = phase === "connecting" || phase === "ending";
   const isScoring    = phase === "scoring";
   const userSpeaking = isLive && !agentSpeaking;
-  const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#ef4444" : MUTED;
-  const micBg        = agentSpeaking ? "#eff6ff" : userSpeaking ? "#fef2f2" : "#f8fafc";
-  const micIconColor = agentSpeaking ? PRIMARY   : userSpeaking ? "#ef4444" : MUTED;
+  const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#a78bfa" : MUTED;
+  const micBg        = agentSpeaking ? SPEAKING_THEME.soft : userSpeaking ? "#f5f3ff" : "#f8fafc";
+  const micIconColor = agentSpeaking ? PRIMARY   : userSpeaking ? PRIMARY : MUTED;
 
   if (isScoring) {
-    return (
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", padding: "80px 24px", fontFamily: "system-ui", gap: 20,
-      }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: "50%",
-          border: `4px solid ${BORDER}`, borderTopColor: PRIMARY,
-          animation: "spin 0.8s linear infinite",
-        }} />
-        <p style={{ fontWeight: 600, color: TEXT, fontSize: 16, margin: 0 }}>Scoring your speaking test…</p>
-        <p style={{ color: MUTED, fontSize: 13, margin: 0 }}>This usually takes 10–20 seconds.</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <PetLoader fixed label="is scoring your speaking test" accent={PRIMARY} />;
   }
 
   return (
@@ -233,8 +221,9 @@ export default function ElevenLabsSpeakingModule({ testSessionId, onComplete }) 
 
         {phase === "idle" && (
           <button onClick={handleStart} style={{
-            padding: "13px 40px", borderRadius: 10, background: PRIMARY, border: "none",
+            padding: "13px 40px", borderRadius: 10, background: SPEAKING_THEME.gradient, border: "none",
             color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer",
+            boxShadow: `0 12px 28px -12px ${PRIMARY}`,
           }}>
             Start Speaking Test
           </button>
@@ -274,8 +263,10 @@ export default function ElevenLabsSpeakingModule({ testSessionId, onComplete }) 
             <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
               <div style={{
                 maxWidth: "80%", padding: "9px 13px", borderRadius: 12,
-                fontSize: 13, lineHeight: 1.55, color: TEXT,
-                background: msg.role === "user" ? "#eff6ff" : "#f1f5f9",
+                fontSize: 13, lineHeight: 1.55,
+                background: msg.role === "user" ? SPEAKING_THEME.soft : "#f1f5f9",
+                border: msg.role === "user" ? "1px solid #ddd6fe" : "none",
+                color: msg.role === "user" ? "#312e81" : TEXT,
                 borderBottomRightRadius: msg.role === "user" ? 4 : 12,
                 borderBottomLeftRadius:  msg.role === "agent" ? 4 : 12,
               }}>

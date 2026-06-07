@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import PetLoader from "@/components/PetLoader";
 
 const s = {
   wrap: { maxWidth: 720, margin: "0 auto", padding: "40px 20px" },
@@ -11,20 +12,6 @@ const s = {
   btn: { padding: "10px 22px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" },
 };
 
-function Skeleton() {
-  return (
-    <div>
-      {[1, 2, 3].map(i => (
-        <div key={i} style={{ ...s.card, animation: "pulse 1.5s ease-in-out infinite" }}>
-          <div style={{ height: 18, background: "#f3f4f6", borderRadius: 4, width: "40%", marginBottom: 10 }} />
-          <div style={{ height: 13, background: "#f3f4f6", borderRadius: 4, width: "80%", marginBottom: 6 }} />
-          <div style={{ height: 13, background: "#f3f4f6", borderRadius: 4, width: "60%" }} />
-          <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }`}</style>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function WordCard({ ex }) {
   const [showAnswer, setShowAnswer] = useState(false);
@@ -142,7 +129,7 @@ export default function VocabularyPage() {
         </div>
       )}
 
-      {loading && <Skeleton />}
+      {loading && <PetLoader label="is building your exercises" />}
 
       {error && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 18px", color: "#dc2626", fontSize: 14, marginBottom: 16 }}>

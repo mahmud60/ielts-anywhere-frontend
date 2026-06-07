@@ -14,6 +14,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft, Eye, Clock } from "lucide-react";
+import PetLoader from "@/components/PetLoader";
 
 function TipOrUpgrade({ result, isWrong }) {
   const wrong = isWrong !== undefined ? isWrong : (result && !result.is_correct);
@@ -330,10 +331,6 @@ function getBandDetail(band) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function Spinner() {
-  return <div className="rm-spinner" />;
-}
 
 function ReadingExamTopBar({
   partLabel, onBack, onSubmit, submitting,
@@ -1075,16 +1072,7 @@ export default function ReadingModule({
 
   // ── Loading ──
   if (loading) {
-    return (
-      <div className="rm">
-        <div className="rm-center">
-          <div style={{ textAlign: "center" }}>
-            <Spinner />
-            <div style={{ color: MUTED, fontSize: 13, marginTop: 12 }}>Loading reading test…</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PetLoader fixed label="is loading your test" accent={ACCENT} />;
   }
 
   if (error) {
@@ -1143,61 +1131,66 @@ export default function ReadingModule({
             <button type="button" className="rm-exam-back" onClick={handleBack} aria-label="Back to tests">
               <ChevronLeft size={20} strokeWidth={2} />
             </button>
-            <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Reading Results</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Reading Report</span>
             <span className="rm-exam-spacer" />
-            <button type="button" className="rm-btn-finish" onClick={handleBack}>Back to Tests</button>
+            <button type="button" className="rm-btn-finish" onClick={handleBack}>Back</button>
           </div>
         </header>
 
         {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", background: "#f6f7fb" }}>
+          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "28px 28px 64px" }}>
 
-          {/* Estimated Band Score hero */}
-          <div style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "28px 28px 24px" }}>
-            <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 16, fontWeight: 600 }}>
-              Estimated IELTS Band Score — Reading
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 32, flexWrap: "wrap" }}>
-              <div style={{ textAlign: "center", minWidth: 100 }}>
-                <div style={{ fontSize: 72, fontWeight: 800, color: bc(band), lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                  {band.toFixed(1)}
+            {/* Band score hero */}
+            <div style={{
+              borderRadius: 20, padding: 32, marginBottom: 24,
+              background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#8b5cf6 100%)",
+              color: "#fff", display: "flex", alignItems: "center", gap: 36, flexWrap: "wrap",
+              boxShadow: "0 18px 40px -16px rgba(79,70,229,.55)",
+            }}>
+              <div style={{ position: "relative", width: 156, height: 156, flexShrink: 0 }}>
+                <svg width="156" height="156" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="78" cy="78" r="66" fill="none" stroke="rgba(255,255,255,.22)" strokeWidth="12" />
+                  <circle cx="78" cy="78" r="66" fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 66}
+                    strokeDashoffset={(2 * Math.PI * 66) * (1 - Math.min(1, band / 9))}
+                    style={{ transition: "stroke-dashoffset .9s ease" }} />
+                </svg>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{band.toFixed(1)}</div>
+                  <div style={{ fontSize: 12, opacity: .8, marginTop: 2 }}>out of 9.0</div>
                 </div>
-                <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>out of 9.0</div>
               </div>
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                  <span style={{
-                    background: bc(band) + "15", color: bc(band),
-                    border: `1px solid ${bc(band)}40`,
-                    borderRadius: 999, padding: "3px 13px", fontSize: 14, fontWeight: 700,
-                  }}>{cefr}</span>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{getBandLabel(band)}</span>
+
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".1em", opacity: .8, marginBottom: 10, fontWeight: 600 }}>
+                  Estimated IELTS Band — Reading
                 </div>
-                <p style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.65, marginBottom: 14 }}>
-                  {getBandDetail(band)}
-                </p>
-                <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{result.correct}/{result.total}</div>
-                    <div style={{ fontSize: 11, color: MUTED }}>Correct answers</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                  <span style={{ background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)", borderRadius: 999, padding: "4px 14px", fontSize: 14, fontWeight: 700 }}>{cefr}</span>
+                  <span style={{ fontSize: 17, fontWeight: 700 }}>{getBandLabel(band)}</span>
+                </div>
+                <p style={{ fontSize: 13.5, lineHeight: 1.6, opacity: .92, margin: "0 0 18px", maxWidth: 460 }}>{getBandDetail(band)}</p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 16px", minWidth: 92 }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{result.correct}/{result.total}</div>
+                    <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Correct</div>
                   </div>
                   {(result.passage_results ?? []).map(p => (
-                    <div key={p.passage_number}>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: bc(p.band ?? 0) }}>{(p.band ?? 0).toFixed(1)}</div>
-                      <div style={{ fontSize: 11, color: MUTED }}>Part {p.passage_number}</div>
+                    <div key={p.passage_number} style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 16px", minWidth: 78 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{(p.band ?? 0).toFixed(1)}</div>
+                      <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Part {p.passage_number}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </div>
 
-          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 28px 56px" }}>
 
             {/* Answer Key */}
-            <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 28, overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, fontWeight: 700, fontSize: 15, color: TEXT }}>
-                Answer Key
+            <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 16, marginBottom: 28, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, fontWeight: 700, fontSize: 15, color: TEXT, display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: PRIMARY }} /> Answer Key
               </div>
               {answerKeyPassages.map(({ passage, passResult, items }) => (
                 <div key={passage.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
@@ -1215,18 +1208,25 @@ export default function ReadingModule({
 
             {/* Improvement tips */}
             {result.improvement_tips?.length > 0 && (
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                  Improvement Tips
+              <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: "18px 20px", marginBottom: 28, boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>💡</span> Improvement Tips
                 </div>
                 {result.improvement_tips.map((tip, i) => (
-                  <div key={i} className="rm-tip" style={{ marginBottom: 6 }}>{tip}</div>
+                  <div key={i} style={{
+                    display: "flex", gap: 10, padding: "11px 14px", marginBottom: 8, borderRadius: 10,
+                    background: "#fffbeb", borderLeft: "3px solid #f59e0b",
+                    fontSize: 13.5, color: "#78350f", lineHeight: 1.6,
+                  }}>
+                    <span style={{ color: "#f59e0b", fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                    <span>{tip}</span>
+                  </div>
                 ))}
               </div>
             )}
 
             {/* Review split pane */}
-            <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>Review your answers</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: TEXT, marginBottom: 16 }}>Review your answers</div>
             {test.passages.map((p, pi) => {
               const pOff = passageSlotOffset(pi);
               return (

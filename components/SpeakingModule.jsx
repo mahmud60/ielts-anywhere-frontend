@@ -25,6 +25,10 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import PetLoader from "@/components/PetLoader";
+import { SPEAKING_THEME } from "@/lib/moduleColors";
+
+const LOADER_ACCENT = SPEAKING_THEME.accent;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -96,7 +100,6 @@ const CSS = `
   @keyframes sm-record-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.18);opacity:.65} }
   .sm-fadeup { animation: sm-fadeup .25s ease both; }
   .sm-card { background:${C.card}; border:1px solid ${C.border}; border-radius:12px; }
-  .sm-spinner { width:18px; height:18px; border:2px solid ${C.border}; border-top-color:${C.accent}; border-radius:50%; animation:sm-spin .7s linear infinite; display:inline-block; }
   .sm-btn { font-family:'Inter',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 20px; transition:all .15s; }
   .sm-btn-primary { background:${C.accent}; color:#fff; }
   .sm-btn-primary:hover { background:#4f46e5; }
@@ -116,8 +119,6 @@ const CSS = `
 function bandColor(b) {
   return b >= 7 ? C.green : b >= 5.5 ? C.gold : C.red;
 }
-
-function Spinner() { return <span className="sm-spinner" />; }
 
 function Badge({ children, color }) {
   return (
@@ -363,8 +364,7 @@ function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
         padding: "18px 20px", background: C.surface,
         border: `1px solid ${C.border}`, borderRadius: 10,
       }}>
-        <Spinner />
-        <span style={{ fontSize: 14, color: C.muted }}>Transcribing your response…</span>
+        <PetLoader size={48} label="is transcribing your response" accent={LOADER_ACCENT} />
       </div>
     );
   }
@@ -544,8 +544,8 @@ function GradingScreen() {
 
   return (
     <div style={{ textAlign: "center", padding: "80px 24px", maxWidth: 480, margin: "0 auto" }}>
-      <Spinner />
-      <h2 style={{ fontSize: 20, fontWeight: 500, marginTop: 20, marginBottom: 10 }}>
+      <PetLoader size={96} accent={LOADER_ACCENT} />
+      <h2 style={{ fontSize: 20, fontWeight: 500, marginTop: 8, marginBottom: 10 }}>
         Evaluating your speaking{dots}
       </h2>
       <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
@@ -868,14 +868,7 @@ export default function SpeakingModule({ apiBase, getToken, sessionId, onComplet
 
   // ── Render ──
   if (loading) {
-    return (
-      <div className="sm-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-        <div style={{ textAlign: "center" }}>
-          <Spinner />
-          <div style={{ color: C.muted, fontSize: 13, marginTop: 12 }}>Loading speaking test…</div>
-        </div>
-      </div>
-    );
+    return <PetLoader fixed label="is loading your speaking test" accent={LOADER_ACCENT} />;
   }
 
   if (error) {

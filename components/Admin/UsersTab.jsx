@@ -2,6 +2,7 @@
 import { useUsers } from "@/lib/admin/useUsers";
 import { formatDate, getSubscriptionColor } from "@/lib/admin/usersData";
 import styles from "@/styles/admin/users.module.css";
+import PetLoader from "@/components/PetLoader";
 
 const TABLE_HEADERS = ["Email", "Name", "Subscription", "Admin", "Joined", "Actions"];
 
@@ -78,7 +79,11 @@ function UsersTable({ users, loading, updating, onSubscription, onAdmin }) {
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={6} className={styles.empty}>Loading…</td></tr>
+            <tr>
+              <td colSpan={6} style={{ padding: "32px 0" }}>
+                <PetLoader size={80} label="is loading users" />
+              </td>
+            </tr>
           ) : users.length === 0 ? (
             <tr><td colSpan={6} className={styles.empty}>No users found</td></tr>
           ) : users.map(u => (

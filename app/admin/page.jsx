@@ -9,6 +9,7 @@ import { OverviewTab } from "@/components/Admin/OverviewTab";
 import { UsersTab } from "@/components/Admin/UsersTab";
 import { logout } from "@/lib/auth";
 import { PricingTab } from "@/components/Admin/PricingTab";
+import PetLoader from "@/components/PetLoader";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -54,7 +55,7 @@ export default function AdminPage() {
   }, [user, loading, router]);
 
   if (loading || checking) {
-    return <p style={{ padding: 32, fontFamily: "system-ui" }}>Checking access…</p>;
+    return <PetLoader fixed label="is checking your access" />;
   }
 
   if (accessDenied) {
