@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/lib/AuthContext";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import "./globals.css";
 
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={inter.variable}>
       <body className={`${inter.className} font-sans`}>
         <AuthProvider>{children}</AuthProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
