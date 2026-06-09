@@ -32,6 +32,98 @@ import {
   VocabularySection,
 } from "@/components/DashboardInsights";
 
+function S({ w = "100%", h = 18, r = 6, mb = 0, style }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      background: "linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)",
+      backgroundSize: "200% 100%",
+      animation: "db-shimmer 1.6s ease-in-out infinite",
+      marginBottom: mb,
+      flexShrink: 0,
+      ...style,
+    }} />
+  );
+}
+
+function DashboardSkeleton({ user }) {
+  return (
+    <>
+      <style>{`@keyframes db-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{greeting()},</div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: "2px 0 0", color: "#0f172a", textTransform: "capitalize" }}>
+          {displayName(user)}
+        </h1>
+      </div>
+
+      {/* Tab bar placeholder */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+        {[80, 72, 88, 90].map((w, i) => <S key={i} w={w} h={34} r={10} />)}
+      </div>
+
+      {/* Hero summary placeholder */}
+      <div style={{ borderRadius: 18, background: "#fff", border: "1px solid #e6e8ef", padding: 24, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <S w={120} h={14} r={5} mb={10} />
+            <S w="80%" h={40} r={8} mb={8} />
+            <S w="55%" h={13} r={5} />
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ borderRadius: 12, background: "#f8fafc", border: "1px solid #e6e8ef", padding: "14px 18px", minWidth: 90 }}>
+                <S w={60} h={12} r={4} mb={8} />
+                <S w={50} h={22} r={6} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Stat tiles */}
+      <div className="da-stat-row" style={{ marginBottom: 26 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} style={{ borderRadius: 14, background: "#fff", border: "1px solid #e6e8ef", padding: "18px 20px", flex: 1, minWidth: 120 }}>
+            <S w={32} h={32} r={10} mb={12} />
+            <S w="60%" h={13} r={4} mb={6} />
+            <S w="45%" h={22} r={6} />
+          </div>
+        ))}
+      </div>
+
+      {/* Practice cards */}
+      <S w={120} h={16} r={5} mb={14} />
+      <div className="da-grid-practice" style={{ marginBottom: 26 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} style={{ borderRadius: 16, background: "#fff", border: "1px solid #e6e8ef", padding: 20 }}>
+            <S w={40} h={40} r={12} mb={14} />
+            <S w="70%" h={16} r={5} mb={8} />
+            <S w="90%" h={12} r={4} mb={6} />
+            <S w="75%" h={12} r={4} mb={20} />
+            <S h={38} r={10} />
+          </div>
+        ))}
+      </div>
+
+      {/* Recent activity */}
+      <S w={140} h={16} r={5} mb={14} />
+      <div className="da-card" style={{ padding: 8 }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderBottom: i < 3 ? "1px solid #f1f5f9" : "none" }}>
+            <S w={38} h={38} r={10} />
+            <div style={{ flex: 1 }}>
+              <S w="55%" h={14} r={4} mb={6} />
+              <S w="35%" h={11} r={4} />
+            </div>
+            <S w={50} h={26} r={8} />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 const MODULES = ["listening", "reading", "writing", "speaking"];
 const MOD_COLOR = MOD_COLORS;
 const TARGET_KEY = "ielts_target_band";
@@ -323,10 +415,18 @@ export default function DashboardPage() {
     return data.best_overall != null && data.best_overall >= Number(target);
   }, [data, target]);
 
-  if (loading || fetching) {
+  if (loading) {
     return (
       <DashboardShell title="Dashboard">
         <PetLoader fullScreen label="is fetching your progress" />
+      </DashboardShell>
+    );
+  }
+
+  if (fetching) {
+    return (
+      <DashboardShell title="Dashboard">
+        <DashboardSkeleton user={user} />
       </DashboardShell>
     );
   }
