@@ -107,6 +107,95 @@ export default function ExamListPage(config) {
 
   const start = (t) => { setStarting(t.id); router.push(startPath(t)); };
 
+  const GRID = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 16 };
+
+  let listContent;
+  if (isLoadingTests) {
+    listContent = (
+      <div style={GRID}>
+        {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+    );
+  } else if (tests.length === 0) {
+    listContent = (
+      <div className="da-card" style={{ padding: "56px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>🗂️</div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>No tests available yet</div>
+        <p style={{ color: "#64748b", fontSize: 14, margin: "0 auto", maxWidth: 360 }}>
+          New {title.toLowerCase()} are added regularly. Check back soon or explore another module.
+        </p>
+      </div>
+    );
+  } else if (filtered.length === 0) {
+    listContent = (
+      <div className="da-card" style={{ padding: "48px 24px", textAlign: "center", color: "#64748b" }}>
+        No tests match &ldquo;{query}&rdquo;.
+      </div>
+    );
+  } else {
+    listContent = (
+      <div style={GRID}>
+        {filtered.map((t, i) => {
+          const meta = getMeta?.(t) || [];
+          const isStarting = starting === t.id;
+          return (
+            <div
+              key={t.id}
+              className="da-pcard"
+              onClick={() => !isStarting && start(t)}
+              style={{ padding: 0, overflow: "hidden", opacity: isStarting ? 0.65 : 1 }}
+            >
+              <div style={{ height: 6, background: gradient }} />
+              <div style={{ padding: 20, display: "flex", flexDirection: "column", flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{
+                    width: 42, height: 42, borderRadius: 12, background: accentSoft,
+                    color: accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15,
+                  }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 11.5, fontWeight: 600, color: "#64748b",
+                    background: "#f4f5f9", borderRadius: 99, padding: "5px 11px",
+                  }}>
+                    <Clock size={12} /> {duration}
+                  </span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 5, lineHeight: 1.35 }}>
+                  {t.title}
+                </div>
+                {getDescription?.(t) && (
+                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55, margin: "0 0 14px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {getDescription(t)}
+                  </p>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 18, marginTop: "auto" }}>
+                  {meta.map((m) => (
+                    <span key={m.label} style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      fontSize: 11.5, fontWeight: 500, color: "#475569",
+                      background: "#f4f5f9", borderRadius: 8, padding: "5px 10px",
+                    }}>
+                      {m.icon}{m.label}
+                    </span>
+                  ))}
+                </div>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                  background: gradient, color: "#fff", borderRadius: 11,
+                  padding: "11px 16px", fontSize: 14, fontWeight: 700,
+                }}>
+                  {isStarting ? "Opening…" : "Start test"} {!isStarting && <ArrowRight size={16} />}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <DashboardShell title={title}>
       {/* Hero banner */}
@@ -161,88 +250,7 @@ export default function ExamListPage(config) {
         </div>
       </div>
 
-      {/* Skeleton grid while data loads */}
-      {isLoadingTests ? (
-        <div style={{ display: “grid”, gridTemplateColumns: “repeat(auto-fill,minmax(290px,1fr))”, gap: 16 }}>
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : tests.length === 0 ? (
-        <div className=”da-card” style={{ padding: “56px 24px”, textAlign: “center” }}>
-          <div style={{ fontSize: 38, marginBottom: 10 }}>🗂️</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: “#0f172a”, marginBottom: 6 }}>No tests available yet</div>
-          <p style={{ color: “#64748b”, fontSize: 14, margin: “0 auto”, maxWidth: 360 }}>
-            New {title.toLowerCase()} are added regularly. Check back soon or explore another module.
-          </p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className=”da-card” style={{ padding: “48px 24px”, textAlign: “center”, color: “#64748b” }}>
-          No tests match “{query}”.
-        </div>
-      ) : (
-        <div style={{ display: “grid”, gridTemplateColumns: “repeat(auto-fill,minmax(290px,1fr))”, gap: 16 }}>
-          {filtered.map((t, i) => {
-            const meta = getMeta?.(t) || [];
-            const isStarting = starting === t.id;
-            return (
-              <div
-                key={t.id}
-                className="da-pcard"
-                onClick={() => !isStarting && start(t)}
-                style={{ padding: 0, overflow: "hidden", opacity: isStarting ? 0.65 : 1 }}
-              >
-                {/* Accent strip */}
-                <div style={{ height: 6, background: gradient }} />
-                <div style={{ padding: 20, display: "flex", flexDirection: "column", flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div style={{
-                      width: 42, height: 42, borderRadius: 12, background: accentSoft,
-                      color: accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15,
-                    }}>
-                      {String(i + 1).padStart(2, "0")}
-                    </div>
-                    <span style={{
-                      display: "inline-flex", alignItems: "center", gap: 5,
-                      fontSize: 11.5, fontWeight: 600, color: "#64748b",
-                      background: "#f4f5f9", borderRadius: 99, padding: "5px 11px",
-                    }}>
-                      <Clock size={12} /> {duration}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 5, lineHeight: 1.35 }}>
-                    {t.title}
-                  </div>
-                  {getDescription?.(t) && (
-                    <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55, margin: "0 0 14px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                      {getDescription(t)}
-                    </p>
-                  )}
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 18, marginTop: "auto" }}>
-                    {meta.map((m) => (
-                      <span key={m.label} style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        fontSize: 11.5, fontWeight: 500, color: "#475569",
-                        background: "#f4f5f9", borderRadius: 8, padding: "5px 10px",
-                      }}>
-                        {m.icon}{m.label}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                    background: gradient, color: "#fff", borderRadius: 11,
-                    padding: "11px 16px", fontSize: 14, fontWeight: 700,
-                  }}>
-                    {isStarting ? "Opening…" : "Start test"} {!isStarting && <ArrowRight size={16} />}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {listContent}
 
       {/* Footer link */}
       <div style={{ marginTop: 26, display: "flex", justifyContent: "center" }}>
