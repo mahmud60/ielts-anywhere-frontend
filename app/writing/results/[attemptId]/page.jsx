@@ -31,7 +31,6 @@ function Spinner() {
 }
 
 function TaskPanel({ task, criteria }) {
-  const { t } = useLang();
   const critCards = criteria.map(c => ({
     ...c,
     band: task[c.key],
@@ -58,11 +57,11 @@ function TaskPanel({ task, criteria }) {
         <div style={{ display: "flex", gap: 24 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(band)}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.cefrLabel}</div>
+            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{wordCount}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.wordsLabel}</div>
+            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Words</div>
           </div>
         </div>
       </div>
@@ -107,18 +106,19 @@ export default function WritingResultsPage() {
 
   useEffect(() => {
     if (!user) return;
+    setFetching(true);
     Promise.all([
-      api.pollWritingAttempt(attemptId),
+      api.pollWritingAttempt(attemptId, lang),
       api.getMe().catch(() => null),
     ]).then(([r, p]) => { setResult(r); setProfile(p); setFetching(false); })
       .catch(e => { setError(e.message ?? "Could not load results."); setFetching(false); });
-  }, [user, attemptId]);
+  }, [user, attemptId, lang]);
 
   const writingCriteria = [
-    { key: "task_achievement",  label: t.critTaskAchievement,   color: CRIT_COLORS.task_achievement },
-    { key: "coherence_cohesion", label: t.critCoherenceCohesion, color: CRIT_COLORS.coherence_cohesion },
-    { key: "lexical_resource",   label: t.critLexicalResource,   color: CRIT_COLORS.lexical_resource },
-    { key: "grammatical_range",  label: t.critGrammaticalRange,  color: CRIT_COLORS.grammatical_range },
+    { key: "task_achievement",  label: "Task Achievement",            color: CRIT_COLORS.task_achievement },
+    { key: "coherence_cohesion", label: "Coherence & Cohesion",       color: CRIT_COLORS.coherence_cohesion },
+    { key: "lexical_resource",   label: "Lexical Resource",           color: CRIT_COLORS.lexical_resource },
+    { key: "grammatical_range",  label: "Grammatical Range & Accuracy", color: CRIT_COLORS.grammatical_range },
   ];
 
   if (loading || fetching) return <Spinner />;
@@ -127,11 +127,11 @@ export default function WritingResultsPage() {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
         <div style={{ textAlign: "center", padding: 32 }}>
-          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? t.resultsNotFound}</p>
+          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? "Results not found."}</p>
           <button onClick={() => router.push("/dashboard")} style={{
             padding: "10px 24px", borderRadius: 8, background: PRIMARY, border: "none",
             color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14,
-          }}>{t.backToDashboard}</button>
+          }}>Back to Dashboard</button>
         </div>
       </div>
     );
@@ -142,9 +142,9 @@ export default function WritingResultsPage() {
   const overall = result.overall_band;
 
   const getTaskTypeLabel = (taskType) => {
-    if (taskType === "task2") return t.essayType;
-    if (taskType === "task1_general") return t.letterType;
-    return t.graphChartType;
+    if (taskType === "task2") return "Essay";
+    if (taskType === "task1_general") return "Letter";
+    return "Graph/Chart";
   };
 
   return (
@@ -162,9 +162,9 @@ export default function WritingResultsPage() {
         >
           ←
         </button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{t.writingResults}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Writing Results</span>
         <span style={{ fontSize: 12, color: MUTED }}>
-          {t.overallBandLabel}: <strong style={{ color: bandColor(overall) }}>{overall != null ? Number(overall).toFixed(1) : "–"}</strong>
+          Overall Band: <strong style={{ color: bandColor(overall) }}>{overall != null ? Number(overall).toFixed(1) : "–"}</strong>
         </span>
         <span style={{ marginLeft: "auto" }} />
         <div style={{ display: "flex", gap: 2, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
@@ -202,7 +202,7 @@ export default function WritingResultsPage() {
                 borderBottom: activeTask === i ? `2px solid ${PRIMARY}` : "2px solid transparent",
               }}
             >
-              {t.taskLabel} {task.task_number} — {getTaskTypeLabel(task.task_type)}
+              Task {task.task_number} — {getTaskTypeLabel(task.task_type)}
             </button>
           ))}
         </div>
@@ -214,7 +214,7 @@ export default function WritingResultsPage() {
             {activeTaskData ? (
               <TaskPanel key={activeTask} task={activeTaskData} criteria={writingCriteria} />
             ) : (
-              <p style={{ color: MUTED, fontSize: 14 }}>{t.noResultsYet}</p>
+              <p style={{ color: MUTED, fontSize: 14 }}>No results available yet.</p>
             )}
 
             {result.improvement_tips?.length > 0 && (
@@ -222,7 +222,7 @@ export default function WritingResultsPage() {
                 background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
                 padding: "20px 24px", marginTop: 24,
               }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>{t.improvementTips}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>Improvement Tips</div>
                 <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
                   {result.improvement_tips.map((tip, i) => (
                     <li key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>{tip}</li>

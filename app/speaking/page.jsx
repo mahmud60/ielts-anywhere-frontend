@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { isProUser } from "@/lib/landingAccess";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
@@ -65,6 +66,7 @@ export default function SpeakingPage() {
   const router = useRouter();
   const [history, setHistory] = useState([]);
   const [starting, setStarting] = useState(false);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -72,10 +74,16 @@ export default function SpeakingPage() {
 
   useEffect(() => {
     if (!user) return;
-    api.getSpeakingHistory().then(setHistory).catch(() => {});
+    Promise.all([
+      api.getSpeakingHistory().catch(() => []),
+      api.getMe().catch(() => null),
+    ]).then(([hist, me]) => { setHistory(hist); setProfile(me); });
   }, [user]);
 
+  const isPro = isProUser(profile);
+
   const startTest = () => {
+    if (!isPro) { router.push("/pricing"); return; }
     setStarting(true);
     router.push("/speaking/start");
   };
@@ -131,32 +139,65 @@ export default function SpeakingPage() {
             </div>
           </div>
 
-          <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: "0 0 18px", flex: 1 }}>
-            Put on headphones, allow microphone access, and the examiner will walk you through Parts 1–3 just like a real test room.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-            {CHECKLIST.map((item) => (
-              <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#475569" }}>
-                <CheckCircle2 size={15} color={ACCENT} />
-                {item}
+          {!isPro && profile !== null ? (
+            /* Pro paywall */
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 12, padding: "8px 0 4px" }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14,
+                background: "#eef2ff", border: "1px solid #c7d2fe",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Award size={24} color="#6366f1" />
               </div>
-            ))}
-          </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>Pro feature</div>
+                <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, margin: "0 0 16px", maxWidth: 260 }}>
+                  AI Speaking is available to Pro subscribers. Upgrade to access the full 3-part IELTS simulation with instant band scoring.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/pricing")}
+                style={{
+                  width: "100%", padding: "13px 20px", borderRadius: 12, border: "none", cursor: "pointer",
+                  background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 700, fontSize: 14,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  boxShadow: "0 10px 24px -10px #6366f199",
+                }}
+              >
+                <Award size={16} /> Upgrade to Pro
+              </button>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: "0 0 18px", flex: 1 }}>
+                Put on headphones, allow microphone access, and the examiner will walk you through Parts 1–3 just like a real test room.
+              </p>
 
-          <button
-            type="button"
-            onClick={startTest}
-            disabled={starting}
-            style={{
-              width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", cursor: starting ? "wait" : "pointer",
-              background: GRADIENT, color: "#fff", fontWeight: 700, fontSize: 15,
-              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-              boxShadow: `0 14px 30px -14px ${ACCENT}`, opacity: starting ? 0.7 : 1,
-            }}
-          >
-            {starting ? "Opening…" : <><Play size={17} fill="#fff" /> Start speaking test</>}
-          </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                {CHECKLIST.map((item) => (
+                  <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#475569" }}>
+                    <CheckCircle2 size={15} color={ACCENT} />
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={startTest}
+                disabled={starting}
+                style={{
+                  width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", cursor: starting ? "wait" : "pointer",
+                  background: GRADIENT, color: "#fff", fontWeight: 700, fontSize: 15,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  boxShadow: `0 14px 30px -14px ${ACCENT}`, opacity: starting ? 0.7 : 1,
+                }}
+              >
+                {starting ? "Opening…" : <><Play size={17} fill="#fff" /> Start speaking test</>}
+              </button>
+            </>
+          )}
         </div>
 
         {/* How it works */}

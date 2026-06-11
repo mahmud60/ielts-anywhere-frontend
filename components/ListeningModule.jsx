@@ -1215,6 +1215,11 @@ export default function ListeningModule({
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [reviewPart, setReviewPart]             = useState(1);
 
+  // Sync result when parent re-fetches with a new lang (tips translation)
+  useEffect(() => {
+    if (initialResult) setResult(initialResult);
+  }, [initialResult]);
+
   // ── Load test ──
   useEffect(() => {
     async function load() {
