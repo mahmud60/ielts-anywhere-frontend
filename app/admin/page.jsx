@@ -9,6 +9,7 @@ import { OverviewTab } from "@/components/Admin/OverviewTab";
 import { UsersTab } from "@/components/Admin/UsersTab";
 import { logout } from "@/lib/auth";
 import { PricingTab } from "@/components/Admin/PricingTab";
+import { AffiliatesTab } from "@/components/Admin/AffiliatesTab";
 import PetLoader from "@/components/PetLoader";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -24,9 +25,10 @@ const C = {
 const NAV = [
   { id: "overview", label: "Overview" },
   { id: "users", label: "Users" },
-  { id: "tests",     label: "Tests" }, 
+  { id: "tests",     label: "Tests" },
   { id: "questions", label: "Questions & Audio" },
   { id: "pricing", label: "Pricing & Limits" },
+  { id: "affiliates", label: "Affiliates" },
 ];
 
 
@@ -135,6 +137,7 @@ export default function AdminPage() {
           {activeTab === "tests" && <TestsTab api={api} />}
           {activeTab === "questions" && <QuestionsTab api={api} />}
           {activeTab === "pricing" && <PricingTab api={api} />}
+          {activeTab === "affiliates" && <AffiliatesTab />}
         </div>
       </div>
     </div>

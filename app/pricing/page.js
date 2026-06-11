@@ -1,19 +1,36 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+
+const REF_KEY = "ielts_ref_code";
 
 export default function PricingPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [refCode, setRefCode] = useState(null);
+
+  useEffect(() => {
+    const param = searchParams.get("ref");
+    if (param) {
+      const code = param.trim().toUpperCase();
+      sessionStorage.setItem(REF_KEY, code);
+      setRefCode(code);
+    } else {
+      const stored = sessionStorage.getItem(REF_KEY);
+      if (stored) setRefCode(stored);
+    }
+  }, [searchParams]);
 
   const handleUpgrade = async () => {
     if (!user) { router.push("/login"); return; }
     setLoading(true);
     try {
-      const { checkout_url } = await api.getCheckoutUrl();
+      const { checkout_url } = await api.getCheckoutUrl(refCode);
+      sessionStorage.removeItem(REF_KEY);
       window.location.href = checkout_url;
     } catch (e) {
       alert("Could not start checkout: " + e.message);
@@ -61,8 +78,17 @@ export default function PricingPage() {
               <span style={{ color: "#059669" }}>✓</span> {f}
             </div>
           ))}
+          {refCode && (
+            <div style={{
+              marginTop: 14, padding: "8px 12px", borderRadius: 8,
+              background: "#d1fae5", color: "#059669", fontSize: 12, fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              ✓ Referral code <strong>{refCode}</strong> applied
+            </div>
+          )}
           <button onClick={handleUpgrade} disabled={loading} style={{
-            width: "100%", marginTop: 20, padding: 11, borderRadius: 8,
+            width: "100%", marginTop: 12, padding: 11, borderRadius: 8,
             background: "#6366f1", border: "none", color: "#fff",
             fontWeight: 600, fontSize: 14, cursor: "pointer",
             opacity: loading ? 0.6 : 1,
