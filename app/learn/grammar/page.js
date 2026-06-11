@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLang } from "@/lib/i18n";
 import PetLoader from "@/components/PetLoader";
 
 const s = {
@@ -13,8 +14,7 @@ const s = {
   label: { fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, display: "block" },
 };
 
-
-function ExerciseCard({ ex }) {
+function ExerciseCard({ ex, t }) {
   const [showAnswer, setShowAnswer] = useState(false);
 
   return (
@@ -26,28 +26,28 @@ function ExerciseCard({ ex }) {
       <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: 10, lineHeight: 1.6 }}>{ex.explanation}</p>
 
       <div style={{ background: "#f0f9ff", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
-        <span style={s.label}>Example</span>
+        <span style={s.label}>{t.exampleLabel}</span>
         <p style={{ fontSize: 14, color: "#0c4a6e", fontStyle: "italic", margin: 0 }}>{ex.example}</p>
       </div>
 
       <div style={{ background: "#f9fafb", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
-        <span style={s.label}>Your turn — transform this sentence</span>
+        <span style={s.label}>{t.yourTurn}</span>
         <p style={{ fontSize: 14, color: "#374151", margin: 0 }}>{ex.transform_task}</p>
         {showAnswer ? (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #e5e7eb" }}>
-            <span style={s.label}>Model answer</span>
+            <span style={s.label}>{t.modelAnswer}</span>
             <p style={{ fontSize: 14, fontWeight: 600, color: "#059669", margin: 0 }}>{ex.model_answer}</p>
           </div>
         ) : (
           <button onClick={() => setShowAnswer(true)} style={{
             marginTop: 8, fontSize: 12, color: "#0ea5e9", background: "none", border: "none", cursor: "pointer", padding: 0,
-          }}>Show model answer</button>
+          }}>{t.showModelAnswer}</button>
         )}
       </div>
 
       {ex.common_error && (
         <div style={{ background: "#fef2f2", borderRadius: 8, padding: "10px 14px", marginBottom: 10, fontSize: 13, color: "#991b1b" }}>
-          <strong>Common error: </strong>{ex.common_error}
+          <strong>{t.commonError} </strong>{ex.common_error}
         </div>
       )}
 
@@ -60,18 +60,18 @@ function ExerciseCard({ ex }) {
   );
 }
 
-function PatternCard({ pattern }) {
+function PatternCard({ pattern, t }) {
   return (
     <div style={{ ...s.card, background: "#fafafa" }}>
       <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 6 }}>{pattern.name}</div>
       <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: 12, lineHeight: 1.6 }}>{pattern.when_to_use}</p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={{ background: "#fef2f2", borderRadius: 8, padding: "10px 12px" }}>
-          <span style={s.label}>Active / Direct</span>
+          <span style={s.label}>{t.activeDirect}</span>
           <p style={{ fontSize: 13, color: "#374151", margin: 0, fontStyle: "italic" }}>{pattern.active_example}</p>
         </div>
         <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "10px 12px" }}>
-          <span style={s.label}>Preferred / Transformed</span>
+          <span style={s.label}>{t.preferredTransformed}</span>
           <p style={{ fontSize: 13, color: "#374151", margin: 0, fontStyle: "italic" }}>{pattern.passive_example}</p>
         </div>
       </div>
@@ -86,6 +86,7 @@ function PatternCard({ pattern }) {
 
 export default function GrammarPage() {
   const router = useRouter();
+  const { lang, t } = useLang();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -94,10 +95,10 @@ export default function GrammarPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.getGrammarExercises();
+      const result = await api.getGrammarExercises(lang);
       setData(result);
     } catch (e) {
-      setError(e.message.includes("403") ? "Pro subscription required." : "Failed to generate exercises. Try again.");
+      setError(e.message.includes("403") ? t.proRequired : t.failedGenerate);
     } finally {
       setLoading(false);
     }
@@ -108,24 +109,19 @@ export default function GrammarPage() {
       <button onClick={() => router.back()} style={{
         background: "none", border: "none", color: "#6b7280", cursor: "pointer",
         fontSize: 13, padding: 0, marginBottom: 20, display: "flex", alignItems: "center", gap: 4,
-      }}>← Back</button>
+      }}>{t.back}</button>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>Grammar Practice</h1>
-        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-          AI-generated exercises targeting your grammatical weak points.
-        </p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>{t.grammarPractice}</h1>
+        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>{t.grammarDesc}</p>
       </div>
 
       {!data && !loading && (
         <div style={{ textAlign: "center", padding: "48px 0" }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>✏️</div>
-          <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
-            Generate grammar exercises based on patterns identified in your Writing and Speaking tests.
-            Exercises are tailored to your current band level.
-          </p>
+          <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>{t.grammarGenDesc}</p>
           <button onClick={generate} style={{ ...s.btn, background: "#0ea5e9", color: "#fff" }}>
-            Generate exercises
+            {t.generateExercises}
           </button>
         </div>
       )}
@@ -150,17 +146,17 @@ export default function GrammarPage() {
               ...s.btn, background: "none", color: "#6b7280", border: "1px solid #e5e7eb",
               padding: "7px 14px", fontSize: 13,
             }}>
-              Refresh ↺
+              {t.refresh}
             </button>
           </div>
 
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 12 }}>Exercises</h2>
-          {data.exercises?.map((ex, i) => <ExerciseCard key={i} ex={ex} />)}
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 12 }}>{t.exercises}</h2>
+          {data.exercises?.map((ex, i) => <ExerciseCard key={i} ex={ex} t={t} />)}
 
           {data.patterns?.length > 0 && (
             <>
-              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", margin: "24px 0 12px" }}>Grammar Patterns</h2>
-              {data.patterns.map((p, i) => <PatternCard key={i} pattern={p} />)}
+              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", margin: "24px 0 12px" }}>{t.grammarPatterns}</h2>
+              {data.patterns.map((p, i) => <PatternCard key={i} pattern={p} t={t} />)}
             </>
           )}
 
@@ -169,7 +165,7 @@ export default function GrammarPage() {
               background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10,
               padding: "14px 18px", marginTop: 8, fontSize: 14, color: "#78350f", lineHeight: 1.6,
             }}>
-              <strong>Study tip: </strong>{data.study_tip}
+              <strong>{t.studyTipLabel} </strong>{data.study_tip}
             </div>
           )}
         </>

@@ -3,8 +3,16 @@
 import { useRouter } from "next/navigation";
 import { Crown, Lock, ArrowRight } from "lucide-react";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { useLang } from "@/lib/i18n";
 
 const MODULES = ["listening", "reading", "writing", "speaking"];
+const TAB_IDS = ["overview", "progress", "studyplan", "vocabulary"];
+const TAB_LABEL_KEYS = {
+  overview: "overviewTab",
+  progress: "progressTab",
+  studyplan: "studyPlanTab",
+  vocabulary: "vocabularyTab",
+};
 
 function bandColor(b) {
   if (b == null || b <= 0) return "#94a3b8";
@@ -17,9 +25,10 @@ function BandBadge({ value, size = 16 }) {
 }
 
 export function ProgressChart({ history }) {
+  const { t } = useLang();
   const data = (history || []).filter((s) => s.overall_band != null);
   if (data.length < 2) {
-    return <div style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "40px 0" }}>Complete at least 2 tests to see your progress chart.</div>;
+    return <div style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", padding: "40px 0" }}>{t.complete2Tests}</div>;
   }
   const W = 600, H = 200, PX = 36, PY = 20;
   const cW = W - PX * 2, cH = H - PY * 2;
@@ -62,7 +71,7 @@ export function ProgressChart({ history }) {
       <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <div style={{ width: 20, height: 2.5, background: "#6366f1", borderRadius: 2 }} />
-          <span style={{ fontSize: 11, color: "#64748b" }}>Overall</span>
+          <span style={{ fontSize: 11, color: "#64748b" }}>{t.overallLegend}</span>
         </div>
         {Object.entries(MOD_COLORS).map(([mod, color]) => (
           <div key={mod} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -76,8 +85,9 @@ export function ProgressChart({ history }) {
 }
 
 function WeaknessPanel({ weaknessByModule }) {
+  const { t } = useLang();
   if (!weaknessByModule || Object.keys(weaknessByModule).length === 0) {
-    return <p style={{ color: "#94a3b8", fontSize: 13 }}>Complete Writing or Speaking tests to see criterion-level analysis.</p>;
+    return <p style={{ color: "#94a3b8", fontSize: 13 }}>{t.completeCritTests}</p>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -88,7 +98,7 @@ function WeaknessPanel({ weaknessByModule }) {
             <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a", textTransform: "capitalize" }}>{mod}</span>
             {info.weakest_label && (
               <span style={{ marginLeft: "auto", fontSize: 11, padding: "2px 8px", borderRadius: 99, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
-                Weakest: {info.weakest_label} ({info.weakest_score?.toFixed(1)})
+                {t.weakest} {info.weakest_label} ({info.weakest_score?.toFixed(1)})
               </span>
             )}
           </div>
@@ -112,16 +122,18 @@ function WeaknessPanel({ weaknessByModule }) {
 }
 
 function TipList({ tips }) {
-  if (!tips || tips.length === 0) return <p style={{ color: "#94a3b8", fontSize: 13 }}>Complete more tests to generate tips.</p>;
+  const { t } = useLang();
+  if (!tips || tips.length === 0) return <p style={{ color: "#94a3b8", fontSize: 13 }}>{t.completeTipsTests}</p>;
   return (
     <ul style={{ margin: 0, paddingLeft: 18 }}>
-      {tips.map((t, i) => <li key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 6 }}>{t}</li>)}
+      {tips.map((tip, i) => <li key={i} style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 6 }}>{tip}</li>)}
     </ul>
   );
 }
 
 export function LockedTeaser({ title, blurb }) {
   const router = useRouter();
+  const { t } = useLang();
   return (
     <div
       className="da-card"
@@ -145,29 +157,30 @@ export function LockedTeaser({ title, blurb }) {
         <p style={{ fontSize: 14, color: "#64748b", maxWidth: 420, margin: "0 auto", lineHeight: 1.65 }}>{blurb}</p>
       </div>
       <button className="da-btn da-btn-pro" onClick={() => router.push("/pricing")} style={{ marginTop: 4 }}>
-        <Crown size={15} /> Upgrade to Pro
+        <Crown size={15} /> {t.upgradeToPro}
       </button>
     </div>
   );
 }
 
 export function ProgressSection({ dash, isPro }) {
+  const { t } = useLang();
   if (isPro) {
     return (
       <>
         <div className="da-card" style={{ padding: "22px 24px", marginBottom: 18 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px" }}>Band score history</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px" }}>{t.bandScoreHistory}</h3>
           <ProgressChart history={dash?.score_history || []} />
         </div>
         {dash?.weak_modules?.length > 0 && (
           <div className="da-card" style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: "16px 20px", display: "flex", gap: 10 }}>
             <span style={{ fontSize: 18, lineHeight: 1 }}>⚠</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "#92400e", marginBottom: 4 }}>Needs attention</div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#92400e", marginBottom: 4 }}>{t.needsAttention}</div>
               <div style={{ fontSize: 13, color: "#78350f" }}>
                 {dash.weak_modules.map((w, i) => (
                   <span key={w.module}>{i > 0 && ", "}<strong style={{ textTransform: "capitalize" }}>{w.module}</strong> ({w.avg_band.toFixed(1)})</span>
-                ))}{" "}— focus here to raise your overall score.
+                ))}{t.focusHere}
               </div>
             </div>
           </div>
@@ -175,15 +188,11 @@ export function ProgressSection({ dash, isPro }) {
       </>
     );
   }
-  return (
-    <LockedTeaser
-      title="Track your progress over time"
-      blurb="Pro unlocks band-score history charts and module trend tracking so you can see exactly how you improve."
-    />
-  );
+  return <LockedTeaser title={t.trackProgressTitle} blurb={t.trackProgressDesc} />;
 }
 
 export function StudyPlanSection({ dash, isPro }) {
+  const { t } = useLang();
   if (isPro) {
     return (
       <>
@@ -199,28 +208,24 @@ export function StudyPlanSection({ dash, isPro }) {
             </div>
           ))}
         </div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px" }}>Criterion analysis</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px" }}>{t.criterionAnalysis}</h2>
         <WeaknessPanel weaknessByModule={dash?.weakness_by_module} />
       </>
     );
   }
-  return (
-    <LockedTeaser
-      title="Get a personalized study plan"
-      blurb="Pro turns your Writing and Speaking AI feedback into module-by-module tips and criterion-level weakness analysis."
-    />
-  );
+  return <LockedTeaser title={t.studyPlanTitle} blurb={t.studyPlanDesc} />;
 }
 
 export function VocabularySection({ dash, isPro }) {
   const router = useRouter();
+  const { t } = useLang();
   if (isPro) {
     return (
       <>
         <div className="da-card" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px 18px", marginBottom: 16, fontSize: 13, color: "#166534", lineHeight: 1.6, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <span>Vocabulary tips extracted from your Writing and Speaking AI feedback.</span>
+          <span>{t.vocabTipsNote}</span>
           <button className="da-btn da-btn-ghost" onClick={() => router.push("/learn/vocabulary")} style={{ fontSize: 12.5 }}>
-            Practice exercises <ArrowRight size={14} />
+            {t.practiceExercisesBtn} <ArrowRight size={14} />
           </button>
         </div>
         <div className="da-card" style={{ padding: "20px 24px" }}>
@@ -232,42 +237,33 @@ export function VocabularySection({ dash, isPro }) {
             </ul>
           ) : (
             <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", margin: 0 }}>
-              No vocabulary tips yet — complete Writing and Speaking modules to generate feedback.
+              {t.noVocabTips}
             </p>
           )}
         </div>
       </>
     );
   }
-  return (
-    <LockedTeaser
-      title="Build exam-ready vocabulary"
-      blurb="Pro extracts vocabulary tips from your AI feedback and unlocks dedicated vocabulary and grammar exercises."
-    />
-  );
+  return <LockedTeaser title={t.buildVocabTitle} blurb={t.buildVocabDesc} />;
 }
 
-export const INSIGHT_TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "progress", label: "Progress" },
-  { id: "studyplan", label: "Study Plan" },
-  { id: "vocabulary", label: "Vocabulary" },
-];
-
 export function InsightTabBar({ tab, setTab, isPro }) {
+  const { t } = useLang();
   return (
     <div className="da-seg" style={{ marginBottom: 22 }}>
-      {INSIGHT_TABS.map((t) => (
+      {TAB_IDS.map((id) => (
         <button
-          key={t.id}
+          key={id}
           type="button"
-          className={`da-seg-item ${tab === t.id ? "active" : ""}`}
-          onClick={() => setTab(t.id)}
+          className={`da-seg-item ${tab === id ? "active" : ""}`}
+          onClick={() => setTab(id)}
         >
-          {t.label}
-          {t.id !== "overview" && !isPro && <Lock size={12} />}
+          {t[TAB_LABEL_KEYS[id]] || id}
+          {id !== "overview" && !isPro && <Lock size={12} />}
         </button>
       ))}
     </div>
   );
 }
+
+export const INSIGHT_TABS = TAB_IDS.map((id) => ({ id }));

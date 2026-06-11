@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useLang } from "@/lib/i18n";
 import PetLoader from "@/components/PetLoader";
 
 const s = {
@@ -12,8 +13,7 @@ const s = {
   btn: { padding: "10px 22px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" },
 };
 
-
-function WordCard({ ex }) {
+function WordCard({ ex, t }) {
   const [showAnswer, setShowAnswer] = useState(false);
 
   return (
@@ -22,8 +22,8 @@ function WordCard({ ex }) {
         <div>
           <span style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{ex.word}</span>
           <span style={{ ...s.tag, background: "#e0f2fe", color: "#0369a1", marginLeft: 8 }}>{ex.part_of_speech}</span>
-          {ex.ielts_topics?.map(t => (
-            <span key={t} style={{ ...s.tag, background: "#f0fdf4", color: "#166534" }}>{t}</span>
+          {ex.ielts_topics?.map(topic => (
+            <span key={topic} style={{ ...s.tag, background: "#f0fdf4", color: "#166534" }}>{topic}</span>
           ))}
         </div>
       </div>
@@ -31,23 +31,21 @@ function WordCard({ ex }) {
       <p style={{ fontSize: 14, color: "#374151", margin: "8px 0 4px" }}>{ex.definition}</p>
       <p style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic", margin: "0 0 12px" }}>"{ex.example_sentence}"</p>
 
-      {/* Gap fill */}
       <div style={{ background: "#f9fafb", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Gap fill</div>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.gapFill}</div>
         <p style={{ fontSize: 14, color: "#374151", margin: 0 }}>{ex.gap_fill}</p>
         {showAnswer ? (
           <p style={{ fontSize: 14, fontWeight: 700, color: "#059669", margin: "6px 0 0" }}>→ {ex.gap_fill_answer}</p>
         ) : (
           <button onClick={() => setShowAnswer(true)} style={{
             marginTop: 6, fontSize: 12, color: "#0ea5e9", background: "none", border: "none", cursor: "pointer", padding: 0,
-          }}>Show answer</button>
+          }}>{t.showAnswer}</button>
         )}
       </div>
 
-      {/* Collocations */}
       {ex.collocations?.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>Collocations: </span>
+          <span style={{ fontSize: 12, color: "#9ca3af" }}>{t.collocations} </span>
           {ex.collocations.map((c, i) => (
             <span key={i} style={{ ...s.tag, background: "#faf5ff", color: "#7c3aed" }}>{c}</span>
           ))}
@@ -63,7 +61,7 @@ function WordCard({ ex }) {
   );
 }
 
-function PhraseCard({ phrase }) {
+function PhraseCard({ phrase, t }) {
   const [showEx, setShowEx] = useState(false);
   return (
     <div style={{ ...s.card, background: "#fafafa" }}>
@@ -77,7 +75,7 @@ function PhraseCard({ phrase }) {
       ) : (
         <button onClick={() => setShowEx(true)} style={{
           fontSize: 12, color: "#0ea5e9", background: "none", border: "none", cursor: "pointer", padding: 0,
-        }}>Show example sentence</button>
+        }}>{t.showExampleSentence}</button>
       )}
     </div>
   );
@@ -85,6 +83,7 @@ function PhraseCard({ phrase }) {
 
 export default function VocabularyPage() {
   const router = useRouter();
+  const { lang, t } = useLang();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -93,10 +92,10 @@ export default function VocabularyPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.getVocabularyExercises();
+      const result = await api.getVocabularyExercises(lang);
       setData(result);
     } catch (e) {
-      setError(e.message.includes("403") ? "Pro subscription required." : "Failed to generate exercises. Try again.");
+      setError(e.message.includes("403") ? t.proRequired : t.failedGenerate);
     } finally {
       setLoading(false);
     }
@@ -107,24 +106,19 @@ export default function VocabularyPage() {
       <button onClick={() => router.back()} style={{
         background: "none", border: "none", color: "#6b7280", cursor: "pointer",
         fontSize: 13, padding: 0, marginBottom: 20, display: "flex", alignItems: "center", gap: 4,
-      }}>← Back</button>
+      }}>{t.back}</button>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>Vocabulary Practice</h1>
-        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-          AI-generated exercises personalised to your IELTS weak areas.
-        </p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>{t.vocabPractice}</h1>
+        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>{t.vocabDesc}</p>
       </div>
 
       {!data && !loading && (
         <div style={{ textAlign: "center", padding: "48px 0" }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📚</div>
-          <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
-            Click below to generate vocabulary exercises tailored to your performance history.
-            Each set focuses on lexical gaps identified in your Writing and Speaking tests.
-          </p>
+          <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>{t.vocabGenDesc}</p>
           <button onClick={generate} style={{ ...s.btn, background: "#0ea5e9", color: "#fff" }}>
-            Generate exercises
+            {t.generateExercises}
           </button>
         </div>
       )}
@@ -149,17 +143,17 @@ export default function VocabularyPage() {
               ...s.btn, background: "none", color: "#6b7280", border: "1px solid #e5e7eb",
               padding: "7px 14px", fontSize: 13,
             }}>
-              Refresh ↺
+              {t.refresh}
             </button>
           </div>
 
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 12 }}>Words & Expressions</h2>
-          {data.exercises?.map((ex, i) => <WordCard key={i} ex={ex} />)}
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 12 }}>{t.wordsAndExpressions}</h2>
+          {data.exercises?.map((ex, i) => <WordCard key={i} ex={ex} t={t} />)}
 
           {data.phrases?.length > 0 && (
             <>
-              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", margin: "24px 0 12px" }}>Academic Phrases</h2>
-              {data.phrases.map((p, i) => <PhraseCard key={i} phrase={p} />)}
+              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#374151", margin: "24px 0 12px" }}>{t.academicPhrases}</h2>
+              {data.phrases.map((p, i) => <PhraseCard key={i} phrase={p} t={t} />)}
             </>
           )}
 
@@ -168,7 +162,7 @@ export default function VocabularyPage() {
               background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10,
               padding: "14px 18px", marginTop: 8, fontSize: 14, color: "#78350f", lineHeight: 1.6,
             }}>
-              <strong>Study tip: </strong>{data.study_tip}
+              <strong>{t.studyTipLabel} </strong>{data.study_tip}
             </div>
           )}
         </>
