@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLang } from "@/lib/i18n";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 export const PRIMARY  = "#0080ff";
@@ -61,15 +60,15 @@ export function segmentText(text, errors) {
 }
 
 // ── Sub-criteria definitions ──────────────────────────────────────────────────
-function getSubcriteria(key, t) {
+function getSubcriteria(key) {
   const map = {
-    task_achievement:   [t.subCritOverview, t.subCritKeyFeatures, t.subCritDataSupport],
-    task_response:      [t.subCritPosition, t.subCritMainIdeas, t.subCritDevelopment],
-    coherence_cohesion: [t.subCritFlowIdeas, t.subCritCohesiveDevices, t.subCritTransition, t.subCritParagraphing],
-    lexical_resource:   [t.subCritRangeVocab, t.subCritAccuracy, t.subCritSpelling],
-    grammatical_range:  [t.subCritRangeStructures, t.subCritAccuracy, t.subCritPunctuation],
-    fluency_coherence:  [t.subCritFluency, t.subCritCoherence, t.subCritDiscourseMarkers],
-    pronunciation:      [t.subCritSounds, t.subCritStressRhythm, t.subCritIntelligibility],
+    task_achievement:   ["Overview", "Key features", "Data support"],
+    task_response:      ["Position", "Main ideas", "Development"],
+    coherence_cohesion: ["Flow of ideas", "Cohesive devices", "Transition", "Paragraphing"],
+    lexical_resource:   ["Range of vocabulary", "Accuracy", "Spelling"],
+    grammatical_range:  ["Range of structures", "Accuracy", "Punctuation"],
+    fluency_coherence:  ["Fluency", "Coherence", "Discourse markers"],
+    pronunciation:      ["Sounds", "Stress & rhythm", "Intelligibility"],
   };
   return map[key] ?? [];
 }
@@ -83,8 +82,7 @@ function hexToRgba(hex, alpha) {
 
 // ── CriterionCard ─────────────────────────────────────────────────────────────
 export function CriterionCard({ crit, expanded, onToggle }) {
-  const { t } = useLang();
-  const subLabels = getSubcriteria(crit.key, t);
+  const subLabels = getSubcriteria(crit.key);
   const sub = subLabels.map(label => ({ label, band: crit.band }));
   const tint = hexToRgba(crit.color, 0.07);
   const borderColor = hexToRgba(crit.color, 0.25);
@@ -113,7 +111,7 @@ export function CriterionCard({ crit, expanded, onToggle }) {
           {sub.length > 0 && (
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                {t.whatExaminersLookFor}
+                What examiners look for
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {sub.map(s => (
@@ -198,7 +196,6 @@ export function AnnotatedText({ text, errors, showHighlights, color }) {
 
 // ── DetailedFeedback (criterion tabs + annotated text + errors panel) ─────────
 export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
-  const { t } = useLang();
   const critKeys = criteria.map(c => c.key);
   const [activeCrit, setActiveCrit] = useState(critKeys[0]);
   const [showHighlights, setShowHighlights] = useState(true);
@@ -208,7 +205,7 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
 
   return (
     <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "20px 20px 24px" }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>{t.detailedFeedback}</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>Detailed Feedback</div>
 
       {taskPrompt && (
         <div style={{
@@ -243,8 +240,8 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
         {/* Left: annotated text */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginRight: 4 }}>{t.yourWritingLabel}</span>
-            {[{ key: "original", label: t.originalMode }, { key: "highlighted", label: t.highlightedMode }].map(mode => (
+            <span style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginRight: 4 }}>Your Writing</span>
+            {[{ key: "original", label: "Original" }, { key: "highlighted", label: "Highlighted" }].map(mode => (
               <button
                 key={mode.key}
                 onClick={() => setShowHighlights(mode.key === "highlighted")}
@@ -275,11 +272,11 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
         {/* Right: error list */}
         <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
-            {crit?.label} {t.issuesSuffix}
+            {crit?.label} Issues
           </div>
           {errors.length > 0
             ? errors.map((e, i) => <ErrorItem key={i} num={i + 1} error={e} color={crit?.color ?? PRIMARY} />)
-            : <p style={{ fontSize: 13, color: MUTED }}>{t.noIssuesFound}</p>
+            : <p style={{ fontSize: 13, color: MUTED }}>No issues found for this criterion.</p>
           }
         </div>
       </div>
@@ -290,7 +287,6 @@ export function DetailedFeedback({ text, criteria, errorsMap, taskPrompt }) {
 // ── PaywallGate ───────────────────────────────────────────────────────────────
 export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
   const router = useRouter();
-  const { t } = useLang();
   const sampleTab = module === "speaking" ? "speaking" : "academic";
   const ctaBg = gradient ?? accent;
 
@@ -306,14 +302,14 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
             {band != null ? Number(band).toFixed(1) : "–"}
             <span style={{ fontSize: 22, fontWeight: 600, color: MUTED }}>/9.0</span>
           </div>
-          <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 6 }}>{t.overallBandScore}</div>
+          <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 6 }}>Overall Band Score</div>
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 6 }}>
-            {t.fullReportLocked}
+            Full report locked
           </div>
           <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>
-            {t.upgradeToUnlockReport}
+            Your score is above. Upgrade to Pro to unlock per-criterion scores, annotated essay with error highlights, and examiner notes.
           </p>
         </div>
       </div>
@@ -345,10 +341,10 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
           background: "rgba(248,250,252,0.7)", gap: 12, padding: 24,
         }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, textAlign: "center" }}>
-            {t.unlockDetailedFeedback}
+            Unlock detailed feedback
           </div>
           <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB, textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
-            {t.seeCriterionScores}
+            See per-criterion band scores, highlighted errors in your essay, and actionable examiner notes.
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
             <button
@@ -358,7 +354,7 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
                 color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
               }}
             >
-              {t.upgradeToPro}
+              Upgrade to Pro
             </button>
             <button
               onClick={() => router.push(`/sample-reports?tab=${sampleTab}`)}
@@ -368,7 +364,7 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
                 fontSize: 14, cursor: "pointer",
               }}
             >
-              {t.seeSampleReport}
+              See Sample Report
             </button>
           </div>
         </div>
@@ -379,7 +375,6 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
 
 // ── SpeakingErrorPanel (criterion tabs + transcript + errors panel) ────────────
 export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
-  const { t } = useLang();
   const critKeys = criteria.map(c => c.key);
   const [activeCrit, setActiveCrit] = useState(critKeys[0]);
 
@@ -388,7 +383,7 @@ export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
 
   return (
     <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "20px 20px 24px" }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>{t.detailedFeedback}</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, marginBottom: 16 }}>Detailed Feedback</div>
 
       {/* Criterion tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
@@ -411,7 +406,7 @@ export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         {/* Left: transcript */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 8 }}>{t.transcriptLabelReport}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 8 }}>Transcript</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 420, overflowY: "auto" }}>
             {transcript.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
@@ -424,7 +419,7 @@ export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
                   borderBottomLeftRadius: msg.role === "agent" ? 4 : 12,
                 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {msg.role === "agent" ? t.examinerLabel : t.youLabel}
+                    {msg.role === "agent" ? "Examiner" : "You"}
                   </div>
                   {msg.text}
                 </div>
@@ -436,11 +431,11 @@ export function SpeakingErrorPanel({ transcript, criteria, errorsMap }) {
         {/* Right: error list */}
         <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 2 }}>
-            {crit?.label} {t.notesSuffix}
+            {crit?.label} Notes
           </div>
           {errors.length > 0
             ? errors.map((e, i) => <ErrorItem key={i} num={i + 1} error={e} color={crit?.color ?? PRIMARY} />)
-            : <p style={{ fontSize: 13, color: MUTED }}>{t.noIssuesFound}</p>
+            : <p style={{ fontSize: 13, color: MUTED }}>No issues found for this criterion.</p>
           }
         </div>
       </div>
