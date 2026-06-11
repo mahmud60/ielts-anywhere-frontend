@@ -1,12 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 
 const REF_KEY = "ielts_ref_code";
 
-export default function PricingPage() {
+function PricingContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -40,6 +40,7 @@ export default function PricingPage() {
 
   return (
     <div style={{ maxWidth: 600, margin: "60px auto", padding: "0 24px", fontFamily: "system-ui" }}>
+
       <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>
         Unlock your full potential
       </h1>
@@ -98,5 +99,13 @@ export default function PricingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense>
+      <PricingContent />
+    </Suspense>
   );
 }
