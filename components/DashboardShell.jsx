@@ -31,7 +31,7 @@ import { useLang, LANGUAGES } from "@/lib/i18n";
 
 export const SHELL_CSS = `
 .da-shell{display:flex;min-height:100vh;background:#f6f7fb;color:#0f172a;font-family:var(--font-inter),system-ui,sans-serif;}
-.da-sidebar{width:252px;flex-shrink:0;background:#fff;border-right:1px solid #edeff4;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;transition:width .22s ease;}
+.da-sidebar{width:252px;flex-shrink:0;background:#fff;border-right:1px solid #edeff4;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;overflow-x:hidden;transition:width .22s ease;z-index:40;}
 .da-brand{display:flex;align-items:center;gap:10px;padding:20px 18px 14px;font-weight:800;font-size:17px;letter-spacing:-.02em;white-space:nowrap;}
 .da-brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;}
 .da-nav{padding:4px 12px;display:flex;flex-direction:column;gap:2px;}
@@ -98,6 +98,7 @@ export const SHELL_CSS = `
 @media(max-width:960px){.da-hero{grid-template-columns:1fr;}}
 @media(max-width:900px){
  .da-sidebar{display:none;}
+ .da-main{margin-left:0 !important;}
  .da-content{padding:16px 16px 80px;}
  .da-topbar{padding:12px 16px;}
  .da-hamburger{display:flex;}
@@ -254,7 +255,7 @@ export default function DashboardShell({ title, children }) {
         <SidebarNav {...navProps} onAfter={closeDrawer} />
       </div>
 
-      <div className="da-main">
+      <div className="da-main" style={{ marginLeft: collapsed ? 74 : 252 }}>
         <header className="da-topbar">
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <button type="button" className="da-hamburger da-iconbtn" onClick={() => setMobileOpen(true)} aria-label="Open menu">

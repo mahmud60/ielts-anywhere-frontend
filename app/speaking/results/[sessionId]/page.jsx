@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Mic } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { useLang } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import {
   BORDER, TEXT, TEXT_SUB, MUTED, RED,
@@ -42,6 +43,7 @@ function Spinner() {
 export default function SpeakingResultsPage() {
   const { sessionId } = useParams();
   const { user, loading } = useAuth();
+  const { lang, setLang } = useLang();
   const router = useRouter();
   const [result, setResult] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -122,7 +124,24 @@ export default function SpeakingResultsPage() {
           <Mic size={16} color={ACCENT} />
         </div>
         <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Speaking Results</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED }}>{fmtDate(result.created_at)}</span>
+        <span style={{ marginLeft: "auto" }} />
+        <div style={{ display: "flex", gap: 2, background: "#f1f5f9", borderRadius: 8, padding: 3, marginRight: 8 }}>
+          {[{ code: "en", label: "EN" }, { code: "bn", label: "বাং" }].map(({ code, label }) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              style={{
+                padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                background: lang === code ? "#fff" : "transparent",
+                color: lang === code ? "#0f172a" : "#94a3b8",
+                boxShadow: lang === code ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span style={{ fontSize: 12, color: MUTED }}>{fmtDate(result.created_at)}</span>
       </div>
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px 64px" }}>

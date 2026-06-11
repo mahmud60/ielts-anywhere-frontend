@@ -137,7 +137,7 @@ function greeting(t) {
 }
 
 function displayName(user) {
-  if (user?.displayName) return user.displayName.split(" ")[0];
+  if (user?.displayName) return user.displayName;
   if (user?.email) return user.email.split("@")[0];
   return "there";
 }

@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Search, ArrowRight, Award } from "lucide-react";
+import { Clock, Search, ArrowRight, Award, CheckCircle2, RefreshCw } from "lucide-react";
 
 import { useAuth } from "@/lib/AuthContext";
-import { useLang } from "@/lib/i18n";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
 
@@ -47,30 +46,26 @@ function SkeletonCard() {
   );
 }
 
+function bandColor(b) {
+  if (!b || b <= 0) return "#94a3b8";
+  return b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626";
+}
+
 /**
  * Reusable exam browser for a single module (Listening / Reading).
- *
- * config = {
- *   moduleKey, title, subtitle, accent, accentSoft, gradient,
- *   icon, duration, facts: [{icon, label, value}],
- *   fetchTests: () => Promise<test[]>,
- *   startPath: (t) => string,
- *   getDescription: (t) => string,
- *   getMeta: (t) => [{icon, label}],
- * }
  */
 export default function ExamListPage(config) {
   const {
     title, subtitle, accent, accentSoft, gradient, icon, duration,
-    facts = [], fetchTests, startPath, getDescription, getMeta,
+    facts = [], fetchTests, fetchAttempts, startPath, getDescription, getMeta,
   } = config;
 
   useShimmerStyle();
 
   const { user, loading } = useAuth();
-  const { t } = useLang();
   const router = useRouter();
   const [tests, setTests] = useState(null);
+  const [attemptMap, setAttemptMap] = useState(new Map());
   const [starting, setStarting] = useState(null);
   const [query, setQuery] = useState("");
 
@@ -81,9 +76,31 @@ export default function ExamListPage(config) {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+
     fetchTests()
       .then((d) => { if (!cancelled) setTests(Array.isArray(d) ? d : []); })
       .catch(() => { if (!cancelled) setTests([]); });
+
+    if (fetchAttempts) {
+      fetchAttempts()
+        .then((attempts) => {
+          if (cancelled) return;
+          const map = new Map();
+          if (Array.isArray(attempts)) {
+            for (const a of attempts) {
+              const tid = a.test_id;
+              if (tid == null) continue;
+              const existing = map.get(tid);
+              if (!existing || (a.overall_band ?? 0) > (existing.overall_band ?? 0)) {
+                map.set(tid, a);
+              }
+            }
+          }
+          setAttemptMap(map);
+        })
+        .catch(() => {});
+    }
+
     return () => { cancelled = true; };
   }, [user]);
 
@@ -106,7 +123,6 @@ export default function ExamListPage(config) {
   }
 
   const isLoadingTests = tests === null;
-
   const start = (test) => { setStarting(test.id); router.push(startPath(test)); };
 
   const GRID = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 16 };
@@ -122,16 +138,16 @@ export default function ExamListPage(config) {
     listContent = (
       <div className="da-card" style={{ padding: "56px 24px", textAlign: "center" }}>
         <div style={{ fontSize: 38, marginBottom: 10 }}>🗂️</div>
-        <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>{t.noTestsAvailable}</div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>No tests available yet</div>
         <p style={{ color: "#64748b", fontSize: 14, margin: "0 auto", maxWidth: 360 }}>
-          {t.newTestsLabel} {title} {t.checkBackSoon}
+          New {title} are added regularly. Check back soon or explore another module.
         </p>
       </div>
     );
   } else if (filtered.length === 0) {
     listContent = (
       <div className="da-card" style={{ padding: "48px 24px", textAlign: "center", color: "#64748b" }}>
-        {t.noTestsMatch} &ldquo;{query}&rdquo;.
+        No tests match &ldquo;{query}&rdquo;.
       </div>
     );
   } else {
@@ -140,30 +156,66 @@ export default function ExamListPage(config) {
         {filtered.map((test, i) => {
           const meta = getMeta?.(test) || [];
           const isStarting = starting === test.id;
+          const attempt = attemptMap.get(test.id);
+          const taken = !!attempt;
+          const band = attempt?.overall_band;
+
           return (
             <div
               key={test.id}
               className="da-pcard"
               onClick={() => !isStarting && start(test)}
-              style={{ padding: 0, overflow: "hidden", opacity: isStarting ? 0.65 : 1 }}
+              style={{
+                padding: 0,
+                overflow: "hidden",
+                opacity: isStarting ? 0.65 : 1,
+                border: taken ? `1.5px solid ${accent}55` : undefined,
+              }}
             >
-              <div style={{ height: 6, background: gradient }} />
+              <div style={{ height: 6, background: taken ? `${accent}88` : gradient }} />
               <div style={{ padding: 20, display: "flex", flexDirection: "column", flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                   <div style={{
-                    width: 42, height: 42, borderRadius: 12, background: accentSoft,
+                    width: 42, height: 42, borderRadius: 12,
+                    background: taken ? accentSoft : accentSoft,
                     color: accent, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15,
                   }}>
-                    {String(i + 1).padStart(2, "0")}
+                    {taken
+                      ? <CheckCircle2 size={20} color={accent} />
+                      : String(i + 1).padStart(2, "0")}
                   </div>
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                    fontSize: 11.5, fontWeight: 600, color: "#64748b",
-                    background: "#f4f5f9", borderRadius: 99, padding: "5px 11px",
-                  }}>
-                    <Clock size={12} /> {duration}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {taken && band != null && (
+                      <span style={{
+                        fontSize: 11.5, fontWeight: 700, color: bandColor(band),
+                        background: "#f0fdf4", borderRadius: 99, padding: "4px 9px",
+                        border: `1px solid ${bandColor(band)}44`,
+                      }}>
+                        Band {Number(band).toFixed(1)}
+                      </span>
+                    )}
+                    {!taken && (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        fontSize: 11.5, fontWeight: 600, color: "#64748b",
+                        background: "#f4f5f9", borderRadius: 99, padding: "5px 11px",
+                      }}>
+                        <Clock size={12} /> {duration}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {taken && (
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 11, fontWeight: 700, color: accent,
+                    textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6,
+                  }}>
+                    <CheckCircle2 size={12} /> Completed
+                  </div>
+                )}
+
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 5, lineHeight: 1.35 }}>
                   {test.title}
                 </div>
@@ -183,13 +235,25 @@ export default function ExamListPage(config) {
                     </span>
                   ))}
                 </div>
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                  background: gradient, color: "#fff", borderRadius: 11,
-                  padding: "11px 16px", fontSize: 14, fontWeight: 700,
-                }}>
-                  {isStarting ? t.opening : t.startTest} {!isStarting && <ArrowRight size={16} />}
-                </div>
+
+                {taken ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    background: "#fff", color: accent,
+                    border: `1.5px solid ${accent}`,
+                    borderRadius: 11, padding: "11px 16px", fontSize: 14, fontWeight: 700,
+                  }}>
+                    {isStarting ? "Opening…" : <><RefreshCw size={15} /> Retake test</>}
+                  </div>
+                ) : (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                    background: gradient, color: "#fff", borderRadius: 11,
+                    padding: "11px 16px", fontSize: 14, fontWeight: 700,
+                  }}>
+                    {isStarting ? "Opening…" : <><span>Start test</span> <ArrowRight size={16} /></>}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -233,7 +297,7 @@ export default function ExamListPage(config) {
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#0f172a" }}>{t.availableTests}</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#0f172a" }}>Available tests</h2>
           {!isLoadingTests && <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>{filtered.length}</span>}
         </div>
         <div style={{ position: "relative", flex: "0 1 280px" }}>
@@ -241,7 +305,7 @@ export default function ExamListPage(config) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={t.searchTests}
+            placeholder="Search tests…"
             disabled={isLoadingTests}
             style={{
               width: "100%", padding: "10px 12px 10px 36px", borderRadius: 11,
@@ -264,7 +328,7 @@ export default function ExamListPage(config) {
             padding: "10px 18px", fontSize: 13.5, fontWeight: 600, color: "#475569", cursor: "pointer",
           }}
         >
-          <Award size={16} color={accent} /> {t.viewPastResults}
+          <Award size={16} color={accent} /> View your past results
         </button>
       </div>
     </DashboardShell>
