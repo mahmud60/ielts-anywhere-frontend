@@ -12,8 +12,8 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
-import PetLoader from "@/components/PetLoader";
 import { useLang } from "@/lib/i18n";
+import PetLoader from "@/components/PetLoader";
 
 const PRIMARY       = "#0080ff";
 const PRIMARY_HOVER = "#006bd6";
@@ -306,7 +306,6 @@ function ListeningExamTopBar({
   section, partLabel, onBack, onSubmit, submitting,
   totalAnswered = 0, totalQuestions = 0,
 }) {
-  const { t } = useLang();
   const audioRef = useRef(null);
   const mockRef  = useRef(null);
   const hasAudio = Boolean(section?.audio);
@@ -467,7 +466,7 @@ function ListeningExamTopBar({
         </div>
 
         <span className="lm-exam-answered" aria-live="polite">
-          <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} {t.answeredLabel}</span>
+          <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} answered</span>
           <span className="lm-exam-answered-short">{totalAnswered}/{totalQuestions}</span>
         </span>
 
@@ -477,7 +476,7 @@ function ListeningExamTopBar({
           disabled={submitting}
           className="lm-btn-primary lm-btn-finish"
         >
-          {submitting ? t.submittingText : t.finishTest}
+          {submitting ? "Submitting…" : "Finish Test"}
         </button>
       </div>
 
@@ -910,7 +909,6 @@ function BottomNav({
   sections, activeSection, setActiveSection, answers, numbering,
   activeQuestionId, onScrollToQuestion,
 }) {
-  const { t } = useLang();
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
@@ -941,7 +939,7 @@ function BottomNav({
                 transition: "background .15s, border-color .15s, color .15s",
               }}
             >
-              {t.part} {sec.part}
+              Part {sec.part}
             </button>
             {isActive ? (
               <div style={{ display: "flex", gap: 6 }}>
@@ -1202,7 +1200,7 @@ export default function ListeningModule({
   initialResult,
 }) {
   useEffect(injectCSS, []);
-  const { lang, t, setLang } = useLang();
+  const { lang, setLang } = useLang();
 
   const [test, setTest]                     = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -1559,7 +1557,7 @@ export default function ListeningModule({
       {section && (
         <ListeningExamTopBar
           section={section}
-          partLabel={`${t.part} ${section.part} — ${t.listenAndAnswer} ${secFirst}–${secLast}`}
+          partLabel={`Part ${section.part} — Listen and answer questions ${secFirst}–${secLast}`}
           onBack={onBack ?? (() => { if (typeof window !== "undefined") window.history.back(); })}
           onSubmit={handleSubmit}
           submitting={submitting}
@@ -1594,14 +1592,14 @@ export default function ListeningModule({
             disabled={activeSection === 0}
             className="lm-btn-ghost"
           >
-            {t.previousSection}
+            ← Previous
           </button>
           {activeSection < test.sections.length - 1 ? (
             <button
               onClick={() => setActiveSection(s => s + 1)}
               className="lm-btn-outline"
             >
-              {t.nextPart}
+              Next Part →
             </button>
           ) : (
             <button
@@ -1609,7 +1607,7 @@ export default function ListeningModule({
               disabled={submitting}
               className="lm-btn-primary"
             >
-              {submitting ? t.submittingText : t.finishTest}
+              {submitting ? "Submitting…" : "Finish Test"}
             </button>
           )}
         </div>
