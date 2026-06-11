@@ -20,12 +20,14 @@ import {
   X,
   ChevronsLeft,
   ChevronsRight,
+  Globe,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
 import { isProUser, isAdminUser } from "@/lib/landingAccess";
+import { useLang, LANGUAGES } from "@/lib/i18n";
 
 export const SHELL_CSS = `
 .da-shell{display:flex;min-height:100vh;background:#f6f7fb;color:#0f172a;font-family:var(--font-inter),system-ui,sans-serif;}
@@ -117,9 +119,10 @@ function nameFromUser(user) {
   return "there";
 }
 
-function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, collapsed = false, onToggle }) {
+function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, collapsed = false, onToggle, t, lang, setLang }) {
   const go = (path) => { router.push(path); onAfter(); };
   const fullMockHref = isPro ? "/tests?mode=full_mock" : "/pricing";
+  const nextLang = LANGUAGES.find(l => l.code !== lang) || LANGUAGES[0];
 
   const item = (active, icon, label, onClick, locked) => (
     <button
@@ -142,34 +145,45 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
       </div>
 
       <nav className="da-nav">
-        {item(pathname === "/dashboard", <Home size={18} />, "Home", () => go("/dashboard"))}
-        {item(pathname.startsWith("/reports"), <FileText size={18} />, "My Reports", () => go("/reports"))}
+        {item(pathname === "/dashboard", <Home size={18} />, t.home, () => go("/dashboard"))}
+        {item(pathname.startsWith("/reports"), <FileText size={18} />, t.myReports, () => go("/reports"))}
       </nav>
 
       <div className="da-nav">
-        <div className="da-nav-label">Practice</div>
-        {item(pathname.startsWith("/reading"), <BookOpen size={18} />, "Reading", () => go("/reading"))}
-        {item(pathname.startsWith("/listening"), <Headphones size={18} />, "Listening", () => go("/listening"))}
-        {item(pathname.startsWith("/writing"), <PenLine size={18} />, "Writing", () => go("/writing"), !isPro)}
-        {item(pathname.startsWith("/speaking"), <Mic size={18} />, "Speaking", () => go("/speaking"), !isPro)}
-        {item(pathname.startsWith("/diagnostic"), <ClipboardList size={18} />, "Diagnostic", () => go("/diagnostic"))}
-        {item(false, <Award size={18} />, "Full Mock", () => go(fullMockHref), !isPro)}
-        {isPro && item(pathname.startsWith("/learn"), <GraduationCap size={18} />, "Lessons", () => go("/learn/grammar"))}
+        <div className="da-nav-label">{t.practice}</div>
+        {item(pathname.startsWith("/reading"), <BookOpen size={18} />, t.reading, () => go("/reading"))}
+        {item(pathname.startsWith("/listening"), <Headphones size={18} />, t.listening, () => go("/listening"))}
+        {item(pathname.startsWith("/writing"), <PenLine size={18} />, t.writing, () => go("/writing"), !isPro)}
+        {item(pathname.startsWith("/speaking"), <Mic size={18} />, t.speaking, () => go("/speaking"), !isPro)}
+        {item(pathname.startsWith("/diagnostic"), <ClipboardList size={18} />, t.diagnostic, () => go("/diagnostic"))}
+        {item(false, <Award size={18} />, t.fullMock, () => go(fullMockHref), !isPro)}
+        {isPro && item(pathname.startsWith("/learn"), <GraduationCap size={18} />, t.lessons, () => go("/learn/grammar"))}
       </div>
 
       <div className="da-foot">
-        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, isPro ? "Manage plan" : "Upgrade", () => go("/pricing"))}
-        {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, "Admin", () => go("/admin"))}
-        {item(false, <LogOut size={18} />, "Log out", () => { onAfter(); logout(router); })}
+        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, isPro ? t.managePlan : t.upgrade, () => go("/pricing"))}
+        {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, t.admin, () => go("/admin"))}
+        {item(false, <LogOut size={18} />, t.logOut, () => { onAfter(); logout(router); })}
+        {!pathname.startsWith("/admin") && (
+          <button
+            type="button"
+            className="da-nav-item"
+            onClick={() => setLang(nextLang.code)}
+            title={nextLang.label}
+          >
+            <Globe size={18} />
+            <span className="da-nav-text" style={{ fontWeight: 600 }}>{nextLang.short}</span>
+          </button>
+        )}
         {onToggle && (
           <button
             type="button"
             className="da-nav-item"
             onClick={onToggle}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : t.collapse}
           >
             {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
-            <span className="da-nav-text">Collapse</span>
+            <span className="da-nav-text">{t.collapse}</span>
           </button>
         )}
       </div>
@@ -179,6 +193,7 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
 
 export default function DashboardShell({ title, children }) {
   const { user } = useAuth();
+  const { lang, t, setLang } = useLang();
   const router = useRouter();
   const pathname = usePathname() || "";
   const [me, setMe] = useState(null);
@@ -221,7 +236,7 @@ export default function DashboardShell({ title, children }) {
 
   const isPro = isProUser(me);
   const isAdmin = isAdminUser(me);
-  const navProps = { pathname, isPro, isAdmin, router };
+  const navProps = { pathname, isPro, isAdmin, router, t, lang, setLang };
 
   return (
     <div className="da-shell">
@@ -254,7 +269,7 @@ export default function DashboardShell({ title, children }) {
               </span>
             ) : (
               <button className="da-pill-pro" onClick={() => router.push("/pricing")}>
-                <Crown size={15} /> Upgrade to Pro
+                <Crown size={15} /> {t.upgradeToPro}
               </button>
             )}
             <div className="da-avatar">{nameFromUser(user).charAt(0).toUpperCase()}</div>
