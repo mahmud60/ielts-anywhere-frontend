@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import { useLang } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import {
   PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED, RED,
@@ -20,13 +21,6 @@ const CRIT_COLORS = {
   grammatical_range: "#0ea5e9",
 };
 
-const WRITING_CRITERIA = [
-  { key: "task_achievement",  label: "Task Achievement",           color: CRIT_COLORS.task_achievement },
-  { key: "coherence_cohesion", label: "Coherence & Cohesion",      color: CRIT_COLORS.coherence_cohesion },
-  { key: "lexical_resource",   label: "Lexical Resource",           color: CRIT_COLORS.lexical_resource },
-  { key: "grammatical_range",  label: "Grammatical Range & Accuracy", color: CRIT_COLORS.grammatical_range },
-];
-
 function fmtDate(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
@@ -36,20 +30,20 @@ function Spinner() {
   return <PetLoader fixed label="is opening your report" accent={MOD_COLORS.writing} />;
 }
 
-function TaskPanel({ task, attemptDate }) {
-  const criteria = WRITING_CRITERIA.map(c => ({
+function TaskPanel({ task, criteria }) {
+  const { t } = useLang();
+  const critCards = criteria.map(c => ({
     ...c,
     band: task[c.key],
     summary: task.feedback,
   }));
-  const [expanded, setExpanded] = useState({ [criteria[0].key]: true });
+  const [expanded, setExpanded] = useState({ [critCards[0].key]: true });
 
   const wordCount = task.word_count ?? 0;
   const band = task.band;
 
   return (
     <>
-      {/* Score hero */}
       <div style={{
         background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
         padding: "24px 24px 20px", marginBottom: 20,
@@ -64,18 +58,17 @@ function TaskPanel({ task, attemptDate }) {
         <div style={{ display: "flex", gap: 24 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{cefrLabel(band)}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>CEFR</div>
+            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.cefrLabel}</div>
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{wordCount}</div>
-            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Words</div>
+            <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.wordsLabel}</div>
           </div>
         </div>
       </div>
 
-      {/* Criterion accordion */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
-        {criteria.map(c => (
+        {critCards.map(c => (
           <CriterionCard
             key={c.key}
             crit={c}
@@ -85,11 +78,10 @@ function TaskPanel({ task, attemptDate }) {
         ))}
       </div>
 
-      {/* Annotated essay */}
       {task.raw_text && (
         <DetailedFeedback
           text={task.raw_text}
-          criteria={criteria}
+          criteria={critCards}
           errorsMap={task.errors ?? {}}
           taskPrompt={task.task_prompt}
         />
@@ -101,6 +93,7 @@ function TaskPanel({ task, attemptDate }) {
 export default function WritingResultsPage() {
   const { attemptId } = useParams();
   const { user, loading } = useAuth();
+  const { t } = useLang();
   const router = useRouter();
   const [result, setResult]     = useState(null);
   const [profile, setProfile]   = useState(null);
@@ -121,17 +114,24 @@ export default function WritingResultsPage() {
       .catch(e => { setError(e.message ?? "Could not load results."); setFetching(false); });
   }, [user, attemptId]);
 
+  const writingCriteria = [
+    { key: "task_achievement",  label: t.critTaskAchievement,   color: CRIT_COLORS.task_achievement },
+    { key: "coherence_cohesion", label: t.critCoherenceCohesion, color: CRIT_COLORS.coherence_cohesion },
+    { key: "lexical_resource",   label: t.critLexicalResource,   color: CRIT_COLORS.lexical_resource },
+    { key: "grammatical_range",  label: t.critGrammaticalRange,  color: CRIT_COLORS.grammatical_range },
+  ];
+
   if (loading || fetching) return <Spinner />;
 
   if (error || !result) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
         <div style={{ textAlign: "center", padding: 32 }}>
-          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? "Results not found."}</p>
+          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? t.resultsNotFound}</p>
           <button onClick={() => router.push("/dashboard")} style={{
             padding: "10px 24px", borderRadius: 8, background: PRIMARY, border: "none",
             color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14,
-          }}>Back to Dashboard</button>
+          }}>{t.backToDashboard}</button>
         </div>
       </div>
     );
@@ -140,6 +140,12 @@ export default function WritingResultsPage() {
   const tasks = result.task_scores ?? [];
   const activeTaskData = tasks[activeTask];
   const overall = result.overall_band;
+
+  const getTaskTypeLabel = (taskType) => {
+    if (taskType === "task2") return t.essayType;
+    if (taskType === "task1_general") return t.letterType;
+    return t.graphChartType;
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "system-ui" }}>
@@ -156,9 +162,9 @@ export default function WritingResultsPage() {
         >
           ←
         </button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Writing Results</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{t.writingResults}</span>
         <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED }}>
-          Overall Band: <strong style={{ color: bandColor(overall) }}>{overall != null ? Number(overall).toFixed(1) : "–"}</strong>
+          {t.overallBandLabel}: <strong style={{ color: bandColor(overall) }}>{overall != null ? Number(overall).toFixed(1) : "–"}</strong>
         </span>
       </div>
 
@@ -168,7 +174,7 @@ export default function WritingResultsPage() {
           background: "#fff", borderBottom: `1px solid ${BORDER}`,
           padding: "0 24px", display: "flex",
         }}>
-          {tasks.map((t, i) => (
+          {tasks.map((task, i) => (
             <button
               key={i}
               onClick={() => setActiveTask(i)}
@@ -179,7 +185,7 @@ export default function WritingResultsPage() {
                 borderBottom: activeTask === i ? `2px solid ${PRIMARY}` : "2px solid transparent",
               }}
             >
-              Task {t.task_number} — {t.task_type === "task2" ? "Essay" : t.task_type === "task1_general" ? "Letter" : "Graph/Chart"}
+              {t.taskLabel} {task.task_number} — {getTaskTypeLabel(task.task_type)}
             </button>
           ))}
         </div>
@@ -189,9 +195,9 @@ export default function WritingResultsPage() {
         {isProUser(profile) ? (
           <>
             {activeTaskData ? (
-              <TaskPanel key={activeTask} task={activeTaskData} />
+              <TaskPanel key={activeTask} task={activeTaskData} criteria={writingCriteria} />
             ) : (
-              <p style={{ color: MUTED, fontSize: 14 }}>No results available yet.</p>
+              <p style={{ color: MUTED, fontSize: 14 }}>{t.noResultsYet}</p>
             )}
 
             {result.improvement_tips?.length > 0 && (
@@ -199,7 +205,7 @@ export default function WritingResultsPage() {
                 background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14,
                 padding: "20px 24px", marginTop: 24,
               }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>Improvement Tips</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: TEXT, marginBottom: 12 }}>{t.improvementTips}</div>
                 <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
                   {result.improvement_tips.map((tip, i) => (
                     <li key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.6 }}>{tip}</li>
