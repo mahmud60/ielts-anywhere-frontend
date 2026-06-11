@@ -200,6 +200,13 @@ function ListeningQTab({ api }) {
     setSaving(false);
   };
 
+  const handleToggleActive = async (t) => {
+    try {
+      await api.admin.updateListeningTest(t.id, { is_active: !t.is_active });
+      await reloadTests();
+    } catch (e) { alert(e.message); }
+  };
+
   const handleDeleteTest = async (t) => {
     if (!confirm(`Delete listening test "${t.title}" and ALL its sections, subsections, and questions?`)) return;
     setSaving(true);
@@ -281,7 +288,15 @@ function ListeningQTab({ api }) {
           <div key={t.id}>
             <div style={{ ...s.sidebarItem(selectedTest?.id === t.id), display: "flex", alignItems: "center", justifyContent: "space-between" }}
               onClick={() => { setSelectedTest(t); setSelectedSection(null); setSelectedSubsection(null); setShowNewSection(false); }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{t.title}</span>
+              <span
+                onClick={e => { e.stopPropagation(); handleToggleActive(t); }}
+                title={t.is_active ? "Deactivate" : "Activate"}
+                style={{
+                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                  background: t.is_active ? "#22c55e" : "#cbd5e1",
+                  margin: "0 4px",
+                }} />
               <span
                 onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
                 style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
@@ -653,6 +668,13 @@ function ReadingQTab({ api }) {
     setQuestions(qs => qs.filter(q => q.id !== qId));
   };
 
+  const handleToggleActive = async (t) => {
+    try {
+      await api.admin.updateReadingTest(t.id, { is_active: !t.is_active });
+      await reload();
+    } catch (e) { alert(e.message); }
+  };
+
   const handleDeleteTest = async (t) => {
     if (!confirm(`Delete reading test "${t.title}" and ALL its passages, groups, and questions?`)) return;
     setSaving(true);
@@ -731,7 +753,15 @@ function ReadingQTab({ api }) {
           <div key={t.id}>
             <div style={{ ...s.sidebarItem(selectedTest?.id === t.id), display: "flex", alignItems: "center", justifyContent: "space-between" }}
               onClick={() => { setSelectedTest(t); setSelectedPassage(null); setSelectedGroup(null); }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{t.title}</span>
+              <span
+                onClick={e => { e.stopPropagation(); handleToggleActive(t); }}
+                title={t.is_active ? "Deactivate" : "Activate"}
+                style={{
+                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                  background: t.is_active ? "#22c55e" : "#cbd5e1",
+                  margin: "0 4px",
+                }} />
               <span
                 onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
                 style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
