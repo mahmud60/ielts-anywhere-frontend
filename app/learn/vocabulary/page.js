@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
@@ -83,10 +83,12 @@ function PhraseCard({ phrase, t }) {
 
 export default function VocabularyPage() {
   const router = useRouter();
-  const { lang, t } = useLang();
+  const { lang, t, setLang } = useLang();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => { setData(null); }, [lang]);
 
   const generate = async () => {
     setLoading(true);
@@ -108,9 +110,27 @@ export default function VocabularyPage() {
         fontSize: 13, padding: 0, marginBottom: 20, display: "flex", alignItems: "center", gap: 4,
       }}>{t.back}</button>
 
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>{t.vocabPractice}</h1>
-        <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>{t.vocabDesc}</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>{t.vocabPractice}</h1>
+          <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>{t.vocabDesc}</p>
+        </div>
+        <div style={{ display: "flex", gap: 2, background: "#f1f5f9", borderRadius: 8, padding: 3, flexShrink: 0, marginTop: 4 }}>
+          {[{ code: "en", label: "EN" }, { code: "bn", label: "বাং" }].map(({ code, label }) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              style={{
+                padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                background: lang === code ? "#fff" : "transparent",
+                color: lang === code ? "#0f172a" : "#94a3b8",
+                boxShadow: lang === code ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!data && !loading && (
