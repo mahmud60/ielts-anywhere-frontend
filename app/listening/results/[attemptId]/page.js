@@ -9,6 +9,7 @@ import ListeningModule from "@/components/ListeningModule";
 import { getClientApiBase } from "@/lib/clientApiBase";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { useLang } from "@/lib/i18n";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -19,6 +20,7 @@ export default function ListeningResultPage() {
   const { attemptId } = useParams();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { lang } = useLang();
   const [attempt, setAttempt] = useState(null);
   const [err, setErr] = useState(null);
 
@@ -28,10 +30,10 @@ export default function ListeningResultPage() {
 
   useEffect(() => {
     if (!user) return;
-    api.getListeningAttempt(attemptId)
+    api.getListeningAttempt(attemptId, lang)
       .then(setAttempt)
       .catch(e => setErr(e.message));
-  }, [user, attemptId]);
+  }, [user, attemptId, lang]);
 
   if (loading || (!attempt && !err)) {
     return <PetLoader fixed label="is opening your report" accent={MOD_COLORS.listening} />;

@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import PetLoader from "@/components/PetLoader";
+import { useLang } from "@/lib/i18n";
 
 const PRIMARY       = "#0080ff";
 const PRIMARY_HOVER = "#006bd6";
@@ -305,6 +306,7 @@ function ListeningExamTopBar({
   section, partLabel, onBack, onSubmit, submitting,
   totalAnswered = 0, totalQuestions = 0,
 }) {
+  const { t } = useLang();
   const audioRef = useRef(null);
   const mockRef  = useRef(null);
   const hasAudio = Boolean(section?.audio);
@@ -465,7 +467,7 @@ function ListeningExamTopBar({
         </div>
 
         <span className="lm-exam-answered" aria-live="polite">
-          <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} answered</span>
+          <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} {t.answeredLabel}</span>
           <span className="lm-exam-answered-short">{totalAnswered}/{totalQuestions}</span>
         </span>
 
@@ -475,7 +477,7 @@ function ListeningExamTopBar({
           disabled={submitting}
           className="lm-btn-primary lm-btn-finish"
         >
-          {submitting ? "Submitting…" : "Finish Test"}
+          {submitting ? t.submittingText : t.finishTest}
         </button>
       </div>
 
@@ -908,6 +910,7 @@ function BottomNav({
   sections, activeSection, setActiveSection, answers, numbering,
   activeQuestionId, onScrollToQuestion,
 }) {
+  const { t } = useLang();
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
@@ -938,7 +941,7 @@ function BottomNav({
                 transition: "background .15s, border-color .15s, color .15s",
               }}
             >
-              Part {sec.part}
+              {t.part} {sec.part}
             </button>
             {isActive ? (
               <div style={{ display: "flex", gap: 6 }}>
@@ -997,24 +1000,24 @@ function getCEFR(band) {
   return "A1";
 }
 
-function getBandLabel(band) {
-  if (band >= 9)   return "Expert User";
-  if (band >= 8)   return "Very Good User";
-  if (band >= 7)   return "Good User";
-  if (band >= 6)   return "Competent User";
-  if (band >= 5)   return "Modest User";
-  if (band >= 4)   return "Limited User";
-  if (band >= 3)   return "Extremely Limited User";
-  return "Non-User";
+function getBandLabel(band, t) {
+  if (band >= 9)   return t.bandExpert;
+  if (band >= 8)   return t.bandVeryGood;
+  if (band >= 7)   return t.bandGood;
+  if (band >= 6)   return t.bandCompetent;
+  if (band >= 5)   return t.bandModest;
+  if (band >= 4)   return t.bandLimited;
+  if (band >= 3)   return t.bandExtremelyLimited;
+  return t.bandNonUser;
 }
 
-function getBandDetail(band) {
-  if (band >= 8)   return "You have a fully operational command of English with only occasional unsystematic inaccuracies.";
-  if (band >= 7)   return "You have an operational command of English, handling complex language well despite occasional inaccuracies.";
-  if (band >= 6)   return "You have generally effective command of the language, though inaccuracies and misunderstandings occur.";
-  if (band >= 5)   return "You have a partial command of the language and cope with overall meaning in most situations.";
-  if (band >= 4)   return "Your competence is limited to familiar situations and you frequently have difficulty understanding.";
-  return "You have basic competence limited to very familiar situations.";
+function getBandDetail(band, t) {
+  if (band >= 8)   return t.bandDetail8;
+  if (band >= 7)   return t.bandDetail7;
+  if (band >= 6)   return t.bandDetail6;
+  if (band >= 5)   return t.bandDetail5;
+  if (band >= 4)   return t.bandDetail4;
+  return t.bandDetail3;
 }
 
 function LMAnswerKeyItem({ num, qResult }) {
@@ -1199,6 +1202,7 @@ export default function ListeningModule({
   initialResult,
 }) {
   useEffect(injectCSS, []);
+  const { lang, t } = useLang();
 
   const [test, setTest]                     = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -1300,7 +1304,7 @@ export default function ListeningModule({
   if (!test) {
     return (
       <div className="lm" style={{ padding: 32 }}>
-        <p style={{ color: MUTED, fontSize: 13 }}>No test available.</p>
+        <p style={{ color: MUTED, fontSize: 13 }}>{t.noTestAvailable}</p>
       </div>
     );
   }
@@ -1339,10 +1343,10 @@ export default function ListeningModule({
           <button onClick={handleBack} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", color: MUTED, padding: "4px 6px", borderRadius: 8 }}>
             <ChevronLeft size={20} strokeWidth={2} />
           </button>
-          <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Listening Report</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{t.listeningReport}</span>
           <span style={{ flex: 1 }} />
           <button onClick={handleBack} style={{ padding: "7px 16px", borderRadius: 8, background: PRIMARY, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-            Back
+            {t.backBtn}
           </button>
         </div>
 
@@ -1367,28 +1371,28 @@ export default function ListeningModule({
                 </svg>
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                   <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{band.toFixed(1)}</div>
-                  <div style={{ fontSize: 12, opacity: .8, marginTop: 2 }}>out of 9.0</div>
+                  <div style={{ fontSize: 12, opacity: .8, marginTop: 2 }}>{t.outOf9}</div>
                 </div>
               </div>
 
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: ".1em", opacity: .8, marginBottom: 10, fontWeight: 600 }}>
-                  Estimated IELTS Band — Listening
+                  {t.estimatedBandListening}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
                   <span style={{ background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)", borderRadius: 999, padding: "4px 14px", fontSize: 14, fontWeight: 700 }}>{cefr}</span>
-                  <span style={{ fontSize: 17, fontWeight: 700 }}>{getBandLabel(band)}</span>
+                  <span style={{ fontSize: 17, fontWeight: 700 }}>{getBandLabel(band, t)}</span>
                 </div>
-                <p style={{ fontSize: 13.5, lineHeight: 1.6, opacity: .92, margin: "0 0 18px", maxWidth: 460 }}>{getBandDetail(band)}</p>
+                <p style={{ fontSize: 13.5, lineHeight: 1.6, opacity: .92, margin: "0 0 18px", maxWidth: 460 }}>{getBandDetail(band, t)}</p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 16px", minWidth: 92 }}>
                     <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{result.correct}/{result.total}</div>
-                    <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Correct</div>
+                    <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>{t.correctLabel}</div>
                   </div>
                   {Object.entries(result.section_scores ?? {}).map(([n, d]) => (
                     <div key={n} style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 16px", minWidth: 78 }}>
                       <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{(d.band ?? 0).toFixed(1)}</div>
-                      <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>Part {n}</div>
+                      <div style={{ fontSize: 11, opacity: .8, marginTop: 4 }}>{t.part} {n}</div>
                     </div>
                   ))}
                 </div>
@@ -1399,12 +1403,12 @@ export default function ListeningModule({
             {/* Answer Key */}
             <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, marginBottom: 24, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
               <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, fontWeight: 700, fontSize: 15, color: TEXT, display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: PRIMARY }} /> Answer Key
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: PRIMARY }} /> {t.answerKey}
               </div>
               {answerKeyParts.map(({ part, sc, items }) => (
                 <div key={part} style={{ borderBottom: `1px solid ${BORDER}` }}>
                   <div style={{ padding: "10px 20px 6px", fontWeight: 600, fontSize: 13, color: TEXT_SUB }}>
-                    Part {part}: {sc.correct ?? 0}/{sc.total ?? items.length} correct
+                    {t.part} {part}: {sc.correct ?? 0}/{sc.total ?? items.length} {t.correctLabel}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "0 12px 10px", gap: "2px 16px" }}>
                     {items.map(({ qNum, qResult }) => qNum && (
@@ -1419,7 +1423,7 @@ export default function ListeningModule({
             {result.improvement_tips?.length > 0 && (
               <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "18px 20px", marginBottom: 24, boxShadow: "0 1px 3px rgba(15,23,42,.04)" }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>💡</span> Improvement Tips
+                  <span style={{ fontSize: 16 }}>💡</span> {t.improvementTips}
                 </div>
                 {result.improvement_tips.map((tip, i) => (
                   <div key={i} style={{
@@ -1435,7 +1439,7 @@ export default function ListeningModule({
             )}
 
             {/* Review split pane */}
-            <div style={{ fontWeight: 700, fontSize: 16, color: TEXT, marginBottom: 14 }}>Review your answers</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: TEXT, marginBottom: 14 }}>{t.reviewYourAnswers}</div>
 
             {/* Part tabs */}
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
@@ -1446,7 +1450,7 @@ export default function ListeningModule({
                   background: reviewPart === part ? PRIMARY : SURFACE,
                   color: reviewPart === part ? "#fff" : TEXT_SUB,
                 }}>
-                  Part {part}
+                  {t.part} {part}
                 </button>
               ))}
             </div>
@@ -1464,7 +1468,7 @@ export default function ListeningModule({
                     <div style={{ borderRight: `1px solid ${BORDER}`, overflowY: "auto", maxHeight: 560 }}>
                       <div style={{ padding: "12px 18px", borderBottom: `1px solid ${BORDER}`, background: SURFACE_ALT }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                          Part {section.part} Transcript
+                          {t.part} {section.part} {t.transcript}
                         </span>
                       </div>
                       <div style={{ padding: "16px 18px" }}>
@@ -1472,7 +1476,7 @@ export default function ListeningModule({
                           ? section.transcript.split(/\n{2,}/).map((para, i) => (
                               <p key={i} style={{ fontSize: 13, color: TEXT_SUB, lineHeight: 1.85, marginBottom: 12 }}>{para}</p>
                             ))
-                          : <p style={{ fontSize: 13, color: MUTED, fontStyle: "italic" }}>Transcript not available for this part.</p>
+                          : <p style={{ fontSize: 13, color: MUTED, fontStyle: "italic" }}>{t.transcriptUnavailable}</p>
                         }
                       </div>
                     </div>
@@ -1480,7 +1484,7 @@ export default function ListeningModule({
                     {/* Questions */}
                     <div style={{ overflowY: "auto", maxHeight: 560 }}>
                       <div style={{ padding: "12px 18px", borderBottom: `1px solid ${BORDER}`, background: SURFACE_ALT }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>Questions {rFirst}–{rLast}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: PRIMARY }}>{t.questionsLabel} {rFirst}–{rLast}</span>
                       </div>
                       <div style={{ padding: "16px 16px" }}>
                         {subs.map(sub => {
@@ -1534,7 +1538,7 @@ export default function ListeningModule({
       {section && (
         <ListeningExamTopBar
           section={section}
-          partLabel={`Part ${section.part} — Listen and answer questions ${secFirst}–${secLast}`}
+          partLabel={`${t.part} ${section.part} — ${t.listenAndAnswer} ${secFirst}–${secLast}`}
           onBack={onBack ?? (() => { if (typeof window !== "undefined") window.history.back(); })}
           onSubmit={handleSubmit}
           submitting={submitting}
@@ -1569,14 +1573,14 @@ export default function ListeningModule({
             disabled={activeSection === 0}
             className="lm-btn-ghost"
           >
-            ← Previous
+            {t.previousSection}
           </button>
           {activeSection < test.sections.length - 1 ? (
             <button
               onClick={() => setActiveSection(s => s + 1)}
               className="lm-btn-outline"
             >
-              Next Part →
+              {t.nextPart}
             </button>
           ) : (
             <button
@@ -1584,7 +1588,7 @@ export default function ListeningModule({
               disabled={submitting}
               className="lm-btn-primary"
             >
-              {submitting ? "Submitting…" : "Finish Test"}
+              {submitting ? t.submittingText : t.finishTest}
             </button>
           )}
         </div>
