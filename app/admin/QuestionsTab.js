@@ -293,10 +293,17 @@ function ListeningQTab({ api }) {
                 onClick={e => { e.stopPropagation(); handleToggleActive(t); }}
                 title={t.is_active ? "Deactivate" : "Activate"}
                 style={{
-                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", flexShrink: 0,
+                  width: 28, height: 16, borderRadius: 99, cursor: "pointer",
                   background: t.is_active ? "#22c55e" : "#cbd5e1",
-                  margin: "0 4px",
+                  margin: "0 4px", transition: "background .2s", position: "relative",
+                }}>
+                <span style={{
+                  position: "absolute", top: 2, borderRadius: "50%", background: "#fff",
+                  width: 12, height: 12, transition: "left .2s",
+                  left: t.is_active ? 14 : 2,
                 }} />
+              </span>
               <span
                 onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
                 style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
@@ -758,10 +765,17 @@ function ReadingQTab({ api }) {
                 onClick={e => { e.stopPropagation(); handleToggleActive(t); }}
                 title={t.is_active ? "Deactivate" : "Activate"}
                 style={{
-                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", flexShrink: 0,
+                  width: 28, height: 16, borderRadius: 99, cursor: "pointer",
                   background: t.is_active ? "#22c55e" : "#cbd5e1",
-                  margin: "0 4px",
+                  margin: "0 4px", transition: "background .2s", position: "relative",
+                }}>
+                <span style={{
+                  position: "absolute", top: 2, borderRadius: "50%", background: "#fff",
+                  width: 12, height: 12, transition: "left .2s",
+                  left: t.is_active ? 14 : 2,
                 }} />
+              </span>
               <span
                 onClick={e => { e.stopPropagation(); handleDeleteTest(t); }}
                 style={{ color: "#ef4444", fontWeight: 700, lineHeight: 1, padding: "0 2px", cursor: "pointer", opacity: 0.7, flexShrink: 0 }}
