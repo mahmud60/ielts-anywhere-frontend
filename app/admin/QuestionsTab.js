@@ -200,11 +200,12 @@ function ListeningQTab({ api }) {
     setSaving(false);
   };
 
-  const handleToggleActive = async (t) => {
-    try {
-      await api.admin.updateListeningTest(t.id, { is_active: !t.is_active });
-      await reloadTests();
-    } catch (e) { alert(e.message); }
+  const handleToggleActive = (t) => {
+    setTests(prev => prev.map(x => x.id === t.id ? { ...x, is_active: !t.is_active } : x));
+    api.admin.updateListeningTest(t.id, { is_active: !t.is_active }).catch(e => {
+      setTests(prev => prev.map(x => x.id === t.id ? { ...x, is_active: t.is_active } : x));
+      alert(e.message);
+    });
   };
 
   const handleDeleteTest = async (t) => {
@@ -675,11 +676,12 @@ function ReadingQTab({ api }) {
     setQuestions(qs => qs.filter(q => q.id !== qId));
   };
 
-  const handleToggleActive = async (t) => {
-    try {
-      await api.admin.updateReadingTest(t.id, { is_active: !t.is_active });
-      await reload();
-    } catch (e) { alert(e.message); }
+  const handleToggleActive = (t) => {
+    setTests(prev => prev.map(x => x.id === t.id ? { ...x, is_active: !t.is_active } : x));
+    api.admin.updateReadingTest(t.id, { is_active: !t.is_active }).catch(e => {
+      setTests(prev => prev.map(x => x.id === t.id ? { ...x, is_active: t.is_active } : x));
+      alert(e.message);
+    });
   };
 
   const handleDeleteTest = async (t) => {
