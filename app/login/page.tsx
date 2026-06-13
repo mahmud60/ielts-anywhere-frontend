@@ -8,32 +8,58 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Headphones,
+  LockKeyhole,
+  Mail,
+  Mic,
+  PenLine,
+  ShieldCheck,
+  Target,
+} from "lucide-react";
+
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 
-const GRAD = "linear-gradient(135deg,#6366f1 0%,#7c3aed 60%,#8b5cf6 100%)";
-const PRIMARY = "#6366f1";
-const BORDER = "#e2e8f0";
+const PRIMARY = "#4f46e5";
+const PRIMARY_DARK = "#312e81";
+const INK = "#0f172a";
+const MUTED = "#64748b";
+const BORDER = "#e6e8ef";
 
-const FEATURES = [
-  { icon: "📖", label: "Reading", desc: "Full-length Academic & General passages" },
-  { icon: "🎧", label: "Listening", desc: "Authentic audio with instant scoring" },
-  { icon: "✍️", label: "Writing", desc: "AI-graded Task 1 & 2 with feedback" },
-  { icon: "🎙️", label: "Speaking", desc: "Conversational AI examiner, anytime" },
+const MODULES = [
+  { icon: BookOpen, label: "Reading", desc: "Timed passages and score review" },
+  { icon: Headphones, label: "Listening", desc: "Audio practice with answer feedback" },
+  { icon: PenLine, label: "Writing", desc: "Task feedback across IELTS criteria" },
+  { icon: Mic, label: "Speaking", desc: "Practice sessions and AI evaluation" },
 ];
 
 const googleProvider = new GoogleAuthProvider();
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
-      <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.6 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-      <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.4-2.5 4.4-4.6 5.8l6.2 5.2C40.7 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.6 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.4-2.5 4.4-4.6 5.8l6.2 5.2C40.7 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z" />
     </svg>
   );
+}
+
+function cleanAuthError(err: unknown) {
+  if (!(err instanceof Error)) return "Something went wrong. Please try again.";
+  return err.message
+    .replace("Firebase: ", "")
+    .replace(/\s*\(auth\/.*\)/, "")
+    .replace(/^Error:\s*/, "");
 }
 
 export default function LoginPage() {
@@ -43,7 +69,7 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -51,16 +77,23 @@ export default function LoginPage() {
   }, [authLoading, router, user]);
 
   const afterAuth = async () => {
-    try { await api.getMe(); } catch {}
+    try {
+      await api.getMe();
+    } catch {
+      // Profile sync can fail independently of Firebase auth; dashboard can retry.
+    }
     router.replace("/dashboard");
   };
 
-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setLoading(true);
     setError("");
     try {
-      if (!auth) { setError("Firebase is not configured."); return; }
+      if (!auth) {
+        setError("Firebase is not configured. Add the Firebase environment variables and restart the app.");
+        return;
+      }
       if (isRegister) {
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
@@ -68,11 +101,7 @@ export default function LoginPage() {
       }
       await afterAuth();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message.replace("Firebase: ", "").replace(/\s*\(auth\/.*\)/, "")
-          : "Something went wrong"
-      );
+      setError(cleanAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -82,290 +111,279 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      if (!auth) { setError("Firebase is not configured."); return; }
+      if (!auth) {
+        setError("Firebase is not configured. Add the Firebase environment variables and restart the app.");
+        return;
+      }
       await signInWithPopup(auth, googleProvider);
       await afterAuth();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message.replace("Firebase: ", "").replace(/\s*\(auth\/.*\)/, "")
-          : "Something went wrong"
-      );
+      setError(cleanAuthError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyle = (field: string): React.CSSProperties => ({
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: `1.5px solid ${focusedField === field ? PRIMARY : BORDER}`,
-    fontSize: 14,
-    color: "#0f172a",
-    background: "#fff",
-    outline: "none",
-    boxSizing: "border-box",
-    transition: "border-color .15s",
-    boxShadow: focusedField === field ? `0 0 0 3px rgba(99,102,241,.12)` : "none",
-  });
+  const primaryLabel = loading ? "Please wait" : isRegister ? "Create account" : "Sign in";
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      fontFamily: "var(--font-inter),system-ui,sans-serif",
-      background: "#f6f7fb",
-    }}>
+    <main className="login-shell">
       <style>{`
-        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-        .login-fadein{animation:fadeUp .4s ease both}
-        @media(max-width:820px){.login-left{display:none!important}.login-right{padding:32px 20px!important}}
+        .login-shell{
+          min-height:100vh;
+          display:grid;
+          grid-template-columns:minmax(360px, .9fr) minmax(420px, 1.1fr);
+          background:#f6f7fb;
+          color:${INK};
+          font-family:var(--font-inter),system-ui,sans-serif;
+        }
+        .login-brand-panel{
+          background:${PRIMARY_DARK};
+          color:#fff;
+          padding:40px;
+          display:flex;
+          flex-direction:column;
+          justify-content:space-between;
+          min-height:100vh;
+        }
+        .login-brand-row{display:flex;align-items:center;gap:12px;font-weight:850;font-size:18px;letter-spacing:-.02em}
+        .login-mark{
+          width:38px;height:38px;border-radius:11px;background:#fff;color:${PRIMARY_DARK};
+          display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;
+        }
+        .login-copy{max-width:430px}
+        .login-kicker{
+          display:inline-flex;align-items:center;gap:8px;margin-bottom:18px;padding:7px 11px;
+          border-radius:999px;background:rgba(255,255,255,.1);color:#ddd6fe;font-size:12.5px;font-weight:750;
+        }
+        .login-copy h1{font-size:36px;line-height:1.12;margin:0 0 16px;font-weight:900;letter-spacing:-.03em;text-wrap:balance}
+        .login-copy p{margin:0;color:#ddd6fe;font-size:15px;line-height:1.65;max-width:390px}
+        .login-modules{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:32px;max-width:430px}
+        .login-module{
+          border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:13px;
+          background:rgba(255,255,255,.07);
+        }
+        .login-module svg{color:#c4b5fd}
+        .login-module-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;margin-bottom:5px}
+        .login-module-desc{font-size:12px;color:#c4b5fd;line-height:1.45}
+        .login-trust{display:flex;align-items:center;gap:9px;color:#ddd6fe;font-size:12.5px;font-weight:650}
+        .login-form-panel{display:flex;align-items:center;justify-content:center;padding:42px 24px}
+        .login-card{width:100%;max-width:430px;background:#fff;border:1px solid ${BORDER};border-radius:16px;padding:34px}
+        .login-mobile-brand{display:none;align-items:center;justify-content:center;gap:10px;margin-bottom:24px;font-weight:850}
+        .login-mobile-mark{
+          width:34px;height:34px;border-radius:10px;background:${PRIMARY};color:#fff;
+          display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;
+        }
+        .login-heading{margin-bottom:24px}
+        .login-heading h2{font-size:23px;line-height:1.2;margin:0 0 7px;font-weight:900;letter-spacing:-.025em;color:${INK}}
+        .login-heading p{margin:0;color:${MUTED};font-size:13.5px;line-height:1.55}
+        .login-button{
+          width:100%;height:44px;border-radius:11px;border:none;display:inline-flex;align-items:center;justify-content:center;
+          gap:9px;font-weight:800;font-size:14px;cursor:pointer;transition:background .16s,border-color .16s,box-shadow .16s,transform .16s,opacity .16s;
+        }
+        .login-button:focus-visible,.login-field:focus-within{outline:3px solid rgba(79,70,229,.18);outline-offset:2px}
+        .login-button:active{transform:translateY(1px)}
+        .login-button:disabled{cursor:not-allowed;opacity:.65;transform:none}
+        .login-google{background:#fff;color:${INK};border:1px solid #dbe1ea}
+        .login-google:hover:not(:disabled){background:#f8fafc;border-color:#cbd5e1}
+        .login-primary{background:${PRIMARY};color:#fff}
+        .login-primary:hover:not(:disabled){background:#4338ca;box-shadow:0 8px 16px rgba(79,70,229,.18)}
+        .login-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#94a3b8;font-size:12px;font-weight:650}
+        .login-divider:before,.login-divider:after{content:"";height:1px;background:${BORDER};flex:1}
+        .login-label{display:block;color:#334155;font-size:12.5px;font-weight:750;margin-bottom:7px}
+        .login-field{
+          min-height:44px;border:1px solid #dbe1ea;border-radius:11px;background:#fff;
+          display:flex;align-items:center;gap:10px;padding:0 12px;transition:border-color .16s,outline .16s;
+        }
+        .login-field:focus-within{border-color:${PRIMARY}}
+        .login-field svg{color:#64748b;flex-shrink:0}
+        .login-field input{
+          border:none;outline:none;background:transparent;width:100%;min-width:0;color:${INK};
+          font-size:14px;font-family:inherit;padding:11px 0;
+        }
+        .login-field input::placeholder{color:#64748b}
+        .login-password-toggle{
+          border:none;background:transparent;color:#64748b;display:flex;align-items:center;justify-content:center;
+          padding:4px;cursor:pointer;border-radius:7px;
+        }
+        .login-password-toggle:hover{background:#f1f5f9;color:${INK}}
+        .login-alert{
+          display:flex;gap:9px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;
+          border-radius:11px;padding:11px 12px;font-size:13px;line-height:1.45;margin-bottom:16px;
+        }
+        .login-env{margin-bottom:18px}
+        .login-toggle{margin:18px 0 0;text-align:center;color:${MUTED};font-size:13.5px}
+        .login-link{border:none;background:transparent;color:${PRIMARY};font-weight:800;font-size:13.5px;cursor:pointer;padding:0}
+        .login-footnote{margin:18px auto 0;text-align:center;color:#64748b;font-size:12px;line-height:1.55;max-width:360px}
+        @media(max-width:900px){
+          .login-shell{display:block;background:#fff}
+          .login-brand-panel{display:none}
+          .login-form-panel{min-height:100vh;padding:28px 18px;background:#f6f7fb}
+          .login-card{padding:28px 22px}
+          .login-mobile-brand{display:flex}
+        }
+        @media(max-width:420px){
+          .login-form-panel{padding:18px 12px}
+          .login-card{padding:24px 18px;border-radius:14px}
+        }
+        @media(prefers-reduced-motion: reduce){
+          .login-button,.login-field{transition:none}
+        }
       `}</style>
 
-      {/* ── Left panel ── */}
-      <div
-        className="login-left"
-        style={{
-          width: "46%",
-          flexShrink: 0,
-          background: GRAD,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: "56px 52px",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Decorative blobs */}
-        <div style={{ position: "absolute", top: -80, right: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(255,255,255,.06)" }} />
-        <div style={{ position: "absolute", bottom: -60, left: -60, width: 260, height: 260, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
-
-        {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 52 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 13,
-            background: "rgba(255,255,255,.2)",
-            border: "1px solid rgba(255,255,255,.35)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 800, fontSize: 16, color: "#fff",
-          }}>
-            IA
-          </div>
-          <span style={{ fontWeight: 800, fontSize: 20, color: "#fff", letterSpacing: "-.02em" }}>
-            IELTS<span style={{ opacity: .75 }}>Anywhere</span>
-          </span>
+      <section className="login-brand-panel" aria-label="IELTS Anywhere overview">
+        <div className="login-brand-row">
+          <div className="login-mark">IA</div>
+          <span>IELTSAnywhere</span>
         </div>
 
-        {/* Headline */}
-        <div style={{ marginBottom: 36 }}>
-          <h1 style={{ fontSize: 34, fontWeight: 800, color: "#fff", margin: "0 0 12px", lineHeight: 1.2, letterSpacing: "-.02em" }}>
-            Your IELTS<br />preparation,<br />supercharged.
-          </h1>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,.8)", margin: 0, lineHeight: 1.6, maxWidth: 320 }}>
-            AI-powered practice for all four modules — with real-time feedback and instant band scores.
+        <div className="login-copy">
+          <div className="login-kicker">
+            <Target size={14} />
+            Practice with intent
+          </div>
+          <h1>IELTS anywhere anytime preparation that stays focused.</h1>
+          <p>
+            Timed practice, module feedback, vocabulary training, and score tracking in one clean workspace.
           </p>
-        </div>
 
-        {/* Feature list */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {FEATURES.map((f) => (
-            <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-                background: "rgba(255,255,255,.15)",
-                border: "1px solid rgba(255,255,255,.2)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 18,
-              }}>
-                {f.icon}
+          <div className="login-modules">
+            {MODULES.map(({ icon: Icon, label, desc }) => (
+              <div className="login-module" key={label}>
+                <div className="login-module-title">
+                  <Icon size={16} />
+                  {label}
+                </div>
+                <div className="login-module-desc">{desc}</div>
               </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{f.label}</div>
-                <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.7)", marginTop: 1 }}>{f.desc}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Bottom badge */}
-        <div style={{
-          marginTop: 48, display: "inline-flex", alignItems: "center", gap: 8,
-          background: "rgba(255,255,255,.12)", borderRadius: 99, padding: "8px 14px",
-          alignSelf: "flex-start",
-        }}>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,.9)", fontWeight: 600 }}>
-            ✦ Estimated IELTS band score after every test
-          </span>
+        <div className="login-trust">
+          <ShieldCheck size={16} />
+          Focused tools for repeat practice and measurable progress
         </div>
-      </div>
+      </section>
 
-      {/* ── Right panel ── */}
-      <div
-        className="login-right"
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px 24px",
-        }}
-      >
-        <div className="login-fadein" style={{ width: "100%", maxWidth: 400 }}>
-
-          {/* Mobile brand (hidden on desktop) */}
-          <div style={{ display: "none" }} className="login-mobile-brand">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: GRAD, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, color: "#fff" }}>IA</div>
-              <span style={{ fontWeight: 800, fontSize: 18, color: "#0f172a" }}>IELTS<span style={{ color: PRIMARY }}>Anywhere</span></span>
-            </div>
+      <section className="login-form-panel" aria-label={isRegister ? "Create account" : "Sign in"}>
+        <div style={{ width: "100%", maxWidth: 430 }}>
+          <div className="login-mobile-brand">
+            <div className="login-mobile-mark">IA</div>
+            <span>IELTS<span style={{ color: PRIMARY }}>Anywhere</span></span>
           </div>
 
-          {/* Card */}
-          <div style={{
-            background: "#fff",
-            borderRadius: 20,
-            border: `1px solid ${BORDER}`,
-            padding: "36px 36px 32px",
-            boxShadow: "0 4px 32px rgba(15,23,42,.07)",
-          }}>
-            {/* Heading */}
-            <div style={{ marginBottom: 28 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: "0 0 6px", letterSpacing: "-.02em" }}>
-                {isRegister ? "Create your account" : "Welcome back"}
-              </h2>
-              <p style={{ fontSize: 13.5, color: "#64748b", margin: 0 }}>
+          <div className="login-card">
+            <div className="login-heading">
+              <h2>{isRegister ? "Create your account" : "Welcome back"}</h2>
+              <p>
                 {isRegister
-                  ? "Join thousands of IELTS candidates preparing smarter."
-                  : "Sign in to continue your preparation."}
+                  ? "Start your IELTS preparation workspace."
+                  : "Continue your practice, reports, and study plan."}
               </p>
             </div>
 
-            {/* Firebase warning */}
             {!isFirebaseConfigured && (
-              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 14px", marginBottom: 20, fontSize: 13, color: "#dc2626", lineHeight: 1.5 }}>
-                Firebase env vars are missing. Copy <code style={{ fontSize: 12 }}>.env.example</code> to{" "}
-                <code style={{ fontSize: 12 }}>.env.local</code> and add{" "}
-                <code style={{ fontSize: 12 }}>NEXT_PUBLIC_FIREBASE_*</code>.
+              <div className="login-alert login-env" role="alert">
+                <AlertCircle size={17} />
+                <span>
+                  Firebase env vars are missing. Copy <code>.env.example</code> to <code>.env.local</code> and add{" "}
+                  <code>NEXT_PUBLIC_FIREBASE_*</code>.
+                </span>
               </div>
             )}
 
-            {/* Google button */}
             <button
               type="button"
+              className="login-button login-google"
               onClick={signInWithGoogle}
               disabled={loading || !isFirebaseConfigured}
-              style={{
-                width: "100%", padding: "11px 16px", borderRadius: 10,
-                background: "#fff", border: `1.5px solid ${BORDER}`,
-                color: "#0f172a", fontWeight: 600, fontSize: 14,
-                cursor: loading ? "wait" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-                boxShadow: "0 1px 3px rgba(15,23,42,.06)",
-                transition: "background .15s, border-color .15s",
-                opacity: loading ? 0.7 : 1,
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
             >
               <GoogleIcon />
               Continue with Google
             </button>
 
-            {/* Divider */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
-              <div style={{ flex: 1, height: 1, background: BORDER }} />
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>or</span>
-              <div style={{ flex: 1, height: 1, background: BORDER }} />
-            </div>
+            <div className="login-divider">or use email</div>
 
-            {/* Email/password form */}
             <form onSubmit={submit}>
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
-                  Email address
-                </label>
-                <input
-                  style={inputStyle("email")}
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setFocusedField("email")}
-                  onBlur={() => setFocusedField(null)}
-                  required
-                  autoComplete="email"
-                />
+                <label className="login-label" htmlFor="email">Email address</label>
+                <div className="login-field">
+                  <Mail size={17} />
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
-                  Password
-                </label>
-                <input
-                  style={inputStyle("password")}
-                  type="password"
-                  placeholder={isRegister ? "At least 6 characters" : "Your password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setFocusedField("password")}
-                  onBlur={() => setFocusedField(null)}
-                  required
-                  autoComplete={isRegister ? "new-password" : "current-password"}
-                />
+              <div style={{ marginBottom: 16 }}>
+                <label className="login-label" htmlFor="password">Password</label>
+                <div className="login-field">
+                  <LockKeyhole size={17} />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder={isRegister ? "At least 6 characters" : "Your password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    autoComplete={isRegister ? "new-password" : "current-password"}
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
               </div>
 
               {error && (
-                <div style={{
-                  background: "#fef2f2", border: "1px solid #fecaca",
-                  borderRadius: 8, padding: "10px 13px", marginBottom: 16,
-                  fontSize: 13, color: "#dc2626", lineHeight: 1.5,
-                }}>
-                  {error}
+                <div className="login-alert" role="alert">
+                  <AlertCircle size={17} />
+                  <span>{error}</span>
                 </div>
               )}
 
               <button
                 type="submit"
+                className="login-button login-primary"
                 disabled={loading || !isFirebaseConfigured}
-                style={{
-                  width: "100%", padding: "13px", borderRadius: 10,
-                  background: loading ? "#a5b4fc" : GRAD,
-                  border: "none", color: "#fff",
-                  fontWeight: 700, fontSize: 15,
-                  cursor: loading ? "wait" : "pointer",
-                  boxShadow: loading ? "none" : "0 4px 16px rgba(99,102,241,.35)",
-                  transition: "opacity .15s, box-shadow .15s",
-                  letterSpacing: "-.01em",
-                }}
               >
-                {loading ? "Please wait…" : isRegister ? "Create account" : "Sign in"}
+                {primaryLabel}
+                {!loading && <ArrowRight size={16} />}
               </button>
             </form>
 
-            {/* Toggle */}
-            <p style={{ textAlign: "center", marginTop: 20, fontSize: 13.5, color: "#64748b", marginBottom: 0 }}>
-              {isRegister ? "Already have an account? " : "Don't have an account? "}
+            <p className="login-toggle">
+              {isRegister ? "Already have an account? " : "No account yet? "}
               <button
                 type="button"
-                onClick={() => { setIsRegister((r) => !r); setError(""); }}
-                style={{
-                  background: "none", border: "none", color: PRIMARY,
-                  fontWeight: 600, fontSize: 13.5, cursor: "pointer", padding: 0,
+                className="login-link"
+                onClick={() => {
+                  setIsRegister((current) => !current);
+                  setError("");
                 }}
               >
-                {isRegister ? "Sign in" : "Register for free"}
+                {isRegister ? "Sign in" : "Create one"}
               </button>
             </p>
           </div>
 
-          {/* Footer */}
-          <p style={{ textAlign: "center", marginTop: 20, fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-            By continuing you agree to our Terms of Service and Privacy Policy.
+          <p className="login-footnote">
+            <CheckCircle2 size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />
+            Your progress and reports stay connected to your account.
           </p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

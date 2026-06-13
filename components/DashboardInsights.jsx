@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Crown, Lock, ArrowRight } from "lucide-react";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { VocabularyPractice } from "@/app/learn/vocabulary/page";
 
 const MODULES = ["listening", "reading", "writing", "speaking"];
 const TAB_IDS = ["overview", "progress", "studyplan", "vocabulary"];
@@ -211,6 +212,7 @@ export function StudyPlanSection({ dash, isPro }) {
 
 export function VocabularySection({ dash, isPro }) {
   const router = useRouter();
+  if (isPro) return <VocabularyPractice showBack={false} />;
   if (isPro) {
     return (
       <>

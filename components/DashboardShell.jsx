@@ -11,7 +11,7 @@ import {
   Mic,
   ClipboardList,
   Award,
-  GraduationCap,
+  SpellCheck2,
   Crown,
   Shield,
   LogOut,
@@ -155,7 +155,8 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
         {item(pathname.startsWith("/speaking"), <Mic size={18} />, "Speaking", () => go("/speaking"), !isPro)}
         {item(pathname.startsWith("/diagnostic"), <ClipboardList size={18} />, "Diagnostic", () => go("/diagnostic"))}
         {item(false, <Award size={18} />, "Full Mock Test", () => go(fullMockHref), !isPro)}
-        {isPro && item(pathname.startsWith("/learn"), <GraduationCap size={18} />, "Lessons", () => go("/learn/grammar"))}
+        {isPro && item(pathname.startsWith("/learn/vocabulary"), <BookOpen size={18} />, "Vocabulary", () => go("/learn/vocabulary"))}
+        {isPro && item(pathname.startsWith("/learn/grammar"), <SpellCheck2 size={18} />, "Grammar", () => go("/learn/grammar"))}
       </div>
 
       <div className="da-foot">
