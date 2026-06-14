@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -595,22 +595,27 @@ export function VocabularyPractice({ showBack = true }) {
   const [aiData, setAiData] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [wordBank, setWordBank] = useState(WORD_BANK);
+
+  useEffect(() => {
+    api.getVocabularyWords().then(setWordBank).catch(() => {});
+  }, []);
 
   const topics = useMemo(() => {
-    const scoped = WORD_BANK.filter((item) => module === "All" || item.module === module);
+    const scoped = wordBank.filter((item) => module === "All" || item.module === module);
     return ["All", ...Array.from(new Set(scoped.map((item) => item.topic)))];
-  }, [module]);
+  }, [module, wordBank]);
 
   const filteredWords = useMemo(
-    () => WORD_BANK.filter((item) => {
+    () => wordBank.filter((item) => {
       const matchesModule = module === "All" || item.module === module;
       const matchesTopic = topic === "All" || item.topic === topic;
       return matchesModule && matchesTopic;
     }),
-    [module, topic],
+    [module, topic, wordBank],
   );
 
-  const baseWord = filteredWords[activeIndex] || filteredWords[0] || WORD_BANK[0];
+  const baseWord = filteredWords[activeIndex] || filteredWords[0] || wordBank[0];
   const word = detailsByWord[baseWord.word] || baseWord;
   const wordProgress = progress[baseWord.word] || { box: 0, seen: 0, correct: 0 };
   const mastered = Object.values(progress).filter((item) => item.box >= 3).length;
