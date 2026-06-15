@@ -596,9 +596,22 @@ export function VocabularyPractice({ showBack = true }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [wordBank, setWordBank] = useState(WORD_BANK);
+  const [wordBankLoading, setWordBankLoading] = useState(true);
+  const [wordBankError, setWordBankError] = useState("");
 
   useEffect(() => {
-    api.getVocabularyWords().then(setWordBank).catch(() => {});
+    setWordBankLoading(true);
+    api.getVocabularyWords()
+      .then((words) => {
+        if (Array.isArray(words) && words.length > 0) {
+          setWordBank(words);
+          setActiveIndex(0);
+        }
+      })
+      .catch((err) => {
+        setWordBankError(err?.message || "Could not load vocabulary bank.");
+      })
+      .finally(() => setWordBankLoading(false));
   }, []);
 
   const topics = useMemo(() => {
@@ -727,7 +740,18 @@ export function VocabularyPractice({ showBack = true }) {
         <Stat label="Words studied" value={studied} icon={<Target size={15} />} />
         <Stat label="Mastered" value={mastered} icon={<CheckCircle2 size={15} />} />
         <Stat label="Current box" value={wordProgress.box || 0} icon={<Brain size={15} />} />
+        <Stat
+          label="Word bank"
+          value={wordBankLoading ? "…" : wordBank.length}
+          icon={<Sparkles size={15} />}
+        />
       </div>
+
+      {wordBankError && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "10px 14px", color: "#b91c1c", fontSize: 13, marginBottom: 16 }}>
+          {wordBankError}
+        </div>
+      )}
 
       <AiExerciseCard data={aiData} loading={aiLoading} error={aiError} onGenerate={generateAiSet} />
 
