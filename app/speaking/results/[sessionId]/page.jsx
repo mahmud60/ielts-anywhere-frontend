@@ -7,13 +7,15 @@ import { useAuth } from "@/lib/AuthContext";
 import { useLang } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import {
-  BORDER, TEXT, TEXT_SUB, MUTED, RED,
+  BORDER, TEXT, TEXT_SUB, MUTED,
   bandColor, cefrLabel,
   CriterionCard, SpeakingErrorPanel, PaywallGate,
 } from "@/components/report/ReportComponents";
 import { isProUser } from "@/lib/landingAccess";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import PetLoader from "@/components/PetLoader";
+import DashboardShell from "@/components/DashboardShell";
+import ErrorState from "@/components/ErrorState";
 
 const { accent: ACCENT, soft: SOFT, gradient: GRADIENT } = SPEAKING_THEME;
 
@@ -67,21 +69,16 @@ export default function SpeakingResultsPage() {
   if (loading || fetching) return <Spinner />;
 
   if (error || !result) {
+    const msg = error ?? "Results not found.";
+    const errType = msg.includes("not found") || msg.includes("404")
+      ? "not_found"
+      : msg.includes("AI") || msg.includes("unavailable")
+      ? "ai_unavailable"
+      : "error";
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
-        <div style={{ textAlign: "center", padding: 32 }}>
-          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? "Results not found."}</p>
-          <button
-            onClick={() => router.push("/speaking")}
-            style={{
-              padding: "10px 24px", borderRadius: 10, background: GRADIENT, border: "none",
-              color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14,
-            }}
-          >
-            Back to Speaking
-          </button>
-        </div>
-      </div>
+      <DashboardShell title="Speaking Results">
+        <ErrorState type={errType} message={msg} backHref="/speaking" backLabel="Back to Speaking" />
+      </DashboardShell>
     );
   }
 

@@ -6,13 +6,15 @@ import { useAuth } from "@/lib/AuthContext";
 import { useLang } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import {
-  PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED, RED,
+  PRIMARY, BORDER, TEXT, TEXT_SUB, MUTED,
   bandColor, cefrLabel,
   CriterionCard, DetailedFeedback, PaywallGate,
 } from "@/components/report/ReportComponents";
 import { isProUser } from "@/lib/landingAccess";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import DashboardShell from "@/components/DashboardShell";
+import ErrorState from "@/components/ErrorState";
 
 const CRIT_COLORS = {
   task_achievement:  "#ef4444",
@@ -124,16 +126,16 @@ export default function WritingResultsPage() {
   if (loading || fetching) return <Spinner />;
 
   if (error || !result) {
+    const msg = error ?? "Results not found.";
+    const errType = msg.includes("not found") || msg.includes("404")
+      ? "not_found"
+      : msg.includes("AI") || msg.includes("unavailable")
+      ? "ai_unavailable"
+      : "error";
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui" }}>
-        <div style={{ textAlign: "center", padding: 32 }}>
-          <p style={{ color: RED, fontWeight: 600, marginBottom: 16 }}>{error ?? "Results not found."}</p>
-          <button onClick={() => router.push("/dashboard")} style={{
-            padding: "10px 24px", borderRadius: 8, background: PRIMARY, border: "none",
-            color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14,
-          }}>Back to Dashboard</button>
-        </div>
-      </div>
+      <DashboardShell title="Writing Results">
+        <ErrorState type={errType} message={msg} backHref="/reports" backLabel="Back to Reports" />
+      </DashboardShell>
     );
   }
 
