@@ -508,6 +508,7 @@ export function VocabularyPractice({ showBack = true }) {
     } finally {
       setAiLoading(false);
     }
+  };
 
   if (wordBankLoading) {
     return <div style={s.wrap}><PetLoader label="is loading vocabulary" /></div>;
