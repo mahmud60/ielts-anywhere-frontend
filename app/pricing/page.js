@@ -20,7 +20,7 @@ function PricingContent() {
       sessionStorage.setItem(REF_KEY, code);
       setRefCode(code);
     } else {
-      const stored = sessionStorage.getItem(REF_KEY);
+      const stored = sessionStorage.getItem(REF_KEY) || localStorage.getItem(REF_KEY);
       if (stored) setRefCode(stored);
     }
   }, [searchParams]);

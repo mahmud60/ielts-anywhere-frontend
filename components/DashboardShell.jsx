@@ -17,6 +17,7 @@ import {
   LogOut,
   Lock,
   Menu,
+  Users,
   X,
   ChevronsLeft,
   ChevronsRight,
@@ -162,6 +163,7 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
       <div className="da-foot">
         {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, isPro ? "Manage Plan" : "Upgrade to Pro", () => go("/pricing"))}
         {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, "Admin", () => go("/admin"))}
+        {item(pathname.startsWith("/affiliate"), <Users size={18} />, "Affiliate", () => go("/affiliate"))}
         {item(false, <LogOut size={18} />, "Log out", () => { onAfter(); logout(router); })}
         {onToggle && (
           <button

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -62,7 +62,7 @@ function cleanAuthError(err: unknown) {
     .replace(/^Error:\s*/, "");
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -71,6 +71,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Persist referral code from URL into localStorage for use after signup
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      localStorage.setItem("ielts_ref_code", ref.trim().toUpperCase());
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authLoading && user) router.replace("/dashboard");
@@ -81,6 +90,12 @@ export default function LoginPage() {
       await api.getMe();
     } catch {
       // Profile sync can fail independently of Firebase auth; dashboard can retry.
+    }
+    // Link referral if one was stored (fire-and-forget — don't block navigation)
+    const refCode = localStorage.getItem("ielts_ref_code");
+    if (refCode) {
+      localStorage.removeItem("ielts_ref_code");
+      api.linkReferral(refCode).catch(() => {});
     }
     router.replace("/dashboard");
   };
@@ -385,5 +400,13 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }
