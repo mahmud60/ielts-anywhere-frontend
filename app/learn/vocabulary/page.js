@@ -428,8 +428,12 @@ export function VocabularyPractice({ showBack = true }) {
     [module, topic, wordBank],
   );
 
+  if (wordBankLoading) {
+    return <div style={s.wrap}><PetLoader label="is loading vocabulary" /></div>;
+  }
+
   const baseWord = filteredWords[activeIndex] || filteredWords[0] || wordBank[0];
-  const word = detailsByWord[baseWord.word] || baseWord;
+  const word = detailsByWord[baseWord?.word] || baseWord;
   const wordProgress = progress[baseWord.word] || { box: 0, seen: 0, correct: 0 };
   const mastered = Object.values(progress).filter((item) => item.box >= 3).length;
   const studied = Object.keys(progress).length;
@@ -509,10 +513,6 @@ export function VocabularyPractice({ showBack = true }) {
       setAiLoading(false);
     }
   };
-
-  if (wordBankLoading) {
-    return <div style={s.wrap}><PetLoader label="is loading vocabulary" /></div>;
-  }
 
   return (
     <div style={s.wrap}>
