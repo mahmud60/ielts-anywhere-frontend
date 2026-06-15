@@ -16,6 +16,7 @@ import {
   Target,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
 
@@ -382,6 +383,7 @@ function AiExerciseCard({ data, loading, error, onGenerate }) {
 
 export function VocabularyPractice({ showBack = true }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [module, setModuleState] = useState("All");
   const [topic, setTopic] = useState("All");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -400,6 +402,7 @@ export function VocabularyPractice({ showBack = true }) {
   const [wordBankError, setWordBankError] = useState("");
 
   useEffect(() => {
+    if (!user) return;
     setWordBankLoading(true);
     api.getVocabularyWords()
       .then((words) => {
@@ -412,7 +415,7 @@ export function VocabularyPractice({ showBack = true }) {
         setWordBankError(err?.message || "Could not load vocabulary bank.");
       })
       .finally(() => setWordBankLoading(false));
-  }, []);
+  }, [user]);
 
   const topics = useMemo(() => {
     const scoped = wordBank.filter((item) => module === "All" || item.module === module);
@@ -430,6 +433,16 @@ export function VocabularyPractice({ showBack = true }) {
 
   if (wordBankLoading) {
     return <div style={s.wrap}><PetLoader label="is loading vocabulary" /></div>;
+  }
+
+  if (!wordBank.length) {
+    return (
+      <div style={s.wrap}>
+        <div style={{ color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "12px 16px", fontSize: 13 }}>
+          {wordBankError || "No vocabulary words available."}
+        </div>
+      </div>
+    );
   }
 
   const baseWord = filteredWords[activeIndex] || filteredWords[0] || wordBank[0];
