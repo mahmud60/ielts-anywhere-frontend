@@ -21,206 +21,6 @@ import PetLoader from "@/components/PetLoader";
 
 const PROGRESS_KEY = "ielts_vocab_srs_v1";
 
-const WORD_BANK = [
-  {
-    word: "mitigate",
-    module: "Writing",
-    topic: "Environment",
-    band: "7+",
-    partOfSpeech: "verb",
-    definition: "to make a problem, risk, or effect less severe",
-    example: "Governments can mitigate air pollution by improving public transport.",
-    mnemonic: "Imagine a heavy gate blocking smoke; closing the gate mitigates the damage.",
-    collocations: ["mitigate risk", "mitigate climate change", "mitigate the impact"],
-  },
-  {
-    word: "substantial",
-    module: "Writing",
-    topic: "Writing Task 1",
-    band: "7+",
-    partOfSpeech: "adjective",
-    definition: "large in amount, value, or importance",
-    example: "There was a substantial increase in online sales after 2015.",
-    mnemonic: "Substance means something real; substantial means a real, noticeable amount.",
-    collocations: ["substantial increase", "substantial evidence", "substantial investment"],
-  },
-  {
-    word: "prevalent",
-    module: "Speaking",
-    topic: "Society",
-    band: "7+",
-    partOfSpeech: "adjective",
-    definition: "common or widespread in a particular place or time",
-    example: "Remote work has become more prevalent in many industries.",
-    mnemonic: "Prevalent sounds like present everywhere.",
-    collocations: ["highly prevalent", "prevalent among", "prevalent in society"],
-  },
-  {
-    word: "detrimental",
-    module: "Speaking",
-    topic: "Health",
-    band: "7+",
-    partOfSpeech: "adjective",
-    definition: "causing harm or damage",
-    example: "A sedentary lifestyle can be detrimental to long-term health.",
-    mnemonic: "Detrimental has detriment inside it; detriment means harm.",
-    collocations: ["detrimental effect", "detrimental to health", "environmentally detrimental"],
-  },
-  {
-    word: "allocate",
-    module: "Writing",
-    topic: "Education",
-    band: "6.5+",
-    partOfSpeech: "verb",
-    definition: "to officially set aside money, time, or resources for a purpose",
-    example: "Schools should allocate more funding to teacher training.",
-    mnemonic: "A location for each resource: allocate means put it in its place.",
-    collocations: ["allocate resources", "allocate funding", "allocate time"],
-  },
-  {
-    word: "coherent",
-    module: "Writing",
-    topic: "Writing",
-    band: "7+",
-    partOfSpeech: "adjective",
-    definition: "clear, logical, and easy to understand",
-    example: "A coherent essay uses clear topic sentences and logical transitions.",
-    mnemonic: "Co-here: all ideas are here together in a sensible order.",
-    collocations: ["coherent argument", "coherent structure", "coherent response"],
-  },
-  {
-    word: "scarce",
-    module: "Reading",
-    topic: "Resources",
-    band: "6.5+",
-    partOfSpeech: "adjective",
-    definition: "not available in large enough quantities",
-    example: "Clean water is scarce in some rural communities.",
-    mnemonic: "Scarce sounds like scared; people get scared when resources run out.",
-    collocations: ["scarce resources", "increasingly scarce", "scarce supply"],
-  },
-  {
-    word: "notion",
-    module: "Reading",
-    topic: "Ideas",
-    band: "6.5+",
-    partOfSpeech: "noun",
-    definition: "an idea, belief, or understanding of something",
-    example: "The notion that technology always reduces inequality is too simplistic.",
-    mnemonic: "A notion is a note in your mind.",
-    collocations: ["popular notion", "reject the notion", "basic notion"],
-  },
-  {
-    word: "incentive",
-    module: "Listening",
-    topic: "Work",
-    band: "7+",
-    partOfSpeech: "noun",
-    definition: "something that encourages a person to do something",
-    example: "Tax reductions can provide an incentive for companies to hire graduates.",
-    mnemonic: "In-cent-ive: money cents can push people into action.",
-    collocations: ["financial incentive", "strong incentive", "provide an incentive"],
-  },
-  {
-    word: "consequence",
-    module: "Writing",
-    topic: "Cause and Effect",
-    band: "6.5+",
-    partOfSpeech: "noun",
-    definition: "a result or effect of an action or situation",
-    example: "One consequence of urbanisation is increased demand for housing.",
-    mnemonic: "Con-sequence: what comes in sequence after an action.",
-    collocations: ["serious consequence", "as a consequence", "long-term consequences"],
-  },
-  {
-    word: "whereas",
-    module: "Writing",
-    topic: "Contrast",
-    band: "6.5+",
-    partOfSpeech: "conjunction",
-    definition: "used to compare two facts and show contrast",
-    example: "The north experienced rapid growth, whereas the south remained stable.",
-    mnemonic: "Whereas creates a bridge between two different places or ideas.",
-    collocations: ["whereas the figure", "whereas others", "whereas in contrast"],
-  },
-  {
-    word: "feasible",
-    module: "Speaking",
-    topic: "Planning",
-    band: "7+",
-    partOfSpeech: "adjective",
-    definition: "possible and practical to do",
-    example: "It is not feasible for every city to ban private cars completely.",
-    mnemonic: "Feasible feels like doable.",
-    collocations: ["feasible solution", "economically feasible", "technically feasible"],
-  },
-  {
-    word: "venue",
-    module: "Listening",
-    topic: "Places",
-    band: "6+",
-    partOfSpeech: "noun",
-    definition: "the place where an event or activity happens",
-    example: "The conference venue is close to the central train station.",
-    mnemonic: "Venue sounds like where you go for an event.",
-    collocations: ["conference venue", "wedding venue", "change the venue"],
-  },
-  {
-    word: "deposit",
-    module: "Listening",
-    topic: "Bookings",
-    band: "6+",
-    partOfSpeech: "noun",
-    definition: "money paid in advance to reserve something",
-    example: "Students must pay a small deposit to reserve a room.",
-    mnemonic: "Deposit means you put money down before the full payment.",
-    collocations: ["pay a deposit", "refundable deposit", "security deposit"],
-  },
-  {
-    word: "approximately",
-    module: "Listening",
-    topic: "Numbers",
-    band: "6+",
-    partOfSpeech: "adverb",
-    definition: "almost, but not exactly",
-    example: "The journey takes approximately forty minutes by bus.",
-    mnemonic: "Approx means close; approximately means close to the real number.",
-    collocations: ["approximately half", "approximately 20 percent", "approximately the same"],
-  },
-  {
-    word: "infer",
-    module: "Reading",
-    topic: "Question Skills",
-    band: "7+",
-    partOfSpeech: "verb",
-    definition: "to understand something from evidence rather than direct statement",
-    example: "Readers can infer the writer's attitude from the final paragraph.",
-    mnemonic: "Infer means information enters your mind from clues.",
-    collocations: ["infer meaning", "infer from context", "reasonably infer"],
-  },
-  {
-    word: "contradict",
-    module: "Reading",
-    topic: "Question Skills",
-    band: "6.5+",
-    partOfSpeech: "verb",
-    definition: "to say or show that something is opposite or not true",
-    example: "The second study appears to contradict earlier research.",
-    mnemonic: "Contra means against; contradict means speak against.",
-    collocations: ["contradict a claim", "contradict evidence", "directly contradict"],
-  },
-  {
-    word: "elaborate",
-    module: "Speaking",
-    topic: "Fluency",
-    band: "7+",
-    partOfSpeech: "verb",
-    definition: "to explain something in more detail",
-    example: "I would like to elaborate on why public parks matter.",
-    mnemonic: "Elaborate means add layers to an idea.",
-    collocations: ["elaborate on a point", "elaborate answer", "elaborate explanation"],
-  },
-];
 
 const MODULES = ["All", "Listening", "Reading", "Writing", "Speaking"];
 
@@ -595,7 +395,7 @@ export function VocabularyPractice({ showBack = true }) {
   const [aiData, setAiData] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
-  const [wordBank, setWordBank] = useState(WORD_BANK);
+  const [wordBank, setWordBank] = useState([]);
   const [wordBankLoading, setWordBankLoading] = useState(true);
   const [wordBankError, setWordBankError] = useState("");
 
@@ -708,7 +508,10 @@ export function VocabularyPractice({ showBack = true }) {
     } finally {
       setAiLoading(false);
     }
-  };
+
+  if (wordBankLoading) {
+    return <div style={s.wrap}><PetLoader label="is loading vocabulary" /></div>;
+  }
 
   return (
     <div style={s.wrap}>
@@ -930,4 +733,4 @@ export default function VocabularyPage() {
       <VocabularyPractice showBack={false} />
     </DashboardShell>
   );
-}
+}
