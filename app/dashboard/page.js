@@ -424,18 +424,10 @@ export default function DashboardPage() {
     return data.best_overall != null && data.best_overall >= Number(target);
   }, [data, target]);
 
-  if (loading) {
+  if ((loading || fetching) && !data) {
     return (
       <DashboardShell title="Home">
         <PetLoader fullScreen label="is fetching your progress" />
-      </DashboardShell>
-    );
-  }
-
-  if (fetching) {
-    return (
-      <DashboardShell title="Home">
-        <DashboardSkeleton user={user} />
       </DashboardShell>
     );
   }

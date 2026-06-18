@@ -89,7 +89,7 @@ export default function SpeakingPage() {
     router.push("/speaking/start");
   };
 
-  if (loading) {
+  if (loading && !profile) {
     return (
       <DashboardShell title="Speaking">
         <PetLoader fullScreen label="is warming up" accent={ACCENT} />
