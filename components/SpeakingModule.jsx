@@ -1,965 +1,300 @@
-/**
- * SpeakingModule.jsx
- *
- * IELTS Speaking module — 3-part format with AI examiner conversation.
- * Text-based now, structured for easy voice upgrade later.
- *
- * Props:
- *   apiBase   — FastAPI URL e.g. "http://localhost:8000"
- *   getToken  — async () => Firebase ID token string
- *   sessionId — UUID string of the current TestSession
- *   onComplete— callback fired after grading completes
- *
- * Architecture note:
- *   This component collects exchanges (question + answer pairs) for all
- *   three parts, then submits the full transcript at the end.
- *   The AI examiner persona is purely frontend — it displays each question
- *   in sequence and waits for the student's response.
- *   Grading is async: submit → poll until complete → show results.
- *
- * Voice upgrade path:
- *   Replace the <textarea> in AnswerInput with a MediaRecorder hook.
- *   Send audio blob to POST /speaking/transcribe (Whisper endpoint).
- *   Use the returned transcript string as the answer.
- *   Everything else — submission, polling, results — stays identical.
- */
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import PetLoader from "@/components/PetLoader";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Room, RoomEvent, Track } from "livekit-client";
+import { api } from "@/lib/api";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
+import PetLoader from "@/components/PetLoader";
 
-const LOADER_ACCENT = SPEAKING_THEME.accent;
+const PRIMARY = SPEAKING_THEME.accent;
+const BORDER  = "#e2e8f0";
+const TEXT    = "#0f172a";
+const MUTED   = "#94a3b8";
+const GREEN   = "#059669";
+const AMBER   = "#d97706";
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#0f1117",
-  surface: "#1a1f2e",
-  card: "#1e2536",
-  border: "#2a3547",
-  borderHover: "#3a4a62",
-  accent: "#6366f1",
-  accentDim: "#1e2051",
-  accentLight: "#818cf8",
-  green: "#10b981",
-  greenDim: "#022c22",
-  gold: "#f59e0b",
-  goldDim: "#2d1f02",
-  red: "#ef4444",
-  redDim: "#2d0a0a",
-  text: "#e2e8f0",
-  muted: "#64748b",
-  mutedLight: "#94a3b8",
-  examiner: "#1e3a5f",
-  examinerBorder: "#2563eb44",
-  student: "#1a2d1a",
-  studentBorder: "#16a34a44",
-};
-
-const PART_INFO = {
-  1: {
-    label: "Part 1",
-    subtitle: "Introduction & Interview",
-    color: "#6366f1",
-    duration: "4–5 minutes",
-    icon: "👤",
-  },
-  2: {
-    label: "Part 2",
-    subtitle: "Individual Long Turn",
-    color: "#06b6d4",
-    duration: "3–4 minutes",
-    icon: "🗣️",
-  },
-  3: {
-    label: "Part 3",
-    subtitle: "Two-way Discussion",
-    color: "#8b5cf6",
-    duration: "4–5 minutes",
-    icon: "💬",
-  },
-};
-
-const CRITERIA = [
-  { key: "fluency_coherence", label: "Fluency & Coherence" },
-  { key: "lexical_resource", label: "Lexical Resource" },
-  { key: "grammatical_range", label: "Grammatical Range" },
-  { key: "pronunciation", label: "Pronunciation" },
-];
-
-// ─── Global CSS ───────────────────────────────────────────────────────────────
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  .sm-root * { box-sizing: border-box; margin: 0; padding: 0; }
-  .sm-root { font-family: 'Inter', sans-serif; color: ${C.text}; background: ${C.bg}; min-height: 100vh; }
-  .sm-root ::-webkit-scrollbar { width: 3px; }
-  .sm-root ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 3px; }
-  @keyframes sm-fadeup { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes sm-spin { to { transform: rotate(360deg); } }
-  @keyframes sm-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-  @keyframes sm-typing { 0%{opacity:0} 50%{opacity:1} 100%{opacity:0} }
-  @keyframes sm-record-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.18);opacity:.65} }
-  .sm-fadeup { animation: sm-fadeup .25s ease both; }
-  .sm-card { background:${C.card}; border:1px solid ${C.border}; border-radius:12px; }
-  .sm-btn { font-family:'Inter',sans-serif; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; padding:9px 20px; transition:all .15s; }
-  .sm-btn-primary { background:${C.accent}; color:#fff; }
-  .sm-btn-primary:hover { background:#4f46e5; }
-  .sm-btn-primary:disabled { opacity:.4; cursor:not-allowed; }
-  .sm-btn-outline { background:transparent; color:${C.accentLight}; border:1px solid ${C.accent}44; }
-  .sm-btn-outline:hover { background:${C.accentDim}; }
-  .sm-btn-ghost { background:transparent; color:${C.muted}; border:none; }
-  .sm-bubble-examiner { background:${C.examiner}; border:1px solid ${C.examinerBorder}; border-radius:12px 12px 12px 4px; padding:12px 16px; font-size:14px; line-height:1.65; color:${C.text}; max-width:85%; }
-  .sm-bubble-student { background:${C.student}; border:1px solid ${C.studentBorder}; border-radius:12px 12px 4px 12px; padding:12px 16px; font-size:14px; line-height:1.65; color:${C.text}; max-width:85%; }
-  .sm-textarea { width:100%; font-family:'Inter',sans-serif; font-size:14px; line-height:1.7; color:${C.text}; background:${C.surface}; border:1px solid ${C.border}; border-radius:10px; padding:14px 16px; resize:none; transition:border-color .15s; }
-  .sm-textarea:focus { outline:none; border-color:${C.accent}; }
-  .sm-textarea::placeholder { color:${C.muted}; }
-  .sm-badge { border-radius:99px; font-size:11px; font-weight:600; letter-spacing:.05em; padding:2px 10px; text-transform:uppercase; }
-`;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function bandColor(b) {
-  return b >= 7 ? C.green : b >= 5.5 ? C.gold : C.red;
-}
-
-function Badge({ children, color }) {
+function MicIcon({ size = 32, color = "currentColor" }) {
   return (
-    <span className="sm-badge" style={{
-      background: color + "20", color,
-      border: `1px solid ${color}44`,
-      display: "inline-block",
-    }}>
-      {children}
-    </span>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
   );
 }
 
-// ─── Countdown timer ──────────────────────────────────────────────────────────
-function Timer({ seconds, onDone }) {
-  const [remaining, setRemaining] = useState(seconds);
+function useElapsedTimer(running) {
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(null);
+  const frameRef = useRef(null);
 
   useEffect(() => {
-    if (remaining <= 0) { onDone?.(); return; }
-    const t = setTimeout(() => setRemaining(r => r - 1), 1000);
-    return () => clearTimeout(t);
-  }, [remaining, onDone]);
+    if (running) {
+      startRef.current = Date.now() - elapsed * 1000;
+      const tick = () => {
+        setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+        frameRef.current = requestAnimationFrame(tick);
+      };
+      frameRef.current = requestAnimationFrame(tick);
+    } else {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    }
+    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+  }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pct = (remaining / seconds) * 100;
-  const color = remaining > 20 ? C.green : remaining > 10 ? C.gold : C.red;
-  const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ position: "relative", width: 36, height: 36 }}>
-        <svg width="36" height="36" viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="15" fill="none" stroke={C.border} strokeWidth="2.5" />
-          <circle cx="18" cy="18" r="15" fill="none" stroke={color} strokeWidth="2.5"
-            strokeDasharray={`${pct * 0.942} 94.2`}
-            strokeDashoffset="23.55"
-            strokeLinecap="round"
-            style={{ transition: "stroke-dasharray .9s linear, stroke .3s" }}
-          />
-        </svg>
-        <span style={{
-          position: "absolute", inset: 0, display: "flex",
-          alignItems: "center", justifyContent: "center",
-          fontSize: 9, fontFamily: "'JetBrains Mono'", color,
-        }}>
-          {remaining}
-        </span>
-      </div>
-      <span style={{ fontSize: 13, color, fontFamily: "'JetBrains Mono'" }}>
-        {fmt(remaining)}
-      </span>
-    </div>
-  );
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
-// ─── Typing indicator ─────────────────────────────────────────────────────────
-function TypingIndicator() {
-  return (
-    <div style={{ display: "flex", gap: 4, padding: "10px 14px", alignItems: "center" }}>
-      {[0, 1, 2].map(i => (
-        <div key={i} style={{
-          width: 7, height: 7, borderRadius: "50%",
-          background: C.mutedLight,
-          animation: `sm-typing .9s ease-in-out ${i * 0.18}s infinite`,
-        }} />
-      ))}
-    </div>
-  );
-}
+/**
+ * LiveKit speaking module for use inside the test session flow.
+ * Props:
+ *   testSessionId — UUID of the TestSession to link the attempt to
+ *   onComplete    — called after scoring succeeds (advances the session)
+ */
+export default function SpeakingModule({ testSessionId, onComplete }) {
+  const [phase, setPhase]           = useState("idle");
+  const [errorMsg, setErrorMsg]     = useState(null);
+  const [transcript, setTranscript] = useState([]);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
 
-// ─── Part intro screen ────────────────────────────────────────────────────────
-function PartIntro({ part, onStart }) {
-  const info = PART_INFO[part.part_number];
-  return (
-    <div className="sm-fadeup" style={{ maxWidth: 540, margin: "0 auto", padding: "48px 24px", textAlign: "center" }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>{info.icon}</div>
-      <Badge color={info.color}>{info.label}</Badge>
-      <h2 style={{ fontSize: 24, fontWeight: 600, marginTop: 12, marginBottom: 6 }}>
-        {info.subtitle}
-      </h2>
-      <p style={{ color: C.muted, fontSize: 14, marginBottom: 28, lineHeight: 1.6 }}>
-        {part.instructions}
-      </p>
+  const roomNameRef   = useRef(null);
+  const submittedRef  = useRef(false);
+  const transcriptRef = useRef([]);
+  const roomRef       = useRef(null);
+  const audioElRef    = useRef(null);
 
-      {/* Cue card for Part 2 */}
-      {part.cue_card && (
-        <div style={{
-          background: C.surface, border: `1px solid ${info.color}44`,
-          borderRadius: 12, padding: "20px 24px", marginBottom: 28,
-          textAlign: "left",
-        }}>
-          <div style={{ fontSize: 12, color: info.color, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            Task Card
-          </div>
-          <div style={{ fontSize: 14.5, lineHeight: 1.8, whiteSpace: "pre-line", color: C.text }}>
-            {part.cue_card}
-          </div>
-        </div>
-      )}
+  const timerRunning = phase === "live";
+  const elapsed = useElapsedTimer(timerRunning);
 
-      <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
-        <div style={{ padding: "8px 16px", background: C.surface, borderRadius: 8, fontSize: 13, color: C.muted }}>
-          {info.duration}
-        </div>
-        <div style={{ padding: "8px 16px", background: C.surface, borderRadius: 8, fontSize: 13, color: C.muted }}>
-          {part.questions.length} question{part.questions.length !== 1 ? "s" : ""}
-        </div>
-        {part.prep_time_seconds > 0 && (
-          <div style={{ padding: "8px 16px", background: C.goldDim, borderRadius: 8, fontSize: 13, color: C.gold, border: `1px solid ${C.gold}33` }}>
-            {part.prep_time_seconds}s preparation time
-          </div>
-        )}
-      </div>
-
-      <button className="sm-btn sm-btn-primary" onClick={onStart}
-        style={{ padding: "11px 32px", fontSize: 14 }}>
-        Begin Part {part.part_number}
-      </button>
-    </div>
-  );
-}
-
-// ─── Part 2 preparation screen ────────────────────────────────────────────────
-function PrepScreen({ part, onDone }) {
-  return (
-    <div className="sm-fadeup" style={{ maxWidth: 540, margin: "0 auto", padding: "48px 24px", textAlign: "center" }}>
-      <Badge color={C.gold}>Preparation time</Badge>
-      <h2 style={{ fontSize: 20, fontWeight: 600, marginTop: 14, marginBottom: 6 }}>
-        Prepare your response
-      </h2>
-      <p style={{ color: C.muted, fontSize: 14, marginBottom: 28 }}>
-        Make notes if you wish. You will speak for 1–2 minutes.
-      </p>
-      <div style={{ marginBottom: 32 }}>
-        <Timer seconds={part.prep_time_seconds} onDone={onDone} />
-      </div>
-      <div style={{
-        background: C.surface, border: `1px solid ${C.gold}33`,
-        borderRadius: 12, padding: "20px 24px", textAlign: "left",
-        fontSize: 14.5, lineHeight: 1.8, whiteSpace: "pre-line", color: C.text,
-      }}>
-        {part.cue_card}
-      </div>
-      <button className="sm-btn sm-btn-outline" onClick={onDone}
-        style={{ marginTop: 24 }}>
-        I'm ready — skip timer
-      </button>
-    </div>
-  );
-}
-
-// ─── Voice + text answer input ────────────────────────────────────────────────
-function AnswerInput({ value, onChange, onSend, isLast, apiBase, getToken }) {
-  const [recState, setRecState] = useState("idle"); // idle | recording | transcribing
-  const [canRecord, setCanRecord] = useState(true);
-  const [hint, setHint] = useState("");
-  const mrRef = useRef(null);
-  const chunksRef = useRef([]);
-  const textareaRef = useRef(null);
+  useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
   useEffect(() => {
-    if (!navigator.mediaDevices || typeof MediaRecorder === "undefined") setCanRecord(false);
+    return () => {
+      roomRef.current?.disconnect();
+      if (audioElRef.current) { audioElRef.current.remove(); audioElRef.current = null; }
+    };
   }, []);
 
-  useEffect(() => {
-    if (recState === "idle") setTimeout(() => textareaRef.current?.focus(), 80);
-  }, [recState]);
+  const submitAndComplete = useCallback(async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setPhase("scoring");
 
-  const startRecording = async () => {
-    setHint("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      mrRef.current = mr;
-      chunksRef.current = [];
-
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        setRecState("transcribing");
-        let transcribed = false;
-        try {
-          const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
-          const fd = new FormData();
-          fd.append("audio", blob, "recording.webm");
-          const token = await getToken();
-          const res = await fetch(`${apiBase}/speaking/transcribe`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: fd,
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.transcript) {
-              onChange(data.transcript);
-              transcribed = true;
-            }
-          }
-        } catch (e) {
-          console.warn("Transcription error:", e.message);
-        } finally {
-          if (!transcribed) setHint("Transcription unavailable — please type your answer below.");
-          setRecState("idle");
-        }
-      };
-
-      mr.start(200);
-      setRecState("recording");
-    } catch {
-      setCanRecord(false);
+    const msgs = transcriptRef.current;
+    if (msgs.length === 0) {
+      onComplete?.();
+      return;
     }
-  };
 
-  const stopRecording = () => mrRef.current?.stop();
+    try {
+      await api.submitSpeaking(msgs, roomNameRef.current, testSessionId);
+      onComplete?.();
+    } catch (e) {
+      setPhase("error");
+      setErrorMsg(e.message ?? "Scoring failed. Please try again.");
+      submittedRef.current = false;
+    }
+  }, [testSessionId, onComplete]);
 
-  const handleKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
-  };
+  async function handleStart() {
+    setPhase("connecting");
+    const doSubmit = submitAndComplete;
+    try {
+      const { token, room_name, ws_url } = await api.lkGetToken();
+      roomNameRef.current = room_name;
 
-  if (recState === "recording") {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 16,
-        padding: "18px 20px", background: C.redDim,
-        border: `1px solid ${C.red}44`, borderRadius: 10,
-      }}>
-        <div style={{
-          width: 14, height: 14, borderRadius: "50%", background: C.red,
-          animation: "sm-record-pulse 1s ease-in-out infinite", flexShrink: 0,
-        }} />
-        <span style={{ flex: 1, fontSize: 14, color: C.red }}>Recording… speak now</span>
-        <button className="sm-btn sm-btn-primary" onClick={stopRecording}
-          style={{ background: C.red, padding: "8px 18px" }}>
-          Stop
-        </button>
-      </div>
-    );
+      const room = new Room({
+        audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      roomRef.current = room;
+
+      room.on(RoomEvent.DataReceived, (payload) => {
+        try {
+          const msg = JSON.parse(new TextDecoder().decode(payload));
+          if (msg.role && msg.text) {
+            setTranscript(prev => [...prev, { role: msg.role, text: msg.text, timestamp: msg.timestamp }]);
+          }
+        } catch { /* ignore malformed packets */ }
+      });
+
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        setAgentSpeaking(speakers.some(p => !p.isLocal));
+      });
+
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        if (track.kind === Track.Kind.Audio && !participant.isLocal) {
+          const el = track.attach();
+          el.autoplay = true;
+          document.body.appendChild(el);
+          audioElRef.current = el;
+        }
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach(el => el.remove());
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        roomRef.current = null;
+        doSubmit();
+      });
+
+      room.on(RoomEvent.MediaDevicesError, () => {
+        setPhase("error");
+        setErrorMsg("Microphone access was denied. Please allow microphone access and try again.");
+      });
+
+      await room.connect(ws_url, token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      setPhase("live");
+    } catch (e) {
+      const msg = e?.message ?? String(e);
+      setErrorMsg(
+        msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")
+          ? "Microphone access was denied. Please allow microphone access and try again."
+          : msg || "Could not connect. Please try again."
+      );
+      setPhase("error");
+    }
   }
 
-  if (recState === "transcribing") {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "18px 20px", background: C.surface,
-        border: `1px solid ${C.border}`, borderRadius: 10,
-      }}>
-        <PetLoader size={48} label="is transcribing your response" accent={LOADER_ACCENT} />
-      </div>
-    );
+  async function handleEnd() {
+    setPhase("ending");
+    try { await roomRef.current?.disconnect(); } catch {}
+  }
+
+  const isLive       = phase === "live";
+  const isConnecting = phase === "connecting" || phase === "ending";
+  const isScoring    = phase === "scoring";
+  const userSpeaking = isLive && !agentSpeaking;
+  const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#a78bfa" : MUTED;
+  const micBg        = agentSpeaking ? SPEAKING_THEME.soft : userSpeaking ? "#f5f3ff" : "#f8fafc";
+  const micIconColor = agentSpeaking ? PRIMARY : userSpeaking ? PRIMARY : MUTED;
+
+  if (isScoring) {
+    return <PetLoader fixed label="is scoring your speaking test" accent={PRIMARY} />;
   }
 
   return (
-    <div>
-      {hint && (
-        <div style={{ fontSize: 12, color: C.gold, marginBottom: 8, paddingLeft: 2 }}>
-          {hint}
-        </div>
-      )}
-      <textarea
-        ref={textareaRef}
-        className="sm-textarea"
-        rows={3}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={handleKey}
-        placeholder="Type your response… (Enter to submit, Shift+Enter for new line)"
-      />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-        <span style={{ fontSize: 11, color: C.muted }}>Enter to send · Shift+Enter for new line</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          {canRecord && (
-            <button className="sm-btn sm-btn-outline" onClick={startRecording}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
-              </svg>
-              Record
-            </button>
-          )}
-          <button className="sm-btn sm-btn-primary" disabled={!value.trim()} onClick={onSend}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {isLast ? "Finish part" : "Send"}
-            <span style={{ opacity: 0.7, fontSize: 11 }}>{isLast ? "→" : "↵"}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+    <div style={{ fontFamily: "system-ui", padding: "24px 0", maxWidth: 600, margin: "0 auto" }}>
 
-// ─── Conversation UI ──────────────────────────────────────────────────────────
-function ConversationView({ part, onPartComplete, apiBase, getToken }) {
-  const [questionIdx, setQuestionIdx] = useState(0);
-  const [answer, setAnswer] = useState("");
-  const [exchanges, setExchanges] = useState([]);
-  const [showTyping, setShowTyping] = useState(true);
-  const [submittingAnswer, setSubmittingAnswer] = useState(false);
-  const chatEndRef = useRef(null);
-
-  const info = PART_INFO[part.part_number];
-  const currentQuestion = part.questions[questionIdx];
-  const totalQuestions = part.questions.length;
-  const isLast = questionIdx === totalQuestions - 1;
-
-  // Auto-scroll to bottom when new messages appear
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [exchanges, showTyping]);
-
-  // Simulate examiner "typing" before showing each question
-  useEffect(() => {
-    setShowTyping(true);
-    const t = setTimeout(() => setShowTyping(false), 900);
-    return () => clearTimeout(t);
-  }, [questionIdx]);
-
-  const handleSend = useCallback(() => {
-    if (!answer.trim() || showTyping) return;
-    setSubmittingAnswer(true);
-
-    const newExchange = { question: currentQuestion, answer: answer.trim() };
-    const newExchanges = [...exchanges, newExchange];
-    setExchanges(newExchanges);
-    setAnswer("");
-
-    setTimeout(() => {
-      setSubmittingAnswer(false);
-      if (isLast) {
-        onPartComplete(newExchanges);
-      } else {
-        setQuestionIdx(i => i + 1);
-      }
-    }, 400);
-  }, [answer, currentQuestion, exchanges, isLast, onPartComplete, showTyping]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", maxWidth: 680, margin: "0 auto" }}>
-      {/* Part header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 0", borderBottom: `1px solid ${C.border}`, marginBottom: 16, flexShrink: 0,
+        marginBottom: 32, padding: "10px 16px",
+        background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 10,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Badge color={info.color}>{info.label}</Badge>
-          <span style={{ fontSize: 13, color: C.muted }}>{info.subtitle}</span>
-        </div>
-        <div style={{ fontSize: 12, color: C.muted, fontFamily: "'JetBrains Mono'" }}>
-          {questionIdx + 1} / {totalQuestions}
+        <span style={{ fontWeight: 700, fontSize: 14, color: TEXT }}>IELTS Speaking Test</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: isLive ? TEXT : MUTED, fontWeight: 600 }}>{elapsed}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: isLive ? GREEN : isConnecting ? AMBER : MUTED }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: isLive ? GREEN : isConnecting ? AMBER : MUTED,
+              ...(isLive ? { animation: "pulse 1.5s ease-in-out infinite" } : {}),
+            }} />
+            {isLive ? "Live" : isConnecting ? "Connecting…" : "Ready"}
+          </div>
         </div>
       </div>
 
-      {/* Chat area */}
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, paddingRight: 4 }}>
-        {/* Completed exchanges */}
-        {exchanges.map((ex, i) => (
-          <div key={i} className="sm-fadeup" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Examiner bubble */}
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                background: C.examiner, border: `1px solid ${info.color}44`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, color: info.color, fontWeight: 600,
-              }}>E</div>
-              <div className="sm-bubble-examiner">{ex.question}</div>
-            </div>
-            {/* Student bubble */}
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexDirection: "row-reverse" }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                background: C.student, border: `1px solid ${C.green}44`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, color: C.green, fontWeight: 600,
-              }}>U</div>
-              <div className="sm-bubble-student">{ex.answer}</div>
-            </div>
-          </div>
-        ))}
-
-        {/* Current question */}
-        {!submittingAnswer && (
-          <div className="sm-fadeup" style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          {agentSpeaking && (
             <div style={{
-              width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-              background: C.examiner, border: `1px solid ${info.color}44`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, color: info.color, fontWeight: 600,
-            }}>E</div>
-            {showTyping
-              ? <div className="sm-bubble-examiner"><TypingIndicator /></div>
-              : <div className="sm-bubble-examiner sm-fadeup">{currentQuestion}</div>
-            }
+              position: "absolute", inset: -12, borderRadius: "50%",
+              border: `2px solid ${PRIMARY}`, opacity: 0.4,
+              animation: "ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite",
+            }} />
+          )}
+          <div style={{
+            width: 110, height: 110, borderRadius: "50%",
+            background: micBg, border: `3px solid ${ringColor}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "border-color .2s, background .2s",
+            boxShadow: isLive ? `0 0 0 6px ${ringColor}22` : "none",
+          }}>
+            <MicIcon size={38} color={micIconColor} />
           </div>
+        </div>
+
+        <p style={{ fontSize: 15, color: TEXT, fontWeight: 600, marginBottom: 4, textAlign: "center" }}>
+          {phase === "idle"       && "Ready to start your speaking test"}
+          {phase === "connecting" && "Connecting to AI examiner…"}
+          {phase === "live"       && (agentSpeaking ? "Examiner is speaking" : "Your turn to speak")}
+          {phase === "ending"     && "Ending session…"}
+          {phase === "error"      && "Connection error"}
+        </p>
+        <p style={{ fontSize: 13, color: MUTED, marginBottom: 24, textAlign: "center", maxWidth: 340 }}>
+          {phase === "idle"  && "The AI examiner will guide you through all three parts of the IELTS speaking test."}
+          {phase === "live"  && (agentSpeaking ? "Listen carefully. Respond when the examiner finishes." : "Speak clearly into your microphone.")}
+          {phase === "error" && (errorMsg ?? "")}
+        </p>
+
+        {phase === "idle" && (
+          <button onClick={handleStart} style={{
+            padding: "13px 40px", borderRadius: 10, background: SPEAKING_THEME.gradient, border: "none",
+            color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer",
+            boxShadow: `0 12px 28px -12px ${PRIMARY}`,
+          }}>
+            Start Speaking Test
+          </button>
         )}
 
-        <div ref={chatEndRef} />
+        {phase === "error" && (
+          <button onClick={() => { submittedRef.current = false; setPhase("idle"); setErrorMsg(null); }} style={{
+            padding: "11px 28px", borderRadius: 8, background: PRIMARY, border: "none",
+            color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
+          }}>
+            Try Again
+          </button>
+        )}
+
+        {isLive && (
+          <button onClick={handleEnd} style={{
+            padding: "11px 28px", borderRadius: 8, background: "#fff",
+            border: "1px solid #fca5a5", color: "#dc2626", fontWeight: 600,
+            fontSize: 14, cursor: "pointer",
+          }}>
+            End Test
+          </button>
+        )}
       </div>
 
-      {/* Input area */}
-      {!showTyping && !submittingAnswer && (
-        <div className="sm-fadeup" style={{ paddingTop: 14, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <AnswerInput
-            value={answer}
-            onChange={setAnswer}
-            onSend={handleSend}
-            isLast={isLast}
-            apiBase={apiBase}
-            getToken={getToken}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Grading screen ───────────────────────────────────────────────────────────
-function GradingScreen() {
-  const [dots, setDots] = useState(".");
-  useEffect(() => {
-    const t = setInterval(() => setDots(d => d.length >= 3 ? "." : d + "."), 500);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <div style={{ textAlign: "center", padding: "80px 24px", maxWidth: 480, margin: "0 auto" }}>
-      <PetLoader size={96} accent={LOADER_ACCENT} />
-      <h2 style={{ fontSize: 20, fontWeight: 500, marginTop: 8, marginBottom: 10 }}>
-        Evaluating your speaking{dots}
-      </h2>
-      <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.7, marginBottom: 28 }}>
-        Our AI examiner is reviewing your full transcript against the official
-        IELTS band descriptors across all three parts.
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 260, margin: "0 auto" }}>
-        {CRITERIA.map((c, i) => (
-          <div key={c.key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: C.accentLight,
-              animation: `sm-pulse 1.2s ease-in-out ${i * 0.22}s infinite`,
-            }} />
-            <span style={{ fontSize: 12, color: C.mutedLight }}>{c.label}</span>
+      {transcript.length > 0 && (
+        <div style={{
+          maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8,
+          padding: "12px 0", borderTop: `1px solid ${BORDER}`,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
+            Transcript
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Results screen ───────────────────────────────────────────────────────────
-function ResultsScreen({ result, onRetry }) {
-  const [activeTab, setActiveTab] = useState("scores");   // "scores" | "transcript"
-  const bc = bandColor(result.overall_band);
-
-  return (
-    <div className="sm-fadeup" style={{ maxWidth: 680, margin: "0 auto", padding: "24px 0" }}>
-      {/* Overall */}
-      <div className="sm-card" style={{
-        padding: "24px 28px", marginBottom: 16,
-        borderColor: bc + "55",
-        display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap",
-      }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Overall band
-          </div>
-          <div style={{ fontSize: 56, fontWeight: 700, color: bc, fontFamily: "'JetBrains Mono'", lineHeight: 1 }}>
-            {result.overall_band.toFixed(1)}
-          </div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
-            {result.overall_band >= 7
-              ? "Strong performance across all three parts"
-              : result.overall_band >= 6
-              ? "Competent — good foundation to build on"
-              : "Developing — focus on fluency and vocabulary range"}
-          </div>
-          {result.improvement_tips?.map((tip, i) => (
-            <div key={i} style={{
-              fontSize: 13, color: C.mutedLight, lineHeight: 1.6,
-              paddingLeft: 12, borderLeft: `2px solid ${C.gold}`,
-              marginBottom: 6,
-            }}>
-              {tip}
+          {transcript.map((msg, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+              <div style={{
+                maxWidth: "80%", padding: "9px 13px", borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+                background: msg.role === "user" ? SPEAKING_THEME.soft : "#f1f5f9",
+                border: msg.role === "user" ? "1px solid #ddd6fe" : "none",
+                color: msg.role === "user" ? "#312e81" : TEXT,
+                borderBottomRightRadius: msg.role === "user" ? 4 : 12,
+                borderBottomLeftRadius:  msg.role === "agent" ? 4 : 12,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {msg.role === "agent" ? "Examiner" : "You"}
+                </div>
+                {msg.text}
+              </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[{ key: "scores", label: "Part scores" }, { key: "transcript", label: "Transcript" }].map(t => (
-          <button key={t.key} className="sm-btn"
-            onClick={() => setActiveTab(t.key)}
-            style={{
-              background: activeTab === t.key ? C.accentDim : "transparent",
-              color: activeTab === t.key ? C.accentLight : C.muted,
-              border: `1px solid ${activeTab === t.key ? C.accent + "55" : C.border}`,
-              padding: "7px 16px",
-            }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Part scores */}
-      {activeTab === "scores" && result.part_scores?.map(ps => {
-        const info = PART_INFO[ps.part_number];
-        const pbc = bandColor(ps.band);
-        return (
-          <div key={ps.part_number} className="sm-card sm-fadeup" style={{ padding: "18px 22px", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <Badge color={info.color}>{info.label}</Badge>
-              <span style={{ color: C.muted, fontSize: 13 }}>{info.subtitle}</span>
-              <span style={{ marginLeft: "auto", fontSize: 28, fontWeight: 700, color: pbc, fontFamily: "'JetBrains Mono'" }}>
-                {ps.band.toFixed(1)}
-              </span>
-            </div>
-
-            {/* Criteria bars */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 20px", marginBottom: 14 }}>
-              {CRITERIA.map(c => (
-                <div key={c.key}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                    <span style={{ fontSize: 11.5, color: C.mutedLight }}>{c.label}</span>
-                    <span style={{ fontSize: 12, color: bandColor(ps[c.key]), fontFamily: "'JetBrains Mono'" }}>
-                      {ps[c.key].toFixed(1)}
-                    </span>
-                  </div>
-                  <div style={{ height: 4, background: C.border, borderRadius: 3 }}>
-                    <div style={{
-                      width: `${(ps[c.key] / 9) * 100}%`, height: "100%",
-                      background: bandColor(ps[c.key]), borderRadius: 3,
-                      transition: "width .5s ease",
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Examiner feedback */}
-            <div style={{
-              padding: "10px 14px", background: C.accentDim,
-              borderRadius: 8, fontSize: 13, lineHeight: 1.65,
-              color: C.accentLight, borderLeft: `3px solid ${C.accent}`,
-              marginBottom: ps.examiner_notes ? 8 : 0,
-            }}>
-              {ps.feedback}
-            </div>
-            {ps.examiner_notes && (
-              <div style={{
-                padding: "8px 12px", background: C.surface,
-                borderRadius: 8, fontSize: 12.5, color: C.muted,
-                lineHeight: 1.6, marginTop: 8,
-              }}>
-                <span style={{ color: C.gold }}>Note: </span>{ps.examiner_notes}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Transcript tab */}
-      {activeTab === "transcript" && (
-        <div className="sm-card sm-fadeup" style={{ padding: "18px 22px" }}>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            Full transcript
-          </div>
-          {[1, 2, 3].map(partNum => {
-            const partExchanges = result.transcript?.filter(t => t.part === partNum) || [];
-            if (!partExchanges.length) return null;
-            const info = PART_INFO[partNum];
-            return (
-              <div key={partNum} style={{ marginBottom: 20 }}>
-                <div style={{ marginBottom: 10 }}>
-                  <Badge color={info.color}>{info.label} — {info.subtitle}</Badge>
-                </div>
-                {partExchanges.map((ex, i) => (
-                  <div key={i} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, color: C.accentLight, marginBottom: 3 }}>
-                      Examiner:
-                    </div>
-                    <div style={{ fontSize: 13.5, color: C.mutedLight, marginBottom: 6, paddingLeft: 12 }}>
-                      {ex.question}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.green, marginBottom: 3 }}>
-                      You:
-                    </div>
-                    <div style={{ fontSize: 13.5, color: C.text, paddingLeft: 12, lineHeight: 1.65 }}>
-                      {ex.answer}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
       )}
 
-      <button className="sm-btn sm-btn-ghost" onClick={onRetry}
-        style={{ marginTop: 16, fontSize: 13 }}>
-        ← Retake speaking test
-      </button>
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-export default function SpeakingModule({ apiBase, getToken, sessionId, onComplete, autoSubmitRef }) {
-  useEffect(() => {
-    const id = "sm-styles";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("style");
-      s.id = id; s.textContent = CSS;
-      document.head.appendChild(s);
-    }
-  }, []);
-
-  const [test, setTest] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Navigation state
-  const [currentPartIdx, setCurrentPartIdx] = useState(0);
-  const [phase, setPhase] = useState("intro");
-  // "intro" | "prep" | "conversation" | "grading" | "results"
-
-  // Collected exchanges per part
-  const [partExchanges, setPartExchanges] = useState({});
-
-  // Grading state
-  const [, setAttemptId] = useState(null);
-  const [result, setResult] = useState(null);
-  const pollRef = useRef(null);
-
-  // Load test
-  useEffect(() => {
-    async function load() {
-      try {
-        const token = await getToken();
-        const res = await fetch(
-          `${apiBase}/speaking/for-session/${sessionId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) throw new Error(await res.text());
-        setTest(await res.json());
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (apiBase && sessionId) load();
-  }, [apiBase, sessionId, getToken]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
-
-  const startPolling = useCallback((aid) => {
-    pollRef.current = setInterval(async () => {
-      try {
-        const token = await getToken();
-        const res = await fetch(`${apiBase}/speaking/attempts/${aid}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.status === "complete") {
-          clearInterval(pollRef.current);
-          setResult(data);
-          setPhase("results");
-          if (onComplete) onComplete();
-        } else if (data.status === "failed") {
-          clearInterval(pollRef.current);
-          setError("Grading failed — please try again.");
-          setPhase("intro");
-          setCurrentPartIdx(0);
-        }
-      } catch (e) {
-        console.warn("Poll error:", e.message);
-      }
-    }, 2000);
-  }, [apiBase, getToken, onComplete]);
-
-  // Called when a part's conversation finishes
-  const handlePartComplete = useCallback(async (exchanges) => {
-    const part = test.parts[currentPartIdx];
-    const updatedExchanges = { ...partExchanges, [part.part_number]: exchanges };
-    setPartExchanges(updatedExchanges);
-
-    if (currentPartIdx < test.parts.length - 1) {
-      // Move to next part intro
-      setCurrentPartIdx(i => i + 1);
-      setPhase("intro");
-    } else {
-      // All parts done — submit
-      setPhase("grading");
-      try {
-        const token = await getToken();
-        const partResponses = test.parts.map(p => ({
-          part_number: p.part_number,
-          exchanges: updatedExchanges[p.part_number] || [],
-        }));
-
-        const res = await fetch(`${apiBase}/speaking/submit`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            test_id: test.id,
-            part_responses: partResponses,
-          }),
-        });
-
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setAttemptId(data.attempt_id);
-        startPolling(data.attempt_id);
-      } catch (e) {
-        setError(e.message);
-        setPhase("intro");
-        setCurrentPartIdx(0);
-      }
-    }
-  }, [test, currentPartIdx, partExchanges, apiBase, getToken, startPolling]);
-
-    // ✅ ADD THIS RIGHT AFTER handleSubmit:
-  useEffect(() => {
-    if (autoSubmitRef) {
-      autoSubmitRef.current = handlePartComplete;
-    }
-  }, [autoSubmitRef, handlePartComplete]);
-
-  const handleRetry = () => {
-    setPhase("intro");
-    setCurrentPartIdx(0);
-    setPartExchanges({});
-    setResult(null);
-    setAttemptId(null);
-  };
-
-  // ── Render ──
-  if (loading) {
-    return <PetLoader fixed label="is loading your speaking test" accent={LOADER_ACCENT} />;
-  }
-
-  if (error) {
-    return (
-      <div className="sm-root" style={{ padding: 24 }}>
-        <div style={{ padding: 16, background: C.redDim, borderRadius: 10, color: C.red, fontSize: 13 }}>
-          {error}
-        </div>
-        <button className="sm-btn sm-btn-ghost" style={{ marginTop: 12 }} onClick={() => setError(null)}>
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  if (!test) return null;
-
-  const currentPart = test.parts[currentPartIdx];
-
-  return (
-    <div className="sm-root" style={{ padding: "24px 0" }}>
-      {/* Header — only show during test phases */}
-      {phase !== "results" && phase !== "grading" && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 2 }}>Speaking Test</h2>
-            <div style={{ fontSize: 13, color: C.muted }}>{test.title} · 11–14 minutes</div>
-          </div>
-          {/* Part progress dots */}
-          <div style={{ display: "flex", gap: 8 }}>
-            {test.parts.map((p, i) => {
-              const info = PART_INFO[p.part_number];
-              const done = i < currentPartIdx || phase === "grading" || phase === "results";
-              const active = i === currentPartIdx;
-              return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{
-                    width: 26, height: 26, borderRadius: "50%",
-                    background: done ? C.green : active ? info.color : C.border,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 600, color: "#fff",
-                    transition: "all .3s",
-                  }}>
-                    {done ? "✓" : p.part_number}
-                  </div>
-                  {i < test.parts.length - 1 && (
-                    <div style={{ width: 20, height: 1, background: i < currentPartIdx ? C.green : C.border }} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Phase renders */}
-      {phase === "intro" && currentPart && (
-        <PartIntro
-          part={currentPart}
-          onStart={() => {
-            if (currentPart.prep_time_seconds > 0) {
-              setPhase("prep");
-            } else {
-              setPhase("conversation");
-            }
-          }}
-        />
-      )}
-
-      {phase === "prep" && currentPart && (
-        <PrepScreen
-          part={currentPart}
-          onDone={() => setPhase("conversation")}
-        />
-      )}
-
-      {phase === "conversation" && currentPart && (
-        <ConversationView
-          key={`part-${currentPart.part_number}`}
-          part={currentPart}
-          onPartComplete={handlePartComplete}
-          apiBase={apiBase}
-          getToken={getToken}
-        />
-      )}
-
-      {phase === "grading" && <GradingScreen />}
-
-      {phase === "results" && result && (
-        <ResultsScreen result={result} onRetry={handleRetry} />
-      )}
+      <style>{`
+        @keyframes ping  { 75%, 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
     </div>
   );
 }

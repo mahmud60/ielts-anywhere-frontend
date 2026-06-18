@@ -13,8 +13,8 @@ import ReadingModule from "@/components/ReadingModule";
 import WritingModule from "@/components/WritingModule";
 import PetLoader from "@/components/PetLoader";
 
-const ElevenLabsSpeakingModule = dynamic(
-  () => import("@/components/ElevenLabsSpeakingModule"),
+const SpeakingModule = dynamic(
+  () => import("@/components/SpeakingModule"),
   { ssr: false }
 );
 
@@ -604,7 +604,7 @@ export default function SessionPage() {
           />
         )}
         {!showExpired && !transitioning && current === "speaking" && (
-          <ElevenLabsSpeakingModule
+          <SpeakingModule
             key={moduleKey}
             testSessionId={sessionId}
             onComplete={handleModuleComplete}

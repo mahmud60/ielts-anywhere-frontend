@@ -6,14 +6,13 @@ import {
   ChevronLeft, Mic, Volume2, Clock, CheckCircle2,
   Headphones, Wifi, PhoneOff, RotateCcw, Sparkles,
 } from "lucide-react";
-import { Conversation } from "@elevenlabs/react";
+import { Room, RoomEvent, Track } from "livekit-client";
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import PetLoader from "@/components/PetLoader";
 
-const AGENT_ID = "agent_9801ksdjxvqqfkdvsh8acxc4xge5";
 const { accent: ACCENT, soft: SOFT, gradient: GRADIENT } = SPEAKING_THEME;
 
 const PARTS = [
@@ -174,10 +173,11 @@ export default function SpeakingSession() {
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [checks, setChecks] = useState({ quiet: false, mic: false, time: false });
 
-  const elSessionId = useRef(null);
+  const roomNameRef = useRef(null);
   const submittedRef = useRef(false);
   const transcriptRef = useRef([]);
-  const convRef = useRef(null);
+  const roomRef = useRef(null);
+  const audioElRef = useRef(null);
   const transcriptEndRef = useRef(null);
 
   const isLive = phase === "live";
@@ -205,7 +205,7 @@ export default function SpeakingSession() {
     }
 
     try {
-      const { session_id } = await api.elSubmitSpeaking(msgs, elSessionId.current);
+      const { session_id } = await api.submitSpeaking(msgs, roomNameRef.current);
       router.push(`/speaking/results/${session_id}`);
     } catch (e) {
       setPhase("error");
@@ -218,42 +218,67 @@ export default function SpeakingSession() {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
+  // Cleanup LiveKit room and audio element on unmount
+  useEffect(() => {
+    return () => {
+      roomRef.current?.disconnect();
+      if (audioElRef.current) { audioElRef.current.remove(); audioElRef.current = null; }
+    };
+  }, []);
+
   async function handleStart() {
     setPhase("connecting");
     const doSubmit = submitAndRedirect;
     try {
-      let sessionOpts;
-      try {
-        const { signed_url } = await api.elGetSignedUrl();
-        sessionOpts = { signedUrl: signed_url };
-      } catch {
-        sessionOpts = { agentId: AGENT_ID };
-      }
+      const { token, room_name, ws_url } = await api.lkGetToken();
+      roomNameRef.current = room_name;
 
-      const conv = await Conversation.startSession({
-        ...sessionOpts,
-        onConnect: ({ conversationId }) => {
-          elSessionId.current = conversationId;
-          setPhase("live");
-        },
-        onDisconnect: () => {
-          convRef.current = null;
-          doSubmit();
-        },
-        onMessage: ({ message, source }) => {
-          setTranscript((prev) => [...prev, {
-            role: source === "ai" ? "agent" : "user",
-            text: message,
-            timestamp: Date.now(),
-          }]);
-        },
-        onModeChange: ({ mode }) => setAgentSpeaking(mode === "speaking"),
-        onError: (msg) => {
-          setPhase("error");
-          setErrorMsg(typeof msg === "string" ? msg : "Connection error. Check your microphone and try again.");
-        },
+      const room = new Room({
+        audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      convRef.current = conv;
+      roomRef.current = room;
+
+      // Receive transcript entries sent by the agent via data channel
+      room.on(RoomEvent.DataReceived, (payload) => {
+        try {
+          const msg = JSON.parse(new TextDecoder().decode(payload));
+          if (msg.role && msg.text) {
+            setTranscript((prev) => [...prev, { role: msg.role, text: msg.text, timestamp: msg.timestamp }]);
+          }
+        } catch { /* ignore malformed packets */ }
+      });
+
+      // Track which participant is actively speaking for the voice orb
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        setAgentSpeaking(speakers.some((p) => !p.isLocal));
+      });
+
+      // Subscribe to agent audio and play it through a hidden <audio> element
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        if (track.kind === Track.Kind.Audio && !participant.isLocal) {
+          const el = track.attach();
+          el.autoplay = true;
+          document.body.appendChild(el);
+          audioElRef.current = el;
+        }
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach((el) => el.remove());
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        roomRef.current = null;
+        doSubmit();
+      });
+
+      room.on(RoomEvent.MediaDevicesError, (e) => {
+        setPhase("error");
+        setErrorMsg("Microphone access was denied. Allow microphone access in your browser settings, then try again.");
+      });
+
+      await room.connect(ws_url, token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      setPhase("live");
     } catch (e) {
       const msg = e?.message ?? String(e);
       setErrorMsg(
@@ -267,7 +292,7 @@ export default function SpeakingSession() {
 
   async function handleEnd() {
     setPhase("ending");
-    try { await convRef.current?.endSession(); } catch { /* onDisconnect handles submit */ }
+    try { await roomRef.current?.disconnect(); } catch { /* RoomEvent.Disconnected handles submit */ }
   }
 
   if (loading || !user) {
