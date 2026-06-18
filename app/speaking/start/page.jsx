@@ -17,8 +17,9 @@ const SpeakingSession = dynamic(
 export default function SpeakingStartPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState(() => getCachedProfile());
-  const [checking, setChecking] = useState(() => getCachedProfile() === null);
+  const [profile, setProfile] = useState(null);
+  const [checking, setChecking] = useState(true);
+  useEffect(() => { const c = getCachedProfile(); if (c) { setProfile(c); setChecking(false); } }, []);
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return; }

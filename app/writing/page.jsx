@@ -28,7 +28,8 @@ export default function WritingPage() {
   const router = useRouter();
   const [tests, setTests] = useState(null);
   const [history, setHistory] = useState([]);
-  const [profile, setProfile] = useState(() => getCachedProfile());
+  const [profile, setProfile] = useState(null);
+  useEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
   const [starting, setStarting] = useState(null);
 
   useEffect(() => {

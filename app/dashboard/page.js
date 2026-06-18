@@ -21,7 +21,7 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, setCachedProfile } from "@/lib/landingAccess";
 import { MOD_COLORS } from "@/lib/moduleColors";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
@@ -368,7 +368,7 @@ function SectionHead({ title, action }) {
   );
 }
 
-const PRO_CACHE_KEY = "ielts_is_pro";
+const DASH_CACHE_KEY = "ielts_dashboard_cache";
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -378,13 +378,14 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [target, setTargetState] = useState("7.0");
   const [tab, setTab] = useState("overview");
-  const [cachedIsPro] = useState(() => {
-    try { return localStorage.getItem(PRO_CACHE_KEY) === "1"; } catch { return false; }
-  });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(TARGET_KEY);
+    // Restore cached dashboard instantly after mount (avoids SSR mismatch)
+    try {
+      const cached = JSON.parse(localStorage.getItem(DASH_CACHE_KEY) || "null");
+      if (cached) { setData(cached); setFetching(false); }
+    } catch {}
+    const saved = localStorage.getItem(TARGET_KEY);
     if (saved) setTargetState(saved);
   }, []);
 
@@ -400,20 +401,22 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    setFetching(true);
     api.getDashboard()
       .then((d) => {
         if (!cancelled) {
           setData(d);
-          try { localStorage.setItem(PRO_CACHE_KEY, isProUser(d) ? "1" : "0"); } catch {}
+          setFetching(false);
+          try {
+            localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(d));
+            setCachedProfile(d);
+          } catch {}
         }
       })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Could not load dashboard."); })
-      .finally(() => { if (!cancelled) setFetching(false); });
+      .catch((err) => { if (!cancelled) { setError(err instanceof Error ? err.message : "Could not load dashboard."); setFetching(false); } });
     return () => { cancelled = true; };
   }, [user]);
 
-  const isPro = data ? isProUser(data) : cachedIsPro;
+  const isPro = isProUser(data);
   const isNew = isNewDashboardUser(data);
 
   const targetMet = useMemo(() => {

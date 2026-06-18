@@ -66,7 +66,8 @@ export default function SpeakingPage() {
   const router = useRouter();
   const [history, setHistory] = useState([]);
   const [starting, setStarting] = useState(false);
-  const [profile, setProfile] = useState(() => getCachedProfile());
+  const [profile, setProfile] = useState(null);
+  useEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
