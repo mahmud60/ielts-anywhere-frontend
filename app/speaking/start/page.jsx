@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
 
@@ -17,14 +17,14 @@ const SpeakingSession = dynamic(
 export default function SpeakingStartPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState(null);
-  const [checking, setChecking] = useState(true);
+  const [profile, setProfile] = useState(() => getCachedProfile());
+  const [checking, setChecking] = useState(() => getCachedProfile() === null);
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return; }
     if (!user) return;
     api.getMe()
-      .then(me => { setProfile(me); setChecking(false); })
+      .then(me => { setProfile(me); setCachedProfile(me); setChecking(false); })
       .catch(() => setChecking(false));
   }, [user, loading, router]);
 

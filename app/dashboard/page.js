@@ -368,6 +368,8 @@ function SectionHead({ title, action }) {
   );
 }
 
+const PRO_CACHE_KEY = "ielts_is_pro";
+
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -376,6 +378,9 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [target, setTargetState] = useState("7.0");
   const [tab, setTab] = useState("overview");
+  const [cachedIsPro] = useState(() => {
+    try { return localStorage.getItem(PRO_CACHE_KEY) === "1"; } catch { return false; }
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -397,13 +402,18 @@ export default function DashboardPage() {
     let cancelled = false;
     setFetching(true);
     api.getDashboard()
-      .then((d) => { if (!cancelled) setData(d); })
+      .then((d) => {
+        if (!cancelled) {
+          setData(d);
+          try { localStorage.setItem(PRO_CACHE_KEY, isProUser(d) ? "1" : "0"); } catch {}
+        }
+      })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Could not load dashboard."); })
       .finally(() => { if (!cancelled) setFetching(false); });
     return () => { cancelled = true; };
   }, [user]);
 
-  const isPro = isProUser(data);
+  const isPro = data ? isProUser(data) : cachedIsPro;
   const isNew = isNewDashboardUser(data);
 
   const targetMet = useMemo(() => {

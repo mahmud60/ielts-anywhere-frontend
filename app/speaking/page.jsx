@@ -9,7 +9,7 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
@@ -66,7 +66,7 @@ export default function SpeakingPage() {
   const router = useRouter();
   const [history, setHistory] = useState([]);
   const [starting, setStarting] = useState(false);
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCachedProfile());
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -77,7 +77,7 @@ export default function SpeakingPage() {
     Promise.all([
       api.getSpeakingHistory().catch(() => []),
       api.getMe().catch(() => null),
-    ]).then(([hist, me]) => { setHistory(hist); setProfile(me); });
+    ]).then(([hist, me]) => { setHistory(hist); setProfile(me); if (me) setCachedProfile(me); });
   }, [user]);
 
   const isPro = isProUser(profile);
