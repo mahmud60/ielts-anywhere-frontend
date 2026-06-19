@@ -425,23 +425,13 @@ export default function DashboardPage() {
     return data.best_overall != null && data.best_overall >= Number(target);
   }, [data, target]);
 
-  if ((loading || fetching) && !data) {
+  if (!data) {
     return (
       <DashboardShell title="Home">
-        <PetLoader fullScreen label="is fetching your progress" />
+        <DashboardSkeleton user={user} />
       </DashboardShell>
     );
   }
-  if (error && !data) {
-    return (
-      <DashboardShell title="Home">
-        <h1 style={{ fontSize: 22, marginBottom: 8 }}>Could not load dashboard</h1>
-        <p style={{ color: "#64748b", lineHeight: 1.6 }}>{error}</p>
-        <button className="da-btn da-btn-primary" onClick={() => router.push("/login")} style={{ marginTop: 8 }}>Back to login</button>
-      </DashboardShell>
-    );
-  }
-  if (!data) return null;
 
   const totalTests = data.total_tests ?? 0;
   const hasFullMock = (data.recent_sessions || []).some(

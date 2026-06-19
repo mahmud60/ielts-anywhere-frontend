@@ -45,7 +45,7 @@ export default function WritingPage() {
     api.getMe().then((me) => { setProfile(me); setCachedProfile(me); }).catch(() => {});
   }, [user]);
 
-  if (loading || tests === null) {
+  if (tests === null) {
     return (
       <DashboardShell title={"Writing Tests"}>
         <PetLoader fullScreen label="is warming up" />
