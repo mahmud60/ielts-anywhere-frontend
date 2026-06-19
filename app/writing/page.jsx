@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { useRouter } from "next/navigation";
 import { PenLine, Clock, Sparkles, FileText, ArrowRight, Lock, Crown, Award } from "lucide-react";
 
@@ -29,7 +31,7 @@ export default function WritingPage() {
   const [tests, setTests] = useState(null);
   const [history, setHistory] = useState([]);
   const [profile, setProfile] = useState(null);
-  useEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
   const [starting, setStarting] = useState(null);
 
   useEffect(() => {

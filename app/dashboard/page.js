@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { useRouter } from "next/navigation";
 import {
   TrendingUp,
@@ -379,14 +381,13 @@ export default function DashboardPage() {
   const [target, setTargetState] = useState("7.0");
   const [tab, setTab] = useState("overview");
 
-  useEffect(() => {
-    // Restore cached dashboard instantly after mount (avoids SSR mismatch)
+  useIsomorphicLayoutEffect(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(DASH_CACHE_KEY) || "null");
       if (cached) { setData(cached); setFetching(false); }
+      const saved = localStorage.getItem(TARGET_KEY);
+      if (saved) setTargetState(saved);
     } catch {}
-    const saved = localStorage.getItem(TARGET_KEY);
-    if (saved) setTargetState(saved);
   }, []);
 
   const setTarget = (v) => {

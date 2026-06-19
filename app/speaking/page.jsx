@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { useRouter } from "next/navigation";
 import {
   Mic, Clock, Sparkles, ArrowRight, Award, Volume2, MessageCircle,
@@ -67,7 +69,7 @@ export default function SpeakingPage() {
   const [history, setHistory] = useState([]);
   const [starting, setStarting] = useState(false);
   const [profile, setProfile] = useState(null);
-  useEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/AuthContext";
@@ -19,7 +21,7 @@ export default function SpeakingStartPage() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [checking, setChecking] = useState(true);
-  useEffect(() => { const c = getCachedProfile(); if (c) { setProfile(c); setChecking(false); } }, []);
+  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) { setProfile(c); setChecking(false); } }, []);
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return; }
