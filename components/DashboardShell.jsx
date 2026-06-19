@@ -24,9 +24,12 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/lib/AuthContext";
-import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
-import { isProUser, isAdminUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser, isAdminUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export const SHELL_CSS = `
 .da-shell{display:flex;min-height:100vh;background:#f6f7fb;color:#0f172a;font-family:var(--font-inter),system-ui,sans-serif;}
@@ -119,7 +122,7 @@ function nameFromUser(user) {
   return "there";
 }
 
-function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, collapsed = false, onToggle }) {
+function SidebarNav({ pathname, isPro, isAdmin, router, locked = false, meReady = false, onAfter = () => {}, collapsed = false, onToggle }) {
   const go = (path) => { router.push(path); onAfter(); };
   const fullMockHref = isPro ? "/tests?mode=full_mock" : "/pricing";
 
@@ -152,16 +155,16 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
         <div className="da-nav-label">Practice</div>
         {item(pathname.startsWith("/reading"), <BookOpen size={18} />, "Reading", () => go("/reading"))}
         {item(pathname.startsWith("/listening"), <Headphones size={18} />, "Listening", () => go("/listening"))}
-        {item(pathname.startsWith("/writing"), <PenLine size={18} />, "Writing", () => go("/writing"), !isPro)}
-        {item(pathname.startsWith("/speaking"), <Mic size={18} />, "Speaking", () => go("/speaking"), !isPro)}
+        {item(pathname.startsWith("/writing"), <PenLine size={18} />, "Writing", () => go("/writing"), locked)}
+        {item(pathname.startsWith("/speaking"), <Mic size={18} />, "Speaking", () => go("/speaking"), locked)}
         {item(pathname.startsWith("/diagnostic"), <ClipboardList size={18} />, "Diagnostic", () => go("/diagnostic"))}
-        {item(false, <Award size={18} />, "Full Mock Test", () => go(fullMockHref), !isPro)}
-        {item(pathname.startsWith("/learn/vocabulary"), <BookOpen size={18} />, "Vocabulary", () => go("/learn/vocabulary"), !isPro)}
-        {item(pathname.startsWith("/learn/grammar"), <SpellCheck2 size={18} />, "Grammar", () => go("/learn/grammar"), !isPro)}
+        {item(false, <Award size={18} />, "Full Mock Test", () => go(fullMockHref), locked)}
+        {item(pathname.startsWith("/learn/vocabulary"), <BookOpen size={18} />, "Vocabulary", () => go("/learn/vocabulary"), locked)}
+        {item(pathname.startsWith("/learn/grammar"), <SpellCheck2 size={18} />, "Grammar", () => go("/learn/grammar"), locked)}
       </div>
 
       <div className="da-foot">
-        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, isPro ? "Manage Plan" : "Upgrade to Pro", () => go("/pricing"))}
+        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, meReady ? (isPro ? "Manage Plan" : "Upgrade to Pro") : "Upgrade to Pro", () => go("/pricing"))}
         {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, "Admin", () => go("/admin"))}
         {item(pathname.startsWith("/affiliate"), <Users size={18} />, "Affiliate", () => go("/affiliate"))}
         {item(false, <LogOut size={18} />, "Log out", () => { onAfter(); logout(router); })}
@@ -185,13 +188,13 @@ export default function DashboardShell({ title, children }) {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname() || "";
-  const [me, setMe] = useState(null);
-  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setMe(c); }, []);
+  const { profile: me, ready: meReady } = useProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const closeDrawer = () => setMobileOpen(false);
 
-  useEffect(() => {
+  // Read persisted sidebar preference before first paint (no collapse flash).
+  useIsomorphicLayoutEffect(() => {
     if (typeof window === "undefined") return;
     setCollapsed(window.localStorage.getItem("ia_sidebar_collapsed") === "1");
   }, []);
@@ -203,13 +206,6 @@ export default function DashboardShell({ title, children }) {
       return next;
     });
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) return undefined;
-    api.getMe().then((d) => { if (!cancelled) { setMe(d); setCachedProfile(d); } }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [user]);
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
@@ -226,7 +222,8 @@ export default function DashboardShell({ title, children }) {
 
   const isPro = isProUser(me);
   const isAdmin = isAdminUser(me);
-  const navProps = { pathname, isPro, isAdmin, router };
+  const locked = meReady && !isPro;
+  const navProps = { pathname, isPro, isAdmin, router, locked, meReady };
 
   return (
     <div className="da-shell">
@@ -253,7 +250,7 @@ export default function DashboardShell({ title, children }) {
             {title && <span className="da-title-pill">{title}</span>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {isPro ? (
+            {meReady && (isPro ? (
               <span className="da-chip" style={{ background: "#eef2ff", color: "#4f46e5" }}>
                 <Crown size={13} /> Pro
               </span>
@@ -261,7 +258,7 @@ export default function DashboardShell({ title, children }) {
               <button className="da-pill-pro" onClick={() => router.push("/pricing")}>
                 <Crown size={15} /> Upgrade to Pro
               </button>
-            )}
+            ))}
             <div className="da-avatar">{nameFromUser(user).charAt(0).toUpperCase()}</div>
           </div>
         </header>

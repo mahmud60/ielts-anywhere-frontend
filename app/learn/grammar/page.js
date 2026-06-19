@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
-import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
 import PetLoader from "@/components/PetLoader";
 import DashboardShell from "@/components/DashboardShell";
 import { BookOpen, RefreshCw, Crown, Lightbulb, AlertCircle } from "lucide-react";
@@ -98,21 +99,14 @@ export default function GrammarPage() {
   const { user, loading: authLoading } = useAuth();
   const { lang, setLang } = useLang();
   const router = useRouter();
-  const [profile, setProfile] = useState(null);
+  const { profile } = useProfile();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
-
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    api.getMe().then((d) => { setProfile(d); setCachedProfile(d); }).catch(() => {});
-  }, [user]);
 
   useEffect(() => { setData(null); }, [lang]);
 

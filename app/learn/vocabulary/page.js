@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
 
@@ -801,15 +802,7 @@ export function VocabularyPractice({ showBack = true }) {
 
 export default function VocabularyPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [profile, setProfile] = useState(null);
-
-  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    api.getMe().then((d) => { setProfile(d); setCachedProfile(d); }).catch(() => {});
-  }, [user]);
+  const { profile } = useProfile();
 
   if (profile !== null && !isProUser(profile)) {
     return (

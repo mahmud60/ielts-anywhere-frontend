@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
-
-const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/AuthContext";
-import { api } from "@/lib/api";
-import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
 
@@ -19,19 +17,15 @@ const SpeakingSession = dynamic(
 export default function SpeakingStartPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState(null);
-  const [checking, setChecking] = useState(true);
-  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) { setProfile(c); setChecking(false); } }, []);
+  const { profile, settled } = useProfile();
 
   useEffect(() => {
-    if (!loading && !user) { router.push("/login"); return; }
-    if (!user) return;
-    api.getMe()
-      .then(me => { setProfile(me); setCachedProfile(me); setChecking(false); })
-      .catch(() => setChecking(false));
+    if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  if (loading || checking) {
+  // Block until we have a definitive answer: renders instantly from cache when
+  // present, otherwise waits for the network so a Pro user is never bounced.
+  if (loading || (profile === null && !settled)) {
     return <PetLoader fixed label="is warming up" accent={MOD_COLORS.speaking} />;
   }
 

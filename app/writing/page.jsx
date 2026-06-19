@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
-
-const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PenLine, Clock, Sparkles, FileText, ArrowRight, Lock, Crown, Award } from "lucide-react";
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
 
@@ -30,8 +29,7 @@ export default function WritingPage() {
   const router = useRouter();
   const [tests, setTests] = useState(null);
   const [history, setHistory] = useState([]);
-  const [profile, setProfile] = useState(null);
-  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+  const { profile } = useProfile();
   const [starting, setStarting] = useState(null);
 
   useEffect(() => {
@@ -42,7 +40,6 @@ export default function WritingPage() {
     if (!user) return;
     api.getWritingTests().then((d) => setTests(Array.isArray(d) ? d : [])).catch(() => setTests([]));
     api.getWritingAttempts().then(setHistory).catch(() => {});
-    api.getMe().then((me) => { setProfile(me); setCachedProfile(me); }).catch(() => {});
   }, [user]);
 
   if (tests === null) {

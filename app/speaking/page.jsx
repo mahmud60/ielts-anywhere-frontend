@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
-
-const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Mic, Clock, Sparkles, ArrowRight, Award, Volume2, MessageCircle,
@@ -11,10 +9,10 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
+import { isProUser } from "@/lib/landingAccess";
+import { useProfile } from "@/lib/useProfile";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import DashboardShell from "@/components/DashboardShell";
-import PetLoader from "@/components/PetLoader";
 
 const { accent: ACCENT, soft: SOFT, gradient: GRADIENT } = SPEAKING_THEME;
 
@@ -68,8 +66,7 @@ export default function SpeakingPage() {
   const router = useRouter();
   const [history, setHistory] = useState([]);
   const [starting, setStarting] = useState(false);
-  const [profile, setProfile] = useState(null);
-  useIsomorphicLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+  const { profile } = useProfile();
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -77,10 +74,7 @@ export default function SpeakingPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([
-      api.getSpeakingHistory().catch(() => []),
-      api.getMe().catch(() => null),
-    ]).then(([hist, me]) => { setHistory(hist); setProfile(me); if (me) setCachedProfile(me); });
+    api.getSpeakingHistory().then(setHistory).catch(() => {});
   }, [user]);
 
   const isPro = isProUser(profile);

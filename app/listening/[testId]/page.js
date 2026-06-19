@@ -11,7 +11,7 @@ import { MOD_COLORS } from "@/lib/moduleColors";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
-  return auth.currentUser.getIdToken(true);
+  return auth.currentUser.getIdToken();
 }
 
 export default function StandaloneListeningPage() {

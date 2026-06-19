@@ -14,7 +14,7 @@ import ErrorState from "@/components/ErrorState";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
-  return auth.currentUser.getIdToken(true);
+  return auth.currentUser.getIdToken();
 }
 
 export default function ReadingResultPage() {
