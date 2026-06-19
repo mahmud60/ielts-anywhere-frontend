@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  Crown,
   Headphones,
   Lightbulb,
   RefreshCw,
@@ -17,8 +18,65 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
+import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
+
+const ACCENT_VOC = "#8b5cf6";
+const GRADIENT_VOC = "linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)";
+
+const SAMPLE_WORDS = [
+  { word: "meticulous", definition: "Showing great attention to detail; very careful and precise.", topic: "Academic", module: "Writing" },
+  { word: "prevalent", definition: "Widespread in a particular area or at a particular time.", topic: "Society", module: "Reading" },
+  { word: "fluctuate", definition: "Rise and fall irregularly in number or amount.", topic: "Economics", module: "Listening" },
+];
+
+function VocabularyTeaser({ router }) {
+  return (
+    <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 20px 60px" }}>
+      <div style={{ textAlign: "center", padding: "40px 20px 32px" }}>
+        <div style={{ width: 72, height: 72, borderRadius: 20, background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+          <Crown size={32} color={ACCENT_VOC} />
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>IELTS Vocabulary Builder</h2>
+        <p style={{ color: "#64748b", lineHeight: 1.65, margin: "0 0 8px", maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+          Master 500+ high-frequency IELTS words with spaced repetition, fill-in-the-gap exercises, and AI-powered practice.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
+        {[["500+ words", "Across all modules"], ["Spaced repetition", "Smart review scheduling"], ["Gap exercises", "Learn in context"]].map(([title, sub]) => (
+          <div key={title} style={{ background: "#fff", border: "1px solid #e6e8ef", borderRadius: 14, padding: "14px 20px", minWidth: 150, textAlign: "center" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>{title}</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Sample words</div>
+        {SAMPLE_WORDS.map((w) => (
+          <div key={w.word} style={{ background: "#fff", border: "1px solid #e6e8ef", borderRadius: 14, padding: "16px 20px", marginBottom: 10, display: "flex", gap: 16, alignItems: "flex-start", filter: "blur(0px)" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontWeight: 800, fontSize: 16, color: "#0f172a" }}>{w.word}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, background: "#f5f3ff", color: ACCENT_VOC, borderRadius: 99, padding: "2px 8px" }}>{w.module}</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6, filter: "blur(3.5px)", userSelect: "none" }}>{w.definition}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{ textAlign: "center", fontSize: 13, color: "#94a3b8", marginTop: 6 }}>+ hundreds more across Listening, Reading, Writing & Speaking</div>
+      </div>
+
+      <div style={{ textAlign: "center" }}>
+        <button onClick={() => router.push("/pricing")} style={{ padding: "13px 36px", borderRadius: 12, border: "none", background: GRADIENT_VOC, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", boxShadow: "0 8px 24px -8px #8b5cf699" }}>
+          Unlock Vocabulary Builder
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const PROGRESS_KEY = "ielts_vocab_srs_v1";
 
@@ -742,6 +800,25 @@ export function VocabularyPractice({ showBack = true }) {
 }
 
 export default function VocabularyPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
+
+  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    api.getMe().then((d) => { setProfile(d); setCachedProfile(d); }).catch(() => {});
+  }, [user]);
+
+  if (profile !== null && !isProUser(profile)) {
+    return (
+      <DashboardShell title="Vocabulary Practice">
+        <VocabularyTeaser router={router} />
+      </DashboardShell>
+    );
+  }
+
   return (
     <DashboardShell title="Vocabulary Practice">
       <VocabularyPractice showBack={false} />

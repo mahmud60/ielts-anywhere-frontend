@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
+import { isProUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
 import PetLoader from "@/components/PetLoader";
 import DashboardShell from "@/components/DashboardShell";
 import { BookOpen, RefreshCw, Crown, Lightbulb, AlertCircle } from "lucide-react";
@@ -97,13 +98,21 @@ export default function GrammarPage() {
   const { user, loading: authLoading } = useAuth();
   const { lang, setLang } = useLang();
   const router = useRouter();
+  const [profile, setProfile] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setProfile(c); }, []);
+
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    api.getMe().then((d) => { setProfile(d); setCachedProfile(d); }).catch(() => {});
+  }, [user]);
 
   useEffect(() => { setData(null); }, [lang]);
 
@@ -123,6 +132,27 @@ export default function GrammarPage() {
       setLoading(false);
     }
   };
+
+  const isPro = isProUser(profile);
+
+  if (profile !== null && !isPro) {
+    return (
+      <DashboardShell title="Grammar Practice">
+        <div style={{ maxWidth: 540, margin: "60px auto", textAlign: "center", padding: "0 20px" }}>
+          <div style={{ width: 72, height: 72, borderRadius: 20, background: SOFT, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <Crown size={32} color={ACCENT} />
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>Grammar Practice is Pro</h2>
+          <p style={{ color: "#64748b", lineHeight: 1.65, margin: "0 0 24px" }}>
+            Unlock AI-generated grammar exercises tailored to IELTS patterns, with explanations and study tips.
+          </p>
+          <button onClick={() => router.push("/pricing")} style={{ padding: "13px 32px", borderRadius: 12, border: "none", background: GRADIENT, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+            Upgrade to Pro
+          </button>
+        </div>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell title="Grammar Practice">

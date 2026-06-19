@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
@@ -26,7 +26,7 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
-import { isProUser, isAdminUser } from "@/lib/landingAccess";
+import { isProUser, isAdminUser, getCachedProfile, setCachedProfile } from "@/lib/landingAccess";
 
 export const SHELL_CSS = `
 .da-shell{display:flex;min-height:100vh;background:#f6f7fb;color:#0f172a;font-family:var(--font-inter),system-ui,sans-serif;}
@@ -156,8 +156,8 @@ function SidebarNav({ pathname, isPro, isAdmin, router, onAfter = () => {}, coll
         {item(pathname.startsWith("/speaking"), <Mic size={18} />, "Speaking", () => go("/speaking"), !isPro)}
         {item(pathname.startsWith("/diagnostic"), <ClipboardList size={18} />, "Diagnostic", () => go("/diagnostic"))}
         {item(false, <Award size={18} />, "Full Mock Test", () => go(fullMockHref), !isPro)}
-        {isPro && item(pathname.startsWith("/learn/vocabulary"), <BookOpen size={18} />, "Vocabulary", () => go("/learn/vocabulary"))}
-        {isPro && item(pathname.startsWith("/learn/grammar"), <SpellCheck2 size={18} />, "Grammar", () => go("/learn/grammar"))}
+        {item(pathname.startsWith("/learn/vocabulary"), <BookOpen size={18} />, "Vocabulary", () => go("/learn/vocabulary"), !isPro)}
+        {item(pathname.startsWith("/learn/grammar"), <SpellCheck2 size={18} />, "Grammar", () => go("/learn/grammar"), !isPro)}
       </div>
 
       <div className="da-foot">
@@ -186,6 +186,7 @@ export default function DashboardShell({ title, children }) {
   const router = useRouter();
   const pathname = usePathname() || "";
   const [me, setMe] = useState(null);
+  useLayoutEffect(() => { const c = getCachedProfile(); if (c) setMe(c); }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const closeDrawer = () => setMobileOpen(false);
@@ -206,7 +207,7 @@ export default function DashboardShell({ title, children }) {
   useEffect(() => {
     let cancelled = false;
     if (!user) return undefined;
-    api.getMe().then((d) => { if (!cancelled) setMe(d); }).catch(() => {});
+    api.getMe().then((d) => { if (!cancelled) { setMe(d); setCachedProfile(d); } }).catch(() => {});
     return () => { cancelled = true; };
   }, [user]);
 
