@@ -3,21 +3,14 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
 import {
   AlertCircle,
-  ArrowRight,
   BookOpen,
   CheckCircle2,
-  Eye,
-  EyeOff,
   Headphones,
-  LockKeyhole,
-  Mail,
   Mic,
   PenLine,
   ShieldCheck,
@@ -64,12 +57,8 @@ function cleanAuthError(err: unknown) {
 
 function LoginContent() {
   const { user, loading: authLoading } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -100,28 +89,6 @@ function LoginContent() {
     router.replace("/dashboard");
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      if (!auth) {
-        setError("Firebase is not configured. Add the Firebase environment variables and restart the app.");
-        return;
-      }
-      if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-      await afterAuth();
-    } catch (err) {
-      setError(cleanAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signInWithGoogle = async () => {
     setLoading(true);
     setError("");
@@ -138,8 +105,6 @@ function LoginContent() {
       setLoading(false);
     }
   };
-
-  const primaryLabel = loading ? "Please wait" : isRegister ? "Create account" : "Sign in";
 
   return (
     <main className="login-shell">
@@ -203,32 +168,11 @@ function LoginContent() {
         .login-google:hover:not(:disabled){background:#f8fafc;border-color:#cbd5e1}
         .login-primary{background:${PRIMARY};color:#fff}
         .login-primary:hover:not(:disabled){background:#4338ca;box-shadow:0 8px 16px rgba(79,70,229,.18)}
-        .login-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#94a3b8;font-size:12px;font-weight:650}
-        .login-divider:before,.login-divider:after{content:"";height:1px;background:${BORDER};flex:1}
-        .login-label{display:block;color:#334155;font-size:12.5px;font-weight:750;margin-bottom:7px}
-        .login-field{
-          min-height:44px;border:1px solid #dbe1ea;border-radius:11px;background:#fff;
-          display:flex;align-items:center;gap:10px;padding:0 12px;transition:border-color .16s,outline .16s;
-        }
-        .login-field:focus-within{border-color:${PRIMARY}}
-        .login-field svg{color:#64748b;flex-shrink:0}
-        .login-field input{
-          border:none;outline:none;background:transparent;width:100%;min-width:0;color:${INK};
-          font-size:14px;font-family:inherit;padding:11px 0;
-        }
-        .login-field input::placeholder{color:#64748b}
-        .login-password-toggle{
-          border:none;background:transparent;color:#64748b;display:flex;align-items:center;justify-content:center;
-          padding:4px;cursor:pointer;border-radius:7px;
-        }
-        .login-password-toggle:hover{background:#f1f5f9;color:${INK}}
         .login-alert{
           display:flex;gap:9px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;
           border-radius:11px;padding:11px 12px;font-size:13px;line-height:1.45;margin-bottom:16px;
         }
         .login-env{margin-bottom:18px}
-        .login-toggle{margin:18px 0 0;text-align:center;color:${MUTED};font-size:13.5px}
-        .login-link{border:none;background:transparent;color:${PRIMARY};font-weight:800;font-size:13.5px;cursor:pointer;padding:0}
         .login-footnote{margin:18px auto 0;text-align:center;color:#64748b;font-size:12px;line-height:1.55;max-width:360px}
         @media(max-width:900px){
           .login-shell{display:block;background:#fff}
@@ -281,7 +225,7 @@ function LoginContent() {
         </div>
       </section>
 
-      <section className="login-form-panel" aria-label={isRegister ? "Create account" : "Sign in"}>
+      <section className="login-form-panel" aria-label="Sign in">
         <div style={{ width: "100%", maxWidth: 430 }}>
           <div className="login-mobile-brand">
             <div className="login-mobile-mark">IA</div>
@@ -290,12 +234,8 @@ function LoginContent() {
 
           <div className="login-card">
             <div className="login-heading">
-              <h2>{isRegister ? "Create your account" : "Welcome back"}</h2>
-              <p>
-                {isRegister
-                  ? "Start your IELTS preparation workspace."
-                  : "Continue your practice, reports, and study plan."}
-              </p>
+              <h2>Welcome to IELTSAnywhere</h2>
+              <p>Sign in to continue your practice, reports, and study plan.</p>
             </div>
 
             {!isFirebaseConfigured && (
@@ -308,6 +248,13 @@ function LoginContent() {
               </div>
             )}
 
+            {error && (
+              <div className="login-alert" role="alert">
+                <AlertCircle size={17} />
+                <span>{error}</span>
+              </div>
+            )}
+
             <button
               type="button"
               className="login-button login-google"
@@ -315,82 +262,8 @@ function LoginContent() {
               disabled={loading || !isFirebaseConfigured}
             >
               <GoogleIcon />
-              Continue with Google
+              {loading ? "Please wait…" : "Continue with Google"}
             </button>
-
-            <div className="login-divider">or use email</div>
-
-            <form onSubmit={submit}>
-              <div style={{ marginBottom: 14 }}>
-                <label className="login-label" htmlFor="email">Email address</label>
-                <div className="login-field">
-                  <Mail size={17} />
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 16 }}>
-                <label className="login-label" htmlFor="password">Password</label>
-                <div className="login-field">
-                  <LockKeyhole size={17} />
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder={isRegister ? "At least 6 characters" : "Your password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    required
-                    autoComplete={isRegister ? "new-password" : "current-password"}
-                  />
-                  <button
-                    type="button"
-                    className="login-password-toggle"
-                    onClick={() => setShowPassword((current) => !current)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="login-alert" role="alert">
-                  <AlertCircle size={17} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="login-button login-primary"
-                disabled={loading || !isFirebaseConfigured}
-              >
-                {primaryLabel}
-                {!loading && <ArrowRight size={16} />}
-              </button>
-            </form>
-
-            <p className="login-toggle">
-              {isRegister ? "Already have an account? " : "No account yet? "}
-              <button
-                type="button"
-                className="login-link"
-                onClick={() => {
-                  setIsRegister((current) => !current);
-                  setError("");
-                }}
-              >
-                {isRegister ? "Sign in" : "Create one"}
-              </button>
-            </p>
           </div>
 
           <p className="login-footnote">
