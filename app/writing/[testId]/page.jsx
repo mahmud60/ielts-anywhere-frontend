@@ -9,6 +9,7 @@ import { getClientApiBase } from "@/lib/clientApiBase";
 import { api } from "@/lib/api";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { analytics } from "@/lib/analytics";
 
 function getToken() {
   if (!auth?.currentUser) return Promise.reject(new Error("Not signed in"));
@@ -49,6 +50,12 @@ export default function StandaloneWritingPage() {
       router.replace("/pricing");
     }
   }, [profile, profileLoading, router]);
+
+  useEffect(() => {
+    if (testId && !profileLoading && isProUser(profile)) {
+      analytics.capture("test_started", { module: "writing", test_id: testId });
+    }
+  }, [testId, profileLoading, profile]);
 
   if (loading || profileLoading || !user) {
     return <PetLoader fixed label="is loading your test" accent={MOD_COLORS.writing} />;
