@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { logout } from "@/lib/auth";
 import { isProUser, isAdminUser } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
+import { analytics } from "@/lib/analytics";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -164,7 +165,7 @@ function SidebarNav({ pathname, isPro, isAdmin, router, locked = false, meReady 
       </div>
 
       <div className="da-foot">
-        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, meReady ? (isPro ? "Manage Plan" : "Upgrade to Pro") : "Upgrade to Pro", () => go("/pricing"))}
+        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, meReady ? (isPro ? "Manage Plan" : "Upgrade to Pro") : "Upgrade to Pro", () => { if (!isPro) analytics.capture("upgrade_clicked", { source: "sidebar" }); go("/pricing"); })}
         {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, "Admin", () => go("/admin"))}
         {item(pathname.startsWith("/affiliate"), <Users size={18} />, "Affiliate", () => go("/affiliate"))}
         {item(false, <LogOut size={18} />, "Log out", () => { onAfter(); logout(router); })}
@@ -255,7 +256,7 @@ export default function DashboardShell({ title, children }) {
                 <Crown size={13} /> Pro
               </span>
             ) : (
-              <button className="da-pill-pro" onClick={() => router.push("/pricing")}>
+              <button className="da-pill-pro" onClick={() => { analytics.capture("upgrade_clicked", { source: "topbar" }); router.push("/pricing"); }}>
                 <Crown size={15} /> Upgrade to Pro
               </button>
             ))}
