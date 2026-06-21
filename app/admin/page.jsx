@@ -10,6 +10,7 @@ import { UsersTab } from "@/components/Admin/UsersTab";
 import { logout } from "@/lib/auth";
 import { PricingTab } from "@/components/Admin/PricingTab";
 import { AffiliatesTab } from "@/components/Admin/AffiliatesTab";
+import { AiUsageTab } from "@/components/Admin/AiUsageTab";
 import PetLoader from "@/components/PetLoader";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ const NAV = [
   { id: "tests",     label: "Tests" },
   { id: "questions", label: "Questions & Audio" },
   { id: "pricing", label: "Pricing & Limits" },
+  { id: "ai-usage", label: "AI Usage" },
   { id: "affiliates", label: "Affiliates" },
 ];
 
@@ -137,6 +139,7 @@ export default function AdminPage() {
           {activeTab === "tests" && <TestsTab api={api} />}
           {activeTab === "questions" && <QuestionsTab api={api} />}
           {activeTab === "pricing" && <PricingTab api={api} />}
+          {activeTab === "ai-usage" && <AiUsageTab api={api} />}
           {activeTab === "affiliates" && <AffiliatesTab />}
         </div>
       </div>
