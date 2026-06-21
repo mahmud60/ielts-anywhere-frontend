@@ -1,12 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Search, ArrowRight, Award, CheckCircle2, RefreshCw } from "lucide-react";
 
 import { useAuth } from "@/lib/AuthContext";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
+
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+function buildAttemptMap(attempts) {
+  const map = new Map();
+  if (Array.isArray(attempts)) {
+    for (const a of attempts) {
+      const tid = a.test_id;
+      if (tid == null) continue;
+      const existing = map.get(tid);
+      if (!existing || (a.overall_band ?? 0) > (existing.overall_band ?? 0)) {
+        map.set(tid, a);
+      }
+    }
+  }
+  return map;
+}
+
+function readCache(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
+}
+function writeCache(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
 
 const SHIMMER_ID = "exam-list-shimmer";
 function useShimmerStyle() {
@@ -56,9 +81,12 @@ function bandColor(b) {
  */
 export default function ExamListPage(config) {
   const {
-    title, subtitle, accent, accentSoft, gradient, icon, duration,
+    moduleKey, title, subtitle, accent, accentSoft, gradient, icon, duration,
     facts = [], fetchTests, fetchAttempts, startPath, getDescription, getMeta,
   } = config;
+
+  const TESTS_KEY = `ielts_examlist_tests_${moduleKey}`;
+  const ATTEMPTS_KEY = `ielts_examlist_attempts_${moduleKey}`;
 
   useShimmerStyle();
 
@@ -69,6 +97,15 @@ export default function ExamListPage(config) {
   const [starting, setStarting] = useState(null);
   const [query, setQuery] = useState("");
 
+  // Hydrate tests + attempts from cache before first paint so completed bands
+  // render instantly on revisit/reload instead of popping in after the fetch.
+  useIsomorphicLayoutEffect(() => {
+    const cachedTests = readCache(TESTS_KEY);
+    if (cachedTests) setTests(cachedTests);
+    const cachedAttempts = readCache(ATTEMPTS_KEY);
+    if (cachedAttempts) setAttemptMap(buildAttemptMap(cachedAttempts));
+  }, [TESTS_KEY, ATTEMPTS_KEY]);
+
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
@@ -78,30 +115,28 @@ export default function ExamListPage(config) {
     let cancelled = false;
 
     fetchTests()
-      .then((d) => { if (!cancelled) setTests(Array.isArray(d) ? d : []); })
-      .catch(() => { if (!cancelled) setTests([]); });
+      .then((d) => {
+        if (cancelled) return;
+        const list = Array.isArray(d) ? d : [];
+        setTests(list);
+        writeCache(TESTS_KEY, list);
+      })
+      .catch(() => { if (!cancelled) setTests((prev) => (prev == null ? [] : prev)); });
 
     if (fetchAttempts) {
       fetchAttempts()
         .then((attempts) => {
           if (cancelled) return;
-          const map = new Map();
-          if (Array.isArray(attempts)) {
-            for (const a of attempts) {
-              const tid = a.test_id;
-              if (tid == null) continue;
-              const existing = map.get(tid);
-              if (!existing || (a.overall_band ?? 0) > (existing.overall_band ?? 0)) {
-                map.set(tid, a);
-              }
-            }
-          }
-          setAttemptMap(map);
+          setAttemptMap(buildAttemptMap(attempts));
+          if (Array.isArray(attempts)) writeCache(ATTEMPTS_KEY, attempts);
         })
         .catch(() => {});
     }
 
     return () => { cancelled = true; };
+    // Intentionally runs only when `user` becomes available; the fetchers are
+    // fresh closures each render and the cache keys are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const filtered = useMemo(() => {
@@ -114,7 +149,7 @@ export default function ExamListPage(config) {
     );
   }, [tests, query, getDescription]);
 
-  if (loading) {
+  if (loading && tests === null) {
     return (
       <DashboardShell title={title}>
         <PetLoader fullScreen label="is loading your tests" />
