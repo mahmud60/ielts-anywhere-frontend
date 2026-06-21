@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft, Mic, Volume2, Clock,
-  Headphones, Wifi, PhoneOff, RotateCcw, Sparkles,
+  Headphones, PhoneOff, RotateCcw, Sparkles,
 } from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
 
@@ -22,7 +22,7 @@ const PARTS = [
 ];
 
 const CHECKS = [
-  { key: "quiet", label: "Quiet room", icon: Wifi },
+  { key: "quiet", label: "Headphones on", icon: Headphones },
   { key: "mic", label: "Mic ready", icon: Mic },
   { key: "time", label: "15 min free", icon: Clock },
 ];

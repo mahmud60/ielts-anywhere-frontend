@@ -269,7 +269,7 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
           {phase === "error"      && "Connection error"}
         </p>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 24, textAlign: "center", maxWidth: 340 }}>
-          {phase === "idle"  && "The AI examiner will guide you through all three parts of the IELTS speaking test."}
+          {phase === "idle"  && "The AI examiner will guide you through all three parts. Use headphones to avoid echo."}
           {phase === "waiting" && "Hang tight — your examiner will greet you in a moment. No need to speak yet."}
           {phase === "live"  && (agentSpeaking ? "Listen carefully. Respond when the examiner finishes." : "Speak clearly into your microphone.")}
           {phase === "error" && (errorMsg ?? "")}
