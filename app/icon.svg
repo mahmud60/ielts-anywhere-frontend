@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="IELTSAnywhere">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7c6cf5"/>
+      <stop offset="1" stop-color="#5b4bd6"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef0ff"/>
+      <stop offset="1" stop-color="#dcd9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#eef2ff"/>
+  <g transform="translate(64 66) scale(0.78) translate(-64 -64)">
+    <path d="M40 30 L34 8 L56 24 Z" fill="#5b4bd6"/>
+    <path d="M88 30 L94 8 L72 24 Z" fill="#5b4bd6"/>
+    <ellipse cx="64" cy="66" rx="42" ry="46" fill="url(#body)"/>
+    <ellipse cx="64" cy="78" rx="26" ry="30" fill="url(#belly)"/>
+    <path d="M24 60 q-6 22 8 38 q4 -22 0 -40 Z" fill="#5141c9"/>
+    <path d="M104 60 q6 22 -8 38 q-4 -22 0 -40 Z" fill="#5141c9"/>
+    <circle cx="48" cy="56" r="18" fill="#fff"/>
+    <circle cx="80" cy="56" r="18" fill="#fff"/>
+    <circle cx="51" cy="58" r="8" fill="#1e1b4b"/>
+    <circle cx="83" cy="58" r="8" fill="#1e1b4b"/>
+    <circle cx="48" cy="54" r="2.6" fill="#fff"/>
+    <circle cx="80" cy="54" r="2.6" fill="#fff"/>
+    <path d="M64 64 L57 73 L71 73 Z" fill="#fbbf24"/>
+    <path d="M64 73 L59 78 L69 78 Z" fill="#f59e0b"/>
+    <path d="M52 110 l-6 8 M52 110 l0 9 M52 110 l6 8" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+    <path d="M76 110 l-6 8 M76 110 l0 9 M76 110 l6 8" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
