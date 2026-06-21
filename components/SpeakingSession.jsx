@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ChevronLeft, Mic, Volume2, Clock, CheckCircle2,
+  ChevronLeft, Mic, Volume2, Clock,
   Headphones, Wifi, PhoneOff, RotateCcw, Sparkles,
 } from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
@@ -171,6 +171,7 @@ export default function SpeakingSession() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [transcript, setTranscript] = useState([]);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [examinerJoined, setExaminerJoined] = useState(false);
   const [checks, setChecks] = useState({ quiet: false, mic: false, time: false });
 
   const roomNameRef = useRef(null);
@@ -179,15 +180,20 @@ export default function SpeakingSession() {
   const roomRef = useRef(null);
   const audioElRef = useRef(null);
   const transcriptEndRef = useRef(null);
+  const agentWaitTimerRef = useRef(null);
+  const abortedRef = useRef(false);
+  const phaseRef = useRef("idle");
 
   const isLive = phase === "live";
-  const isConnecting = phase === "connecting" || phase === "ending";
+  const isWaiting = phase === "waiting";
+  const isConnecting = phase === "connecting" || phase === "waiting" || phase === "ending";
   const { display: elapsed, seconds } = useElapsedTimer(isLive);
   const activePart = estimatePart(seconds);
   const userSpeaking = isLive && !agentSpeaking;
   const allChecked = checks.quiet && checks.mic && checks.time;
   const stageActive = isLive || isConnecting;
 
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -221,6 +227,7 @@ export default function SpeakingSession() {
   // Cleanup LiveKit room and audio element on unmount
   useEffect(() => {
     return () => {
+      if (agentWaitTimerRef.current) clearTimeout(agentWaitTimerRef.current);
       roomRef.current?.disconnect();
       if (audioElRef.current) { audioElRef.current.remove(); audioElRef.current = null; }
     };
@@ -228,7 +235,19 @@ export default function SpeakingSession() {
 
   async function handleStart() {
     setPhase("connecting");
+    setExaminerJoined(false);
+    abortedRef.current = false;
     const doSubmit = submitAndRedirect;
+
+    // Promote to the live conversation the instant the examiner actually
+    // joins/speaks — never before, so we don't tell the user it's their turn
+    // while there's still dead air.
+    const goLive = () => {
+      if (agentWaitTimerRef.current) { clearTimeout(agentWaitTimerRef.current); agentWaitTimerRef.current = null; }
+      setExaminerJoined(true);
+      setPhase((p) => (p === "waiting" ? "live" : p));
+    };
+
     try {
       const { token, room_name, ws_url } = await api.lkGetToken();
       roomNameRef.current = room_name;
@@ -243,6 +262,7 @@ export default function SpeakingSession() {
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
           if (msg.role && msg.text) {
+            if (msg.role === "agent") goLive();
             setTranscript((prev) => [...prev, { role: msg.role, text: msg.text, timestamp: msg.timestamp }]);
           }
         } catch { /* ignore malformed packets */ }
@@ -250,8 +270,13 @@ export default function SpeakingSession() {
 
       // Track which participant is actively speaking for the voice orb
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-        setAgentSpeaking(speakers.some((p) => !p.isLocal));
+        const agentTalking = speakers.some((p) => !p.isLocal);
+        setAgentSpeaking(agentTalking);
+        if (agentTalking) goLive();
       });
+
+      // Examiner joined the room (it may still take a beat to start speaking)
+      room.on(RoomEvent.ParticipantConnected, () => setExaminerJoined(true));
 
       // Subscribe to agent audio and play it through a hidden <audio> element
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
@@ -268,17 +293,30 @@ export default function SpeakingSession() {
 
       room.on(RoomEvent.Disconnected, () => {
         roomRef.current = null;
+        if (abortedRef.current) return;   // cancelled/timed-out — nothing to score
         doSubmit();
       });
 
-      room.on(RoomEvent.MediaDevicesError, (e) => {
+      room.on(RoomEvent.MediaDevicesError, () => {
         setPhase("error");
         setErrorMsg("Microphone access was denied. Allow microphone access in your browser settings, then try again.");
       });
 
       await room.connect(ws_url, token);
       await room.localParticipant.setMicrophoneEnabled(true);
-      setPhase("live");
+
+      // Connected to the room, but the AI examiner still has to be dispatched,
+      // join, and generate its greeting. Show a "waiting for examiner" state
+      // until then — and fail gracefully if it never arrives (e.g. at capacity).
+      setPhase("waiting");
+      agentWaitTimerRef.current = setTimeout(() => {
+        if (phaseRef.current !== "waiting") return;
+        abortedRef.current = true;
+        setErrorMsg("Your examiner didn't connect in time — they may be busy right now. Please try again in a moment.");
+        setPhase("error");
+        try { roomRef.current?.disconnect(); } catch { /* noop */ }
+        roomRef.current = null;
+      }, 30000);
     } catch (e) {
       const msg = e?.message ?? String(e);
       setErrorMsg(
@@ -295,6 +333,14 @@ export default function SpeakingSession() {
     try { await roomRef.current?.disconnect(); } catch { /* RoomEvent.Disconnected handles submit */ }
   }
 
+  function handleCancelWait() {
+    abortedRef.current = true;
+    if (agentWaitTimerRef.current) { clearTimeout(agentWaitTimerRef.current); agentWaitTimerRef.current = null; }
+    try { roomRef.current?.disconnect(); } catch { /* noop */ }
+    roomRef.current = null;
+    setPhase("idle");
+  }
+
   if (loading || !user) {
     return <PetLoader fixed label="is loading your test" accent={ACCENT} bg="#0f0a1a" />;
   }
@@ -305,6 +351,10 @@ export default function SpeakingSession() {
   const status = {
     idle: { title: "IELTS Speaking Test", hint: "Your AI examiner is ready. Confirm you're set up, then begin the full 3-part test." },
     connecting: { title: "Connecting…", hint: "Establishing a secure voice line with your examiner." },
+    waiting: {
+      title: examinerJoined ? "Examiner is joining…" : "Connecting you with your examiner…",
+      hint: "Hang tight — your examiner will greet you in a moment. No need to speak yet.",
+    },
     live: agentSpeaking
       ? { title: "Listen to the examiner", hint: "Wait until they finish, then respond in full sentences." }
       : { title: "Your turn to speak", hint: "Speak clearly and naturally — your answers are recorded live." },
@@ -313,7 +363,9 @@ export default function SpeakingSession() {
   }[phase] || { title: "", hint: "" };
 
   const livePillClass = isLive ? "live" : isConnecting ? "wait" : "ready";
-  const livePillLabel = isLive ? "Live session" : isConnecting ? "Connecting" : "Ready";
+  const livePillLabel = isLive
+    ? "Live session"
+    : isWaiting ? "Examiner joining" : phase === "connecting" ? "Connecting" : phase === "ending" ? "Finishing" : "Ready";
 
   return (
     <div className="st-root">
@@ -412,6 +464,12 @@ export default function SpeakingSession() {
                 <ChevronLeft size={15} /> Exit
               </button>
             </div>
+          )}
+
+          {isWaiting && (
+            <button type="button" className="st-end" onClick={handleCancelWait}>
+              <PhoneOff size={15} /> Cancel
+            </button>
           )}
 
           {isLive && (

@@ -60,20 +60,26 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
   const [errorMsg, setErrorMsg]     = useState(null);
   const [transcript, setTranscript] = useState([]);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [examinerJoined, setExaminerJoined] = useState(false);
 
   const roomNameRef   = useRef(null);
   const submittedRef  = useRef(false);
   const transcriptRef = useRef([]);
   const roomRef       = useRef(null);
   const audioElRef    = useRef(null);
+  const agentWaitTimerRef = useRef(null);
+  const abortedRef    = useRef(false);
+  const phaseRef      = useRef("idle");
 
   const timerRunning = phase === "live";
   const elapsed = useElapsedTimer(timerRunning);
 
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
   useEffect(() => {
     return () => {
+      if (agentWaitTimerRef.current) clearTimeout(agentWaitTimerRef.current);
       roomRef.current?.disconnect();
       if (audioElRef.current) { audioElRef.current.remove(); audioElRef.current = null; }
     };
@@ -102,7 +108,16 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
 
   async function handleStart() {
     setPhase("connecting");
+    setExaminerJoined(false);
+    abortedRef.current = false;
     const doSubmit = submitAndComplete;
+
+    const goLive = () => {
+      if (agentWaitTimerRef.current) { clearTimeout(agentWaitTimerRef.current); agentWaitTimerRef.current = null; }
+      setExaminerJoined(true);
+      setPhase(p => (p === "waiting" ? "live" : p));
+    };
+
     try {
       const { token, room_name, ws_url } = await api.lkGetToken();
       roomNameRef.current = room_name;
@@ -116,14 +131,19 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
           if (msg.role && msg.text) {
+            if (msg.role === "agent") goLive();
             setTranscript(prev => [...prev, { role: msg.role, text: msg.text, timestamp: msg.timestamp }]);
           }
         } catch { /* ignore malformed packets */ }
       });
 
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-        setAgentSpeaking(speakers.some(p => !p.isLocal));
+        const agentTalking = speakers.some(p => !p.isLocal);
+        setAgentSpeaking(agentTalking);
+        if (agentTalking) goLive();
       });
+
+      room.on(RoomEvent.ParticipantConnected, () => setExaminerJoined(true));
 
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
         if (track.kind === Track.Kind.Audio && !participant.isLocal) {
@@ -139,6 +159,7 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
 
       room.on(RoomEvent.Disconnected, () => {
         roomRef.current = null;
+        if (abortedRef.current) return;
         doSubmit();
       });
 
@@ -149,7 +170,17 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
 
       await room.connect(ws_url, token);
       await room.localParticipant.setMicrophoneEnabled(true);
-      setPhase("live");
+
+      // Wait for the examiner to actually join/speak before going live.
+      setPhase("waiting");
+      agentWaitTimerRef.current = setTimeout(() => {
+        if (phaseRef.current !== "waiting") return;
+        abortedRef.current = true;
+        setErrorMsg("Your examiner didn't connect in time — they may be busy right now. Please try again in a moment.");
+        setPhase("error");
+        try { roomRef.current?.disconnect(); } catch { /* noop */ }
+        roomRef.current = null;
+      }, 30000);
     } catch (e) {
       const msg = e?.message ?? String(e);
       setErrorMsg(
@@ -166,8 +197,17 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
     try { await roomRef.current?.disconnect(); } catch {}
   }
 
+  function handleCancelWait() {
+    abortedRef.current = true;
+    if (agentWaitTimerRef.current) { clearTimeout(agentWaitTimerRef.current); agentWaitTimerRef.current = null; }
+    try { roomRef.current?.disconnect(); } catch { /* noop */ }
+    roomRef.current = null;
+    setPhase("idle");
+  }
+
   const isLive       = phase === "live";
-  const isConnecting = phase === "connecting" || phase === "ending";
+  const isWaiting    = phase === "waiting";
+  const isConnecting = phase === "connecting" || phase === "waiting" || phase === "ending";
   const isScoring    = phase === "scoring";
   const userSpeaking = isLive && !agentSpeaking;
   const ringColor    = agentSpeaking ? PRIMARY : userSpeaking ? "#a78bfa" : MUTED;
@@ -195,7 +235,7 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
               background: isLive ? GREEN : isConnecting ? AMBER : MUTED,
               ...(isLive ? { animation: "pulse 1.5s ease-in-out infinite" } : {}),
             }} />
-            {isLive ? "Live" : isConnecting ? "Connecting…" : "Ready"}
+            {isLive ? "Live" : isWaiting ? "Examiner joining" : isConnecting ? "Connecting…" : "Ready"}
           </div>
         </div>
       </div>
@@ -223,12 +263,14 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
         <p style={{ fontSize: 15, color: TEXT, fontWeight: 600, marginBottom: 4, textAlign: "center" }}>
           {phase === "idle"       && "Ready to start your speaking test"}
           {phase === "connecting" && "Connecting to AI examiner…"}
+          {phase === "waiting"    && (examinerJoined ? "Examiner is joining…" : "Connecting you with your examiner…")}
           {phase === "live"       && (agentSpeaking ? "Examiner is speaking" : "Your turn to speak")}
           {phase === "ending"     && "Ending session…"}
           {phase === "error"      && "Connection error"}
         </p>
         <p style={{ fontSize: 13, color: MUTED, marginBottom: 24, textAlign: "center", maxWidth: 340 }}>
           {phase === "idle"  && "The AI examiner will guide you through all three parts of the IELTS speaking test."}
+          {phase === "waiting" && "Hang tight — your examiner will greet you in a moment. No need to speak yet."}
           {phase === "live"  && (agentSpeaking ? "Listen carefully. Respond when the examiner finishes." : "Speak clearly into your microphone.")}
           {phase === "error" && (errorMsg ?? "")}
         </p>
@@ -249,6 +291,16 @@ export default function SpeakingModule({ testSessionId, onComplete }) {
             color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
           }}>
             Try Again
+          </button>
+        )}
+
+        {isWaiting && (
+          <button onClick={handleCancelWait} style={{
+            padding: "11px 28px", borderRadius: 8, background: "#fff",
+            border: "1px solid #fca5a5", color: "#dc2626", fontWeight: 600,
+            fontSize: 14, cursor: "pointer",
+          }}>
+            Cancel
           </button>
         )}
 
