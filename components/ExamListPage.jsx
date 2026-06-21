@@ -120,6 +120,16 @@ export default function ExamListPage(config) {
     );
   }, [tests, query, getDescription]);
 
+  // Average of the user's best band across completed tests (null if none taken).
+  const { avgBand, completedCount } = useMemo(() => {
+    const bands = (tests || []).map((t) => t.best_band).filter((b) => b != null);
+    if (!bands.length) return { avgBand: null, completedCount: 0 };
+    return {
+      avgBand: bands.reduce((sum, b) => sum + b, 0) / bands.length,
+      completedCount: bands.length,
+    };
+  }, [tests]);
+
   if (loading && tests === null) {
     return (
       <DashboardShell title={title}>
@@ -132,6 +142,11 @@ export default function ExamListPage(config) {
   const start = (test) => { setStarting(test.id); router.push(startPath(test)); };
 
   const GRID = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 16 };
+
+  // Prepend the user's average band to the hero facts once they've taken a test.
+  const heroFacts = avgBand != null
+    ? [{ icon: <Award size={12} />, label: `Avg band · ${completedCount} taken`, value: avgBand.toFixed(1) }, ...facts]
+    : facts;
 
   let listContent;
   if (isLoadingTests) {
@@ -288,7 +303,7 @@ export default function ExamListPage(config) {
           <p style={{ fontSize: 14, lineHeight: 1.55, opacity: .92, margin: 0, maxWidth: 520 }}>{subtitle}</p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {facts.map((f) => (
+          {heroFacts.map((f) => (
             <div key={f.label} style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "10px 14px", minWidth: 96 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, opacity: .85, marginBottom: 4 }}>
                 {f.icon}{f.label}
