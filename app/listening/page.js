@@ -22,7 +22,6 @@ export default function ListeningTestsPage() {
         { icon: <Sparkles size={12} />, label: "Scoring", value: "Instant band" },
       ]}
       fetchTests={() => api.getListeningTests()}
-      fetchAttempts={() => api.getListeningAttempts()}
       startPath={(test) => `/listening/${test.id}`}
       getDescription={(test) => test.description || ""}
       getMeta={(test) => [

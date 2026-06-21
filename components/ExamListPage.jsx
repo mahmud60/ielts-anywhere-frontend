@@ -11,21 +11,6 @@ import PetLoader from "@/components/PetLoader";
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-function buildAttemptMap(attempts) {
-  const map = new Map();
-  if (Array.isArray(attempts)) {
-    for (const a of attempts) {
-      const tid = a.test_id;
-      if (tid == null) continue;
-      const existing = map.get(tid);
-      if (!existing || (a.overall_band ?? 0) > (existing.overall_band ?? 0)) {
-        map.set(tid, a);
-      }
-    }
-  }
-  return map;
-}
-
 function readCache(key) {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
 }
@@ -82,29 +67,25 @@ function bandColor(b) {
 export default function ExamListPage(config) {
   const {
     moduleKey, title, subtitle, accent, accentSoft, gradient, icon, duration,
-    facts = [], fetchTests, fetchAttempts, startPath, getDescription, getMeta,
+    facts = [], fetchTests, startPath, getDescription, getMeta,
   } = config;
 
   const TESTS_KEY = `ielts_examlist_tests_${moduleKey}`;
-  const ATTEMPTS_KEY = `ielts_examlist_attempts_${moduleKey}`;
 
   useShimmerStyle();
 
   const { user, loading } = useAuth();
   const router = useRouter();
   const [tests, setTests] = useState(null);
-  const [attemptMap, setAttemptMap] = useState(new Map());
   const [starting, setStarting] = useState(null);
   const [query, setQuery] = useState("");
 
-  // Hydrate tests + attempts from cache before first paint so completed bands
-  // render instantly on revisit/reload instead of popping in after the fetch.
+  // Hydrate tests (each carries the user's best band) from cache before first
+  // paint, so completed/band state renders instantly on revisit/reload.
   useIsomorphicLayoutEffect(() => {
     const cachedTests = readCache(TESTS_KEY);
     if (cachedTests) setTests(cachedTests);
-    const cachedAttempts = readCache(ATTEMPTS_KEY);
-    if (cachedAttempts) setAttemptMap(buildAttemptMap(cachedAttempts));
-  }, [TESTS_KEY, ATTEMPTS_KEY]);
+  }, [TESTS_KEY]);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -123,19 +104,9 @@ export default function ExamListPage(config) {
       })
       .catch(() => { if (!cancelled) setTests((prev) => (prev == null ? [] : prev)); });
 
-    if (fetchAttempts) {
-      fetchAttempts()
-        .then((attempts) => {
-          if (cancelled) return;
-          setAttemptMap(buildAttemptMap(attempts));
-          if (Array.isArray(attempts)) writeCache(ATTEMPTS_KEY, attempts);
-        })
-        .catch(() => {});
-    }
-
     return () => { cancelled = true; };
-    // Intentionally runs only when `user` becomes available; the fetchers are
-    // fresh closures each render and the cache keys are stable.
+    // Intentionally runs only when `user` becomes available; fetchTests is a
+    // fresh closure each render and the cache key is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -191,9 +162,8 @@ export default function ExamListPage(config) {
         {filtered.map((test, i) => {
           const meta = getMeta?.(test) || [];
           const isStarting = starting === test.id;
-          const attempt = attemptMap.get(test.id);
-          const taken = !!attempt;
-          const band = attempt?.overall_band;
+          const band = test.best_band;
+          const taken = band != null;
 
           return (
             <div

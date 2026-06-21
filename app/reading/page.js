@@ -21,7 +21,6 @@ export default function ReadingTestsPage() {
         { icon: <Sparkles size={12} />, label: "Scoring", value: "Instant band" },
       ]}
       fetchTests={() => api.getReadingTests()}
-      fetchAttempts={() => api.getReadingAttempts()}
       startPath={(test) => `/reading/${test.id}`}
       getDescription={(test) => (test.test_type === "academic" ? "Academic Reading" : "General Training Reading")}
       getMeta={(test) => [
