@@ -3,6 +3,12 @@ import { useEffect, useState } from "react";
 
 const num = (n) => Number(n || 0).toLocaleString();
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "—");
+const when = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+const bandColor = (b) => (b == null ? "#94a3b8" : b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626");
 
 const CARD = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 18px" };
 const TH = { textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: "1px solid #e2e8f0" };
@@ -55,6 +61,39 @@ export function TestAnalyticsTab({ api }) {
             <div style={{ fontSize: 22, fontWeight: 800, color: c.color, fontFamily: "monospace" }}>{c.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Latest tests taken */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Latest tests taken</div>
+        {(!data.recent_tests || data.recent_tests.length === 0) ? (
+          <div style={{ fontSize: 13, color: "#94a3b8" }}>No tests taken yet.</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={TH}>When</th>
+                <th style={TH}>User</th>
+                <th style={TH}>Module</th>
+                <th style={TH}>Test</th>
+                <th style={{ ...TH, textAlign: "right" }}>Band</th>
+              </tr></thead>
+              <tbody>
+                {data.recent_tests.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ ...TD, color: "#64748b", whiteSpace: "nowrap" }}>{when(r.at)}</td>
+                    <td style={{ ...TD, color: "#0f172a", fontWeight: 600 }}>{r.email}</td>
+                    <td style={TD}><Pill module={r.module} /></td>
+                    <td style={{ ...TD, color: "#334155" }}>{r.title}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: bandColor(r.band) }}>
+                      {r.band != null ? r.band.toFixed(1) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16, marginBottom: 16 }}>
