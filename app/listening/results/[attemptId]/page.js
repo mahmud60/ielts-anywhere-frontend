@@ -3,12 +3,13 @@
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { auth } from "@/lib/firebase";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import ListeningModule from "@/components/ListeningModule";
 import { getClientApiBase } from "@/lib/clientApiBase";
 import PetLoader from "@/components/PetLoader";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { useLang } from "@/lib/i18n";
 import DashboardShell from "@/components/DashboardShell";
 import ErrorState from "@/components/ErrorState";
 
@@ -21,19 +22,30 @@ export default function ListeningResultPage() {
   const { attemptId } = useParams();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { lang } = useLang();
   const [attempt, setAttempt] = useState(null);
   const [err, setErr] = useState(null);
+  const prevLang = useRef(lang);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
+  // Clear stale attempt when lang changes so the loader shows while re-fetching
+  useEffect(() => {
+    if (prevLang.current !== lang) {
+      prevLang.current = lang;
+      setAttempt(null);
+      setErr(null);
+    }
+  }, [lang]);
+
   useEffect(() => {
     if (!user) return;
-    api.getListeningAttempt(attemptId)
+    api.getListeningAttempt(attemptId, lang)
       .then(setAttempt)
       .catch(e => setErr(e.message));
-  }, [user, attemptId]);
+  }, [user, attemptId, lang]);
 
   if (loading || (!attempt && !err)) {
     return <PetLoader fixed label="is opening your report" accent={MOD_COLORS.listening} />;

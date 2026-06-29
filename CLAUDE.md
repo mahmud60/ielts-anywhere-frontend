@@ -162,12 +162,13 @@ if (!isPro && profile !== null) {
 The toggle switches improvement tips between English and Bengali. **Structural UI labels are always hardcoded English** — the toggle never affects them.
 
 ### Where the toggle IS shown
+- Listening results: `app/listening/results/[attemptId]/page.js` (Bengali tips are pre-translated and stored in the DB — no read-time LLM)
 - Writing results: `app/writing/results/[attemptId]/page.jsx`
 - Speaking results: `app/speaking/results/[sessionId]/page.jsx`
 - Grammar page: `app/learn/grammar/page.js`
 
 ### Where the toggle is NOT shown (everywhere else)
-Dashboard, module list pages, test-taking UI, vocabulary page, reports list, **listening results** (deterministic English tips, no LLM), etc.
+Dashboard, module list pages, test-taking UI, vocabulary page, reports list, etc.
 
 ### Rules for new code
 - **Do NOT** use `useLang()` or `t.*` in new pages or components unless they are a report page or grammar page.
@@ -177,8 +178,8 @@ Dashboard, module list pages, test-taking UI, vocabulary page, reports list, **l
 ### API lang param
 Pass `lang` only to these endpoints:
 ```js
+api.getListeningAttempt(attemptId, lang)   // tips in response (Bengali pre-translated in DB)
 api.pollWritingAttempt(attemptId, lang)    // tips in response
-// getListeningAttempt(attemptId) — no lang; listening tips are deterministic English
 // getDashboard() — never pass lang; dashboard is always English
 ```
 
@@ -197,7 +198,7 @@ useEffect(() => {
 
 useEffect(() => {
   if (!user) return;
-  api.pollWritingAttempt(attemptId, lang).then(setAttempt);
+  api.getListeningAttempt(attemptId, lang).then(setAttempt);
 }, [user, attemptId, lang]);
 ```
 
@@ -214,7 +215,7 @@ api.getMe()                                   // user profile + Pro status
 api.getDashboard()                            // dashboard stats (always English)
 api.getAvailableTests()                       // cached 5 min
 api.startSession(testId)                      // → { id: sessionId }
-api.getListeningAttempt(attemptId)            // deterministic English tips (no lang)
+api.getListeningAttempt(attemptId, lang)      // lang: "en" | "bn" (BN pre-translated in DB)
 api.pollWritingAttempt(attemptId, lang)       // poll until graded
 api.getSpeakingResults(sessionId)
 api.getGrammarExercises(lang)                 // Pro only
@@ -230,7 +231,7 @@ api.getVocabularyExercises()                  // Pro only, always English
 | `/dashboard` | Main dashboard |
 | `/listening` | Listening test list |
 | `/listening/[testId]` | Take a listening test |
-| `/listening/results/[attemptId]` | Listening report |
+| `/listening/results/[attemptId]` | Listening report (EN/BN toggle) |
 | `/reading` | Reading test list |
 | `/reading/[testId]` | Take a reading test |
 | `/reading/results/[attemptId]` | Reading report |
