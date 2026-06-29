@@ -12,7 +12,6 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
-import { useLang } from "@/lib/i18n";
 import PetLoader from "@/components/PetLoader";
 
 const PRIMARY       = "#0080ff";
@@ -1200,7 +1199,6 @@ export default function ListeningModule({
   initialResult,
 }) {
   useEffect(injectCSS, []);
-  const { lang, setLang } = useLang();
 
   const [test, setTest]                     = useState(null);
   const [loading, setLoading]               = useState(true);
@@ -1213,7 +1211,7 @@ export default function ListeningModule({
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [reviewPart, setReviewPart]             = useState(1);
 
-  // Sync result when parent re-fetches with a new lang (tips translation)
+  // Keep result in sync if the parent swaps initialResult
   useEffect(() => {
     if (initialResult) setResult(initialResult);
   }, [initialResult]);
@@ -1348,22 +1346,6 @@ export default function ListeningModule({
           </button>
           <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>Listening Report</span>
           <span style={{ flex: 1 }} />
-          <div style={{ display: "flex", gap: 2, background: "#f1f5f9", borderRadius: 8, padding: 3, marginRight: 8 }}>
-            {[{ code: "en", label: "EN" }, { code: "bn", label: "বাং" }].map(({ code, label }) => (
-              <button
-                key={code}
-                onClick={() => setLang(code)}
-                style={{
-                  padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
-                  background: lang === code ? "#fff" : "transparent",
-                  color: lang === code ? "#0f172a" : "#94a3b8",
-                  boxShadow: lang === code ? "0 1px 3px rgba(0,0,0,.1)" : "none",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <button onClick={handleBack} style={{ padding: "7px 16px", borderRadius: 8, background: PRIMARY, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             Back
           </button>
