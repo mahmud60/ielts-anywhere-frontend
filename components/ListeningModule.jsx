@@ -1218,6 +1218,30 @@ export default function ListeningModule({
     if (initialResult) setResult(initialResult);
   }, [initialResult]);
 
+  // Standalone (post-submit) results: this component owns the result, which came
+  // from the submit response (English only). Re-fetch the attempt in the selected
+  // language so the EN/BN toggle works here too. On the /results/ page,
+  // initialResult is provided and that page handles lang, so skip to avoid a
+  // double fetch.
+  useEffect(() => {
+    if (initialResult || view !== "results") return;
+    const attemptId = result?.attempt_id;
+    if (!attemptId || attemptId === "demo-1") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${apiBase}/listening/attempts/${attemptId}?lang=${lang}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok && !cancelled) setResult(await res.json());
+      } catch { /* keep the submit result on failure */ }
+    })();
+    return () => { cancelled = true; };
+    // result.attempt_id read at fire time; re-run only on lang / view change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, view, initialResult, apiBase, getToken]);
+
   // ── Load test ──
   useEffect(() => {
     async function load() {
