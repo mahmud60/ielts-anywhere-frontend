@@ -3,6 +3,7 @@ import { useUsers } from "@/lib/admin/useUsers";
 import { formatDate, getSubscriptionColor } from "@/lib/admin/usersData";
 import styles from "@/styles/admin/users.module.css";
 import PetLoader from "@/components/PetLoader";
+import { UserAnalytics } from "@/components/Admin/UserAnalytics";
 
 const TABLE_HEADERS = ["Email", "Name", "Subscription", "Admin", "Joined", "Actions"];
 
@@ -110,8 +111,10 @@ export function UsersTab() {
 
   return (
     <div className={styles.container}>
+      <UserAnalytics />
+
       <div className={styles.header}>
-        <h2 className={styles.heading}>Users</h2>
+        <h2 className={styles.heading}>Manage users</h2>
         <div className={styles.searchWrap}>
           <input
             className={styles.searchInput}
