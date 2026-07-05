@@ -20,6 +20,10 @@ const SEG = [
   { key: "high", label: "6+", color: "#4f46e5" },
 ];
 
+const FUNNEL_COLORS = ["#6366f1", "#0ea5e9", "#8b5cf6", "#059669"];
+const monthLabel = (iso) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—";
+
 function TierBadge({ subscription }) {
   const c = subscription === "pro" ? "#059669" : "#64748b";
   return (
@@ -76,6 +80,32 @@ export function UserAnalytics() {
         ))}
       </div>
 
+      {/* New-user funnel */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>New-user funnel</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {(data.funnel || []).map((s, i) => {
+            const top = data.funnel[0]?.count || 1;
+            const w = (s.count / Math.max(1, top)) * 100;
+            const step = i > 0 ? (data.funnel[i - 1].count ? Math.round((s.count / data.funnel[i - 1].count) * 100) : 0) : 100;
+            return (
+              <div key={s.stage}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12.5, color: "#334155", fontWeight: 600 }}>{s.stage}</span>
+                  <span style={{ fontSize: 12, color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
+                    <b style={{ color: "#0f172a" }}>{num(s.count)}</b> · {Math.round(w)}%
+                    {i > 0 ? <span style={{ color: "#94a3b8" }}>  ({step}% of prev)</span> : null}
+                  </span>
+                </div>
+                <div style={{ background: "#f1f5f9", borderRadius: 5, height: 20, overflow: "hidden" }}>
+                  <div style={{ width: `${w}%`, height: "100%", background: FUNNEL_COLORS[i] || "#6366f1", borderRadius: 5 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Engagement segments */}
       <div style={{ ...CARD, marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Engagement — users by tests taken</div>
@@ -118,6 +148,41 @@ export function UserAnalytics() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Conversion by signup cohort */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 3 }}>Conversion by signup cohort</div>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 10 }}>Of the users who joined each month, the share now on Pro.</div>
+        {(!data.cohorts || data.cohorts.length === 0) ? (
+          <div style={{ fontSize: 13, color: "#94a3b8" }}>No cohorts yet.</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              <th style={TH}>Cohort</th>
+              <th style={{ ...TH, textAlign: "right" }}>Signups</th>
+              <th style={{ ...TH, textAlign: "right" }}>Pro</th>
+              <th style={TH}>Conversion</th>
+            </tr></thead>
+            <tbody>
+              {data.cohorts.map((c) => (
+                <tr key={c.month}>
+                  <td style={{ ...TD, color: "#334155", fontWeight: 600, whiteSpace: "nowrap" }}>{monthLabel(c.month)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontFamily: "monospace" }}>{num(c.signups)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", color: "#059669", fontWeight: 700 }}>{num(c.pro)}</td>
+                  <td style={TD}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ flex: 1, maxWidth: 120, background: "#f1f5f9", borderRadius: 4, height: 12, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, c.conversion_pct)}%`, height: "100%", background: "#059669", borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#0f172a", width: 44, textAlign: "right" }}>{pct(c.conversion_pct)}</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
