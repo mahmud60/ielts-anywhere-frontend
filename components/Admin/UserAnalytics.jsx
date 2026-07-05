@@ -33,6 +33,13 @@ function TierBadge({ subscription }) {
   );
 }
 
+const MOD_COLOR = { listening: "#0ea5e9", reading: "#14b8a6", writing: "#10b981", speaking: "#8b5cf6" };
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "—");
+function Pill({ module }) {
+  const c = MOD_COLOR[module] || "#64748b";
+  return <span style={{ fontSize: 11, fontWeight: 700, color: c, background: `${c}18`, borderRadius: 99, padding: "2px 9px" }}>{cap(module)}</span>;
+}
+
 export function UserAnalytics() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -128,6 +135,46 @@ export function UserAnalytics() {
               {s.label}: <b style={{ color: "#334155" }}>{num(eng[s.key] || 0)}</b>
             </span>
           ))}
+        </div>
+      </div>
+
+      {/* Module engagement + Retention */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 16 }}>
+        <div style={CARD}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 3 }}>Module engagement</div>
+          <div style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 10 }}>
+            {data.first_module && data.first_module.length
+              ? `Most users start with ${cap(data.first_module[0].module)} (${data.first_module[0].count})`
+              : "How many distinct users try each module"}
+          </div>
+          {(!data.module_reach || data.module_reach.length === 0) ? (
+            <div style={{ fontSize: 13, color: "#94a3b8" }}>No module activity yet.</div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={TH}>Module</th><th style={{ ...TH, textAlign: "right" }}>Users</th><th style={{ ...TH, textAlign: "right" }}>Attempts</th></tr></thead>
+              <tbody>
+                {data.module_reach.map((r) => (
+                  <tr key={r.module}>
+                    <td style={TD}><Pill module={r.module} /></td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>{num(r.users)}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>{num(r.attempts)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div style={CARD}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 3 }}>Retention</div>
+          <div style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 12 }}>Of activated users, the share that came back (active on 2+ days).</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: "#8b5cf6", fontFamily: "monospace", marginBottom: 8 }}>{pct(data.retention?.return_rate_pct)}</div>
+          <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginBottom: 8, background: "#f1f5f9" }}>
+            <div style={{ width: `${(() => { const r = data.retention || {}; const t = Math.max(1, (r.returned || 0) + (r.one_and_done || 0)); return ((r.returned || 0) / t) * 100; })()}%`, height: "100%", background: "#8b5cf6" }} />
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>
+            <b style={{ color: "#334155" }}>{num(data.retention?.returned)}</b> came back · <b style={{ color: "#334155" }}>{num(data.retention?.one_and_done)}</b> one-and-done
+          </div>
         </div>
       </div>
 
