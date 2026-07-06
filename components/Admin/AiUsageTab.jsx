@@ -55,7 +55,7 @@ export function AiUsageTab({ api }) {
 
   const cards = [
     { label: "Estimated cost", value: usd(data.total_cost_usd), color: "#059669" },
-    { label: "AI calls", value: num(data.total_calls), color: "#6366f1" },
+    { label: "AI calls", value: num(data.total_calls), color: "#0ea5e9" },
     { label: "Input tokens", value: num(data.total_input_tokens), color: "#0f172a" },
     { label: "Output tokens", value: num(data.total_output_tokens), color: "#0f172a" },
   ];

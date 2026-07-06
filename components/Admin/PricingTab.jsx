@@ -71,7 +71,7 @@ function PlansSection({ plans }) {
 }
 
 function LimitTile({ module, seconds }) {
-  const color = MODULE_COLORS[module] || "#6366f1";
+  const color = MODULE_COLORS[module] || "#0ea5e9";
   return (
     <div className={styles.limitTile}>
       <div className={styles.limitLabel}>{module}</div>

@@ -36,16 +36,16 @@ const s = {
   sidebarItem: (active) => ({
     padding: "7px 12px", borderRadius: 7, cursor: "pointer",
     fontSize: 13, marginBottom: 2, transition: "all .1s",
-    background: active ? "#eef2ff" : "transparent",
-    color: active ? "#6366f1" : "#64748b",
-    border: `1px solid ${active ? "#6366f144" : "transparent"}`,
+    background: active ? "#e0f2fe" : "transparent",
+    color: active ? "#0ea5e9" : "#64748b",
+    border: `1px solid ${active ? "#0ea5e944" : "transparent"}`,
     fontWeight: active ? 500 : 400,
   }),
   sidebarChild: (active) => ({
     padding: "5px 12px 5px 28px", borderRadius: 6,
     fontSize: 12, cursor: "pointer", marginBottom: 1,
-    background: active ? "#6366f112" : "transparent",
-    color: active ? "#6366f1" : "#94a3b8",
+    background: active ? "#0ea5e912" : "transparent",
+    color: active ? "#0ea5e9" : "#94a3b8",
   }),
   card: {
     background: "#fff", border: "1px solid #e2e8f0",
@@ -90,8 +90,8 @@ function FSelect({ label, value, onChange, options }) {
 
 function SBtn({ children, onClick, variant = "primary", disabled }) {
   const variants = {
-    primary: { background: "#6366f1", color: "#fff", border: "none" },
-    outline: { background: "transparent", color: "#6366f1", border: "1px solid #6366f144" },
+    primary: { background: "#0ea5e9", color: "#fff", border: "none" },
+    outline: { background: "transparent", color: "#0ea5e9", border: "1px solid #0ea5e944" },
     danger: { background: "#fee2e2", color: "#dc2626", border: "1px solid #dc262633" },
     ghost: { background: "transparent", color: "#94a3b8", border: "none" },
     success: { background: "#d1fae5", color: "#059669", border: "1px solid #05996933" },
@@ -105,7 +105,7 @@ function SBtn({ children, onClick, variant = "primary", disabled }) {
   );
 }
 
-function SBadge({ children, color = "#6366f1" }) {
+function SBadge({ children, color = "#0ea5e9" }) {
   return (
     <span style={{
       background: color + "18", color, border: `1px solid ${color}33`,
@@ -345,7 +345,7 @@ function ListeningQTab({ api }) {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ ...s.sidebarChild(false), color: "#6366f1", paddingLeft: 44 }}
+                        <div style={{ ...s.sidebarChild(false), color: "#0ea5e9", paddingLeft: 44 }}
                           onClick={() => setShowNewSubsection(true)}>
                           + Add subsection
                         </div>
@@ -364,7 +364,7 @@ function ListeningQTab({ api }) {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ ...s.sidebarChild(false), color: "#6366f1", paddingLeft: 28 }}
+                  <div style={{ ...s.sidebarChild(false), color: "#0ea5e9", paddingLeft: 28 }}
                     onClick={() => setShowNewSection(true)}>
                     + Add part
                   </div>
@@ -502,7 +502,7 @@ function ListeningQEditor({ q, onSave, onCancel, saving }) {
   const removeOpt = (order) => set("options", f.options.filter(o => o.order !== order));
 
   return (
-    <div style={{ padding: "14px 16px", background: "#eef2ff", borderRadius: 10, border: "1px solid #6366f133", marginBottom: 12 }}>
+    <div style={{ padding: "14px 16px", background: "#e0f2fe", borderRadius: 10, border: "1px solid #0ea5e933", marginBottom: 12 }}>
       <div style={s.grid2}>
         <FSelect label="Question type" value={f.question_type} onChange={v => set("question_type", v)}
           options={[
@@ -822,7 +822,7 @@ function ReadingQTab({ api }) {
               <SBtn onClick={() => setShowNewPassage(t => !t)}>+ Add passage</SBtn>
             </div>
             {showNewPassage && (
-              <div style={{ padding: "12px 14px", background: "#eef2ff", borderRadius: 8, marginBottom: 12, border: "1px solid #6366f133" }}>
+              <div style={{ padding: "12px 14px", background: "#e0f2fe", borderRadius: 8, marginBottom: 12, border: "1px solid #0ea5e933" }}>
                 <div style={s.grid2}>
                   <FInput label="Title" value={newPassage.title} onChange={v => setNewPassage(p => ({ ...p, title: v }))} />
                   <FInput label="Passage number" type="number" value={newPassage.passage_number}
@@ -889,7 +889,7 @@ function ReadingQTab({ api }) {
                 <SBtn onClick={() => setShowNewGroup(t => !t)}>+ Add group</SBtn>
               </div>
               {showNewGroup && (
-                <div style={{ padding: "12px 14px", background: "#eef2ff", borderRadius: 8, marginBottom: 12, border: "1px solid #6366f133" }}>
+                <div style={{ padding: "12px 14px", background: "#e0f2fe", borderRadius: 8, marginBottom: 12, border: "1px solid #0ea5e933" }}>
                   <FSelect label="Question type" value={newGroup.question_type}
                     onChange={v => setNewGroup(g => ({ ...g, question_type: v }))}
                     options={[
@@ -1033,7 +1033,7 @@ function ReadingQEditor({ q, groupType, onSave, onCancel, saving }) {
   const needsListAnswer = groupType === "short_answer";
 
   return (
-    <div style={{ padding: "14px 16px", background: "#eef2ff", borderRadius: 10, border: "1px solid #6366f133", marginBottom: 12 }}>
+    <div style={{ padding: "14px 16px", background: "#e0f2fe", borderRadius: 10, border: "1px solid #0ea5e933", marginBottom: 12 }}>
       <FInput label="Question text" value={f.question_text}
         onChange={v => set("question_text", v)} rows={2}
         placeholder="Enter the question or statement" />
@@ -1299,7 +1299,7 @@ function SpeakingQTab({ api }) {
     setSaving(null);
   };
 
-  const PART_COLORS = { 1: "#6366f1", 2: "#06b6d4", 3: "#8b5cf6" };
+  const PART_COLORS = { 1: "#0ea5e9", 2: "#06b6d4", 3: "#8b5cf6" };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 16 }}>
@@ -1331,7 +1331,7 @@ function SpeakingQTab({ api }) {
             const isEditing = !!editingPart[part.id];
             const ef = editingPart[part.id] || part;
             const setEF = (k, v) => setEditingPart(e => ({ ...e, [part.id]: { ...(e[part.id] || part), [k]: v } }));
-            const color = PART_COLORS[part.part_number] || "#6366f1";
+            const color = PART_COLORS[part.part_number] || "#0ea5e9";
 
             return (
               <div key={part.id} style={s.card}>

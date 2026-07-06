@@ -18,7 +18,7 @@ import PetLoader from "@/components/PetLoader";
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
   bg: "#f8fafc", surface: "#ffffff", border: "#e2e8f0",
-  accent: "#6366f1", accentDim: "#eef2ff",
+  accent: "#0ea5e9", accentDim: "#e0f2fe",
   green: "#059669", greenDim: "#d1fae5",
   red: "#dc2626", redDim: "#fee2e2",
   gold: "#d97706", goldDim: "#fef3c7",
@@ -74,7 +74,7 @@ export default function AdminPage() {
           You need admin privileges to view this page.
         </p>
         <button onClick={() => router.push("/")}
-          style={{ padding: "9px 20px", borderRadius: 8, background: "#6366f1", color: "#fff", border: "none", cursor: "pointer" }}>
+          style={{ padding: "9px 20px", borderRadius: 8, background: "#0ea5e9", color: "#fff", border: "none", cursor: "pointer" }}>
           Go home
         </button>
       </div>

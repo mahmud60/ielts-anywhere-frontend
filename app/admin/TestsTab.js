@@ -120,7 +120,7 @@ export function TestsTab({ api }) {
         <button
           onClick={() => setCreating(c => !c)}
           style={{
-            padding: "8px 18px", borderRadius: 8, background: "#6366f1",
+            padding: "8px 18px", borderRadius: 8, background: "#0ea5e9",
             color: "#fff", border: "none", fontSize: 13, fontWeight: 500,
             cursor: "pointer", fontFamily: "system-ui",
           }}>
@@ -131,8 +131,8 @@ export function TestsTab({ api }) {
       {/* Create form */}
       {creating && (
         <div style={{
-          padding: "16px 18px", background: "#eef2ff", borderRadius: 10,
-          border: "1px solid #6366f133", marginBottom: 16,
+          padding: "16px 18px", background: "#e0f2fe", borderRadius: 10,
+          border: "1px solid #0ea5e933", marginBottom: 16,
         }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>New IELTS test</div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -149,7 +149,7 @@ export function TestsTab({ api }) {
             />
             <button onClick={handleCreate} disabled={saving || !newTitle.trim()}
               style={{
-                padding: "8px 18px", borderRadius: 8, background: "#6366f1",
+                padding: "8px 18px", borderRadius: 8, background: "#0ea5e9",
                 color: "#fff", border: "none", fontSize: 13, cursor: "pointer",
                 fontFamily: "system-ui", opacity: saving ? 0.5 : 1,
               }}>
@@ -202,7 +202,7 @@ export function TestsTab({ api }) {
                         <div style={{ flex: 1, height: 4, background: "#f1f5f9", borderRadius: 4 }}>
                           <div style={{
                             width: `${comp.pct}%`, height: "100%", borderRadius: 4,
-                            background: comp.linked === 4 ? "#059669" : "#6366f1",
+                            background: comp.linked === 4 ? "#059669" : "#0ea5e9",
                             transition: "width .3s",
                           }} />
                         </div>
@@ -245,7 +245,7 @@ export function TestsTab({ api }) {
                       {!isEditing ? (
                         <>
                           <button onClick={() => setEditing({ ...test })}
-                            style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid #6366f144", background: "transparent", color: "#6366f1", fontSize: 12, cursor: "pointer", fontFamily: "system-ui" }}>
+                            style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid #0ea5e944", background: "transparent", color: "#0ea5e9", fontSize: 12, cursor: "pointer", fontFamily: "system-ui" }}>
                             Edit & Link
                           </button>
                           {deleteConfirm === test.id ? (
@@ -269,7 +269,7 @@ export function TestsTab({ api }) {
                       ) : (
                         <>
                           <button onClick={handleSaveEdit} disabled={saving}
-                            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: "#6366f1", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "system-ui", opacity: saving ? 0.5 : 1 }}>
+                            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: "#0ea5e9", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "system-ui", opacity: saving ? 0.5 : 1 }}>
                             {saving ? "Saving…" : "Save"}
                           </button>
                           <button onClick={() => setEditing(null)}

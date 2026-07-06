@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { Copy, Check, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 
 const C = {
-  accent: "#6366f1", accentDim: "#eef2ff",
+  accent: "#0ea5e9", accentDim: "#e0f2fe",
   green: "#059669", greenDim: "#d1fae5",
   red: "#dc2626", redDim: "#fee2e2",
   gold: "#d97706", goldDim: "#fef3c7",

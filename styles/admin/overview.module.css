@@ -62,8 +62,8 @@
 
 .btn {
   background: transparent;
-  color: #6366f1;
-  border: 1px solid #6366f144;
+  color: #0ea5e9;
+  border: 1px solid #0ea5e944;
   font-family: system-ui, sans-serif;
   padding: 8px 18px;
   border-radius: 7px;
@@ -74,5 +74,5 @@
 }
 
 .btn:hover {
-  background: #eef2ff;
+  background: #e0f2fe;
 }

@@ -30,7 +30,7 @@ export function ProductAnalyticsTab() {
         <h2 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: 0 }}>Product analytics</h2>
         <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
           <a href="https://us.posthog.com" target="_blank" rel="noreferrer"
-             style={{ fontSize: 12.5, color: "#6366f1", textDecoration: "none", fontWeight: 600 }}>Open PostHog ↗</a>
+             style={{ fontSize: 12.5, color: "#0ea5e9", textDecoration: "none", fontWeight: 600 }}>Open PostHog ↗</a>
           {showEmbed && (
             <button onClick={() => setEditing(true)}
               style={{ fontSize: 12.5, color: "#64748b", background: "none", border: "none", cursor: "pointer", fontFamily: "system-ui" }}>
@@ -67,7 +67,7 @@ export function ProductAnalyticsTab() {
               style={{ flex: 1, padding: "9px 12px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, fontFamily: "system-ui" }}
             />
             <button onClick={save} disabled={!input.trim()}
-              style={{ padding: "9px 18px", borderRadius: 8, background: input.trim() ? "#6366f1" : "#c7d2fe", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: input.trim() ? "pointer" : "default" }}>
+              style={{ padding: "9px 18px", borderRadius: 8, background: input.trim() ? "#0ea5e9" : "#bae6fd", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: input.trim() ? "pointer" : "default" }}>
               Embed
             </button>
             {url && (

@@ -23,9 +23,9 @@ function UserBadge({ subscription }) {
 function AdminBadge() {
   return (
     <span className={styles.badge} style={{
-      background: "#6366f118",
-      color: "#6366f1",
-      border: "1px solid #6366f133",
+      background: "#0ea5e918",
+      color: "#0ea5e9",
+      border: "1px solid #0ea5e933",
     }}>
       Admin
     </span>

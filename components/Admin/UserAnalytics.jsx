@@ -15,12 +15,12 @@ const TD = { fontSize: 13, color: "#334155", padding: "9px 12px", borderBottom: 
 
 const SEG = [
   { key: "none", label: "0 tests", color: "#e2e8f0" },
-  { key: "low", label: "1–2", color: "#c7d2fe" },
-  { key: "medium", label: "3–5", color: "#818cf8" },
-  { key: "high", label: "6+", color: "#4f46e5" },
+  { key: "low", label: "1–2", color: "#bae6fd" },
+  { key: "medium", label: "3–5", color: "#38bdf8" },
+  { key: "high", label: "6+", color: "#0284c7" },
 ];
 
-const FUNNEL_COLORS = ["#6366f1", "#0ea5e9", "#8b5cf6", "#059669"];
+const FUNNEL_COLORS = ["#0284c7", "#0ea5e9", "#8b5cf6", "#059669"];
 const monthLabel = (iso) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—";
 
@@ -56,7 +56,7 @@ export function UserAnalytics() {
   if (!data) return <p style={{ color: "#64748b", fontFamily: "system-ui" }}>Loading…</p>;
 
   const cards = [
-    { label: "Total users", value: num(data.total_users), color: "#6366f1" },
+    { label: "Total users", value: num(data.total_users), color: "#0ea5e9" },
     { label: "New · 7 days", value: num(data.new_7d), color: "#0ea5e9" },
     { label: "New · 30 days", value: num(data.new_30d), color: "#0ea5e9" },
     { label: "Pro users", value: num(data.pro_users), sub: `${pct(data.pro_conversion_pct)} of users`, color: "#059669" },
@@ -105,7 +105,7 @@ export function UserAnalytics() {
                   </span>
                 </div>
                 <div style={{ background: "#f1f5f9", borderRadius: 5, height: 20, overflow: "hidden" }}>
-                  <div style={{ width: `${w}%`, height: "100%", background: FUNNEL_COLORS[i] || "#6366f1", borderRadius: 5 }} />
+                  <div style={{ width: `${w}%`, height: "100%", background: FUNNEL_COLORS[i] || "#0ea5e9", borderRadius: 5 }} />
                 </div>
               </div>
             );
@@ -189,7 +189,7 @@ export function UserAnalytics() {
               <div key={d.day} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
                 <span style={{ color: "#64748b", width: 54, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{shortDay(d.day)}</span>
                 <div style={{ flex: 1, background: "#f1f5f9", borderRadius: 4, height: 14, overflow: "hidden" }}>
-                  <div style={{ width: `${(d.count / maxDay) * 100}%`, height: "100%", background: "#6366f1", borderRadius: 4 }} />
+                  <div style={{ width: `${(d.count / maxDay) * 100}%`, height: "100%", background: "#0ea5e9", borderRadius: 4 }} />
                 </div>
                 <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#0f172a", width: 28, textAlign: "right" }}>{num(d.count)}</span>
               </div>

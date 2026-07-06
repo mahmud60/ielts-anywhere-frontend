@@ -41,7 +41,7 @@ export function TestAnalyticsTab({ api }) {
   if (!data) return <p style={{ color: "#64748b", fontFamily: "system-ui" }}>Loading…</p>;
 
   const cards = [
-    { label: "Graded attempts", value: num(data.total_attempts), color: "#6366f1" },
+    { label: "Graded attempts", value: num(data.total_attempts), color: "#0ea5e9" },
     { label: "Speaking sessions", value: num(data.speaking_sessions), color: "#8b5cf6" },
     { label: "Full mocks completed", value: num(data.completed_full_mocks), color: "#059669" },
   ];
@@ -152,7 +152,7 @@ export function TestAnalyticsTab({ api }) {
                 <tr key={i}>
                   <td style={TD}><Pill module={r.module} /></td>
                   <td style={{ ...TD, color: "#0f172a", fontWeight: 600 }}>{r.title}</td>
-                  <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#6366f1" }}>{num(r.count)}</td>
+                  <td style={{ ...TD, textAlign: "right", fontFamily: "monospace", fontWeight: 700, color: "#0ea5e9" }}>{num(r.count)}</td>
                 </tr>
               ))}
             </tbody>
