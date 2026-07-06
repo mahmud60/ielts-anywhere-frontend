@@ -9,7 +9,7 @@ const C = {
   green: "#059669", greenDim: "#d1fae5",
   red: "#dc2626", redDim: "#fee2e2",
   gold: "#d97706", goldDim: "#fef3c7",
-  border: "#e2e8f0", surface: "#fff",
+  border: "#edeff4", surface: "#fff",
   text: "#0f172a", muted: "#64748b",
 };
 
@@ -174,7 +174,7 @@ function AffiliateRow({ aff, onUpdated }) {
   const displayRate = editRate !== null ? editRate : (aff.commission_rate * 100).toFixed(1);
 
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: C.surface }}>
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", background: C.surface }}>
       {/* Main row */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", flexWrap: "wrap" }}>
         <div style={{ flex: "0 0 auto" }}>
@@ -314,11 +314,11 @@ export function AffiliatesTab() {
   const totalReferrals = affiliates.reduce((s, a) => s + a.total_referrals, 0);
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 960 }}>
+    <div style={{ maxWidth: 960, fontFamily: "system-ui" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>Affiliates</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: C.text }}>Affiliates</h2>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: C.muted }}>Manage referral codes and commission rates.</p>
         </div>
         <button

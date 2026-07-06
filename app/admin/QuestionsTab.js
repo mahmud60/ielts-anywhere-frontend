@@ -48,8 +48,8 @@ const s = {
     color: active ? "#0ea5e9" : "#94a3b8",
   }),
   card: {
-    background: "#fff", border: "1px solid #e2e8f0",
-    borderRadius: 10, padding: "16px 18px",
+    background: "#fff", border: "1px solid #edeff4",
+    borderRadius: 16, padding: "16px 18px",
   },
   questionRow: {
     padding: "10px 14px", background: "#f8fafc",

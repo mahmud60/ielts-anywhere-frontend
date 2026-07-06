@@ -5,8 +5,8 @@
 }
 
 .heading {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   margin-bottom: 16px;
 }
 
@@ -20,8 +20,8 @@
 
 .planCard {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #edeff4;
+  border-radius: 16px;
   padding: 18px 20px;
 }
 
@@ -69,7 +69,7 @@
   margin-top: 12px;
   padding: 6px 10px;
   background: #f8fafc;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 11px;
   color: #64748b;
   font-family: monospace;
@@ -87,8 +87,8 @@
 /* ── Time limits ── */
 .limitsCard {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #edeff4;
+  border-radius: 16px;
   padding: 18px 20px;
 }
 

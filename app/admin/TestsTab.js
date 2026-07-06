@@ -112,7 +112,7 @@ export function TestsTab({ api }) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 2 }}>IELTS Tests</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>IELTS Tests</h2>
           <p style={{ fontSize: 13, color: "#64748b" }}>
             Each test links one module test per section. Students see only active tests.
           </p>
@@ -165,7 +165,7 @@ export function TestsTab({ api }) {
 
       {/* Test cards */}
       {ieltsTests.length === 0 ? (
-        <div style={{ padding: "40px", textAlign: "center", color: "#94a3b8", background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+        <div style={{ padding: "40px", textAlign: "center", color: "#94a3b8", background: "#fff", borderRadius: 16, border: "1px solid #edeff4" }}>
           No IELTS tests yet. Create one above, then link module tests to it.
         </div>
       ) : (
@@ -176,11 +176,11 @@ export function TestsTab({ api }) {
 
             return (
               <div key={test.id} style={{
-                background: "#fff", border: "1px solid #e2e8f0",
-                borderRadius: 12, overflow: "hidden",
+                background: "#fff", border: "1px solid #edeff4",
+                borderRadius: 16, overflow: "hidden",
               }}>
                 {/* Card header */}
-                <div style={{ padding: "16px 20px", borderBottom: isEditing ? "1px solid #e2e8f0" : "none" }}>
+                <div style={{ padding: "16px 20px", borderBottom: isEditing ? "1px solid #edeff4" : "none" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
