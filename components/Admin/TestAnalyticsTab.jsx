@@ -10,7 +10,7 @@ const when = (iso) => {
 };
 const bandColor = (b) => (b == null ? "#94a3b8" : b >= 7 ? "#059669" : b >= 5.5 ? "#d97706" : "#dc2626");
 
-const CARD = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px 18px" };
+const CARD = { background: "#fff", border: "1px solid #edeff4", borderRadius: 16, padding: "16px 18px" };
 const TH = { textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: "1px solid #e2e8f0" };
 const TD = { fontSize: 13, color: "#334155", padding: "9px 12px", borderBottom: "1px solid #f1f5f9" };
 

@@ -1,44 +1,44 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { logout } from "@/lib/auth";
+import { SHELL_CSS } from "@/components/DashboardShell";
+import PetLoader from "@/components/PetLoader";
+import {
+  LayoutDashboard, BarChart3, TrendingUp, Users, FileText, ListChecks,
+  DollarSign, Sparkles, Gift, Shield, Home, LogOut, Menu, X,
+} from "lucide-react";
 import { QuestionsTab } from "./QuestionsTab";
 import { TestsTab } from "./TestsTab";
 import { OverviewTab } from "@/components/Admin/OverviewTab";
 import { UsersTab } from "@/components/Admin/UsersTab";
-import { logout } from "@/lib/auth";
 import { PricingTab } from "@/components/Admin/PricingTab";
 import { AffiliatesTab } from "@/components/Admin/AffiliatesTab";
 import { AiUsageTab } from "@/components/Admin/AiUsageTab";
 import { TestAnalyticsTab } from "@/components/Admin/TestAnalyticsTab";
 import { ProductAnalyticsTab } from "@/components/Admin/ProductAnalyticsTab";
-import PetLoader from "@/components/PetLoader";
-
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg: "#f8fafc", surface: "#ffffff", border: "#e2e8f0",
-  accent: "#0ea5e9", accentDim: "#e0f2fe",
-  green: "#059669", greenDim: "#d1fae5",
-  red: "#dc2626", redDim: "#fee2e2",
-  gold: "#d97706", goldDim: "#fef3c7",
-  text: "#0f172a", muted: "#64748b", mutedLight: "#94a3b8",
-};
 
 const NAV = [
-  { id: "overview", label: "Overview" },
-  { id: "analytics", label: "Analytics" },
-  { id: "product", label: "Product Analytics" },
-  { id: "users", label: "Users" },
-  { id: "tests",     label: "Tests" },
-  { id: "questions", label: "Questions & Audio" },
-  { id: "pricing", label: "Pricing & Limits" },
-  { id: "ai-usage", label: "AI Usage" },
-  { id: "affiliates", label: "Affiliates" },
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "product", label: "Product Analytics", icon: TrendingUp },
+  { id: "users", label: "Users", icon: Users },
+  { id: "tests", label: "Tests", icon: FileText },
+  { id: "questions", label: "Questions & Audio", icon: ListChecks },
+  { id: "pricing", label: "Pricing & Limits", icon: DollarSign },
+  { id: "ai-usage", label: "AI Usage", icon: Sparkles },
+  { id: "affiliates", label: "Affiliates", icon: Gift },
 ];
 
+// Reuse the main-site shell design; override the few indigo accents to the
+// admin's sky-blue scheme so it reads as one product.
+const ADMIN_CSS = `
+.da-nav-item.active{background:#e0f2fe;color:#0369a1;}
+.da-brand-mark,.da-avatar{background:linear-gradient(135deg,#0ea5e9,#0284c7);}
+`;
 
-// ─── Main admin page ──────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -46,35 +46,32 @@ export default function AdminPage() {
   const [me, setMe] = useState(null);
   const [checking, setChecking] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push("/login"); return; }
-
     api.getMe()
-      .then(data => {
-        setMe(data);
-        if (!data.is_admin) {
-          setAccessDenied(true);
-        }
-      })
+      .then((data) => { setMe(data); if (!data.is_admin) setAccessDenied(true); })
       .catch(() => setAccessDenied(true))
       .finally(() => setChecking(false));
   }, [user, loading, router]);
 
-  if (loading || checking) {
-    return <PetLoader fixed label="is checking your access" />;
-  }
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
+  if (loading || checking) return <PetLoader fixed label="is checking your access" />;
 
   if (accessDenied) {
     return (
       <div style={{ padding: 32, fontFamily: "system-ui", textAlign: "center" }}>
         <h2 style={{ marginBottom: 8 }}>Access denied</h2>
-        <p style={{ color: "#6b7280", marginBottom: 20 }}>
-          You need admin privileges to view this page.
-        </p>
+        <p style={{ color: "#64748b", marginBottom: 20 }}>You need admin privileges to view this page.</p>
         <button onClick={() => router.push("/")}
-          style={{ padding: "9px 20px", borderRadius: 8, background: "#0ea5e9", color: "#fff", border: "none", cursor: "pointer" }}>
+          style={{ padding: "9px 20px", borderRadius: 10, background: "#0ea5e9", color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: "system-ui" }}>
           Go home
         </button>
       </div>
@@ -83,62 +80,73 @@ export default function AdminPage() {
 
   if (!me) return null;
 
-  return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "system-ui, sans-serif" }}>
-      {/* Top bar */}
-      <div style={{
-        background: C.surface, borderBottom: `1px solid ${C.border}`,
-        padding: "0 24px", height: 52,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        position: "sticky", top: 0, zIndex: 100,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 16, color: C.accent }}>IELTS Pro</span>
-          <span style={{ color: C.muted, fontSize: 13 }}>Admin</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: C.muted }}>{me.email}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              onClick={() => logout(router)}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 7,
-                border: "1px solid #fee2e2",
-                background: "#fff5f5",
-                color: "#dc2626",
-                fontSize: 12,
-                cursor: "pointer",
-                fontFamily: "system-ui",
-                fontWeight: 500,
-                transition: "all .15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#fff5f5"; }}
-            >
-              Log out
-            </button>
-          </div>
-        </div>
+  const active = NAV.find((n) => n.id === activeTab);
+  const go = (id) => { setActiveTab(id); setMobileOpen(false); };
+
+  const nav = (
+    <>
+      <div className="da-brand">
+        <span className="da-brand-mark">IA</span>
+        <span className="da-brand-text">IELTS<span style={{ color: "#0ea5e9" }}>Anywhere</span></span>
       </div>
 
-      <div style={{ display: "flex", maxWidth: 1100, margin: "0 auto" }}>
-        {/* Sidebar nav */}
-        <div style={{ width: 180, padding: "24px 0", flexShrink: 0 }}>
-          {NAV.map(n => (
-            <button key={n.id} onClick={() => setActiveTab(n.id)} style={{
-              width: "100%", textAlign: "left", padding: "9px 16px",
-              background: activeTab === n.id ? C.accentDim : "transparent",
-              color: activeTab === n.id ? C.accent : C.muted,
-              border: "none", borderRadius: 8, fontSize: 13, fontWeight: activeTab === n.id ? 500 : 400,
-              cursor: "pointer", transition: "all .15s", fontFamily: "system-ui",
-            }}>{n.label}</button>
-          ))}
-        </div>
+      <div className="da-nav">
+        <div className="da-nav-label">Admin</div>
+        {NAV.map((n) => {
+          const Icon = n.icon;
+          return (
+            <button
+              key={n.id}
+              type="button"
+              className={`da-nav-item ${activeTab === n.id ? "active" : ""}`}
+              onClick={() => go(n.id)}
+              title={n.label}
+            >
+              <Icon size={18} />
+              <span className="da-nav-text">{n.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, padding: "24px 24px 24px 16px" }}>
-          {activeTab === "overview" && <OverviewTab api={api}/>}
+      <div className="da-foot">
+        <button type="button" className="da-nav-item" onClick={() => router.push("/dashboard")} title="Back to app">
+          <Home size={18} /><span className="da-nav-text">Back to app</span>
+        </button>
+        <button type="button" className="da-nav-item" onClick={() => { setMobileOpen(false); logout(router); }} title="Log out">
+          <LogOut size={18} /><span className="da-nav-text">Log out</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="da-shell">
+      <style>{SHELL_CSS}{ADMIN_CSS}</style>
+
+      <aside className="da-sidebar">{nav}</aside>
+
+      <div className={`da-backdrop ${mobileOpen ? "open" : ""}`} onClick={() => setMobileOpen(false)} aria-hidden={!mobileOpen} />
+      <div className={`da-drawer ${mobileOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-label="Admin menu">
+        <button type="button" className="da-drawer-close" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X size={18} /></button>
+        {nav}
+      </div>
+
+      <div className="da-main" style={{ marginLeft: 252 }}>
+        <header className="da-topbar">
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <button type="button" className="da-hamburger da-iconbtn" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu size={20} /></button>
+            <span className="da-title-pill">{active?.label || "Admin"}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <span className="da-chip" style={{ background: "#e0f2fe", color: "#0369a1" }}><Shield size={13} /> Admin</span>
+            <span style={{ fontSize: 13, color: "#64748b" }}>{me.email}</span>
+            <div className="da-avatar">{(me.email || "A").charAt(0).toUpperCase()}</div>
+          </div>
+        </header>
+
+        <main className="da-content">
+          {activeTab === "overview" && <OverviewTab api={api} />}
           {activeTab === "analytics" && <TestAnalyticsTab api={api} />}
           {activeTab === "product" && <ProductAnalyticsTab />}
           {activeTab === "users" && <UsersTab api={api} />}
@@ -147,7 +155,7 @@ export default function AdminPage() {
           {activeTab === "pricing" && <PricingTab api={api} />}
           {activeTab === "ai-usage" && <AiUsageTab api={api} />}
           {activeTab === "affiliates" && <AffiliatesTab />}
-        </div>
+        </main>
       </div>
     </div>
   );

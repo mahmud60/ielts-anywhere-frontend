@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 
 const KEY = "ia_posthog_embed";
-const CARD = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" };
+const CARD = { background: "#fff", border: "1px solid #edeff4", borderRadius: 16, padding: "18px 20px" };
 
 export function ProductAnalyticsTab() {
   const [url, setUrl] = useState("");
