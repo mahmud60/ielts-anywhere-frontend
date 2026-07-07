@@ -106,10 +106,11 @@ export default function NotFound() {
         }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8,
-            background: `linear-gradient(135deg, ${BRAND}, #8b5cf6)`,
+            background: "#eef2ff",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 900, fontSize: 11,
-          }}>IA</div>
+          }}>
+            <img src="/warda.png" alt="IELTS Anywhere" style={{ width: 21, height: 21, objectFit: "contain" }} />
+          </div>
           <span style={{ fontWeight: 700, fontSize: 14, color: "#334155" }}>
             IELTS<span style={{ color: BRAND }}>Anywhere</span>
           </span>

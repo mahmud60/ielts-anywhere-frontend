@@ -36,7 +36,7 @@ const NAV = [
 // admin's sky-blue scheme so it reads as one product.
 const ADMIN_CSS = `
 .da-nav-item.active{background:#e0f2fe;color:#0369a1;}
-.da-brand-mark,.da-avatar{background:linear-gradient(135deg,#0ea5e9,#0284c7);}
+.da-avatar{background:linear-gradient(135deg,#0ea5e9,#0284c7);}
 `;
 
 export default function AdminPage() {
@@ -86,7 +86,7 @@ export default function AdminPage() {
   const nav = (
     <>
       <div className="da-brand">
-        <span className="da-brand-mark">IA</span>
+        <span className="da-brand-mark"><img src="/warda.png" alt="IELTS Anywhere" /></span>
         <span className="da-brand-text">IELTS<span style={{ color: "#0ea5e9" }}>Anywhere</span></span>
       </div>
 

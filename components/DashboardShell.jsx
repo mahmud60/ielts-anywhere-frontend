@@ -36,7 +36,7 @@ export const SHELL_CSS = `
 .da-shell{display:flex;min-height:100vh;background:#f6f7fb;color:#0f172a;font-family:var(--font-inter),system-ui,sans-serif;}
 .da-sidebar{width:252px;flex-shrink:0;background:#fff;border-right:1px solid #edeff4;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;overflow-x:hidden;transition:width .22s ease;z-index:40;}
 .da-brand{display:flex;align-items:center;gap:10px;padding:20px 18px 14px;font-weight:800;font-size:17px;letter-spacing:-.02em;white-space:nowrap;}
-.da-brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;}
+.da-brand-mark{width:32px;height:32px;border-radius:9px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}.da-brand-mark img{width:23px;height:23px;object-fit:contain;display:block;}
 .da-nav{padding:4px 12px;display:flex;flex-direction:column;gap:2px;}
 .da-nav-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#9aa4b5;padding:16px 12px 6px;white-space:nowrap;}
 .da-nav-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;font-size:13.5px;font-weight:500;color:#475569;cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:background .15s,color .15s;white-space:nowrap;}
@@ -143,7 +143,7 @@ function SidebarNav({ pathname, isPro, isAdmin, router, locked = false, meReady 
   return (
     <>
       <div className="da-brand">
-        <span className="da-brand-mark">IA</span>
+        <span className="da-brand-mark"><img src="/warda.png" alt="IELTS Anywhere" /></span>
         <span className="da-brand-text">IELTS<span style={{ color: "#6366f1" }}>Anywhere</span></span>
       </div>
 

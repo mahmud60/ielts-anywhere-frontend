@@ -128,9 +128,10 @@ function LoginContent() {
         }
         .login-brand-row{display:flex;align-items:center;gap:12px;font-weight:850;font-size:18px;letter-spacing:-.02em}
         .login-mark{
-          width:38px;height:38px;border-radius:11px;background:#fff;color:${PRIMARY_DARK};
-          display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;
+          width:38px;height:38px;border-radius:11px;background:#eef2ff;color:${PRIMARY_DARK};
+          display:flex;align-items:center;justify-content:center;
         }
+        .login-mark img{width:28px;height:28px;object-fit:contain;display:block}
         .login-copy{max-width:430px}
         .login-kicker{
           display:inline-flex;align-items:center;gap:8px;margin-bottom:18px;padding:7px 11px;
@@ -151,9 +152,10 @@ function LoginContent() {
         .login-card{width:100%;max-width:430px;background:#fff;border:1px solid ${BORDER};border-radius:16px;padding:34px}
         .login-mobile-brand{display:none;align-items:center;justify-content:center;gap:10px;margin-bottom:24px;font-weight:850}
         .login-mobile-mark{
-          width:34px;height:34px;border-radius:10px;background:${PRIMARY};color:#fff;
-          display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;
+          width:34px;height:34px;border-radius:10px;background:#eef2ff;
+          display:flex;align-items:center;justify-content:center;
         }
+        .login-mobile-mark img{width:25px;height:25px;object-fit:contain;display:block}
         .login-heading{margin-bottom:24px}
         .login-heading h2{font-size:23px;line-height:1.2;margin:0 0 7px;font-weight:900;letter-spacing:-.025em;color:${INK}}
         .login-heading p{margin:0;color:${MUTED};font-size:13.5px;line-height:1.55}
@@ -192,7 +194,7 @@ function LoginContent() {
 
       <section className="login-brand-panel" aria-label="IELTS Anywhere overview">
         <div className="login-brand-row">
-          <div className="login-mark">IA</div>
+          <div className="login-mark"><img src="/warda.png" alt="IELTS Anywhere" /></div>
           <span>IELTSAnywhere</span>
         </div>
 
@@ -228,7 +230,7 @@ function LoginContent() {
       <section className="login-form-panel" aria-label="Sign in">
         <div style={{ width: "100%", maxWidth: 430 }}>
           <div className="login-mobile-brand">
-            <div className="login-mobile-mark">IA</div>
+            <div className="login-mobile-mark"><img src="/warda.png" alt="IELTS Anywhere" /></div>
             <span>IELTS<span style={{ color: PRIMARY }}>Anywhere</span></span>
           </div>
 
