@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
         source: "/api-backend/:path*",
         destination: `${apiBase}/:path*`,
       },
+      {
+        // Serve Firebase Auth's handler from our own domain so Google sign-in
+        // works on the custom domain — proxied to the ielts-anywhere project's
+        // Firebase auth domain.
+        source: "/__/auth/:path*",
+        destination: "https://ielts-anywhere.firebaseapp.com/__/auth/:path*",
+      },
     ];
   },
 };
