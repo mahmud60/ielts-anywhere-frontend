@@ -3,7 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const apiBase =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ||
-  "https://fastapi-xbk5edja3a-uc.a.run.app";
+  "https://fastapi-hs3omivhsa-uc.a.run.app";
 
 const nextConfig: NextConfig = {
   async rewrites() {
