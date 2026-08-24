@@ -9,7 +9,7 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
 import { SPEAKING_THEME } from "@/lib/moduleColors";
 import DashboardShell from "@/components/DashboardShell";
@@ -144,6 +144,7 @@ export default function SpeakingPage() {
                   AI Speaking is available to Pro subscribers. Upgrade to access the full 3-part IELTS simulation with instant band scoring.
                 </p>
               </div>
+              {PRO_UPGRADE_ENABLED && (
               <button
                 type="button"
                 onClick={() => router.push("/pricing")}
@@ -156,6 +157,7 @@ export default function SpeakingPage() {
               >
                 <Award size={16} /> Upgrade to Pro
               </button>
+              )}
             </div>
           ) : (
             <>

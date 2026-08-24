@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/AuthContext";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
 import PetLoader from "@/components/PetLoader";
 import DashboardShell from "@/components/DashboardShell";
@@ -140,9 +140,11 @@ export default function GrammarPage() {
           <p style={{ color: "#64748b", lineHeight: 1.65, margin: "0 0 24px" }}>
             Unlock AI-generated grammar exercises tailored to IELTS patterns, with explanations and study tips.
           </p>
+          {PRO_UPGRADE_ENABLED && (
           <button onClick={() => router.push("/pricing")} style={{ padding: "13px 32px", borderRadius: 12, border: "none", background: GRADIENT, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
             Upgrade to Pro
           </button>
+          )}
         </div>
       </DashboardShell>
     );
@@ -240,6 +242,7 @@ export default function GrammarPage() {
             <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.65, maxWidth: 320, margin: "0 auto 24px" }}>
               Grammar Practice is a Pro feature. Upgrade to unlock AI grammar exercises, pattern cards, and study tips.
             </p>
+            {PRO_UPGRADE_ENABLED && (
             <button
               onClick={() => router.push("/pricing")}
               style={{
@@ -248,6 +251,7 @@ export default function GrammarPage() {
                 fontWeight: 700, fontSize: 14, cursor: "pointer",
               }}
             >Upgrade to Pro</button>
+            )}
           </div>
         )}
 

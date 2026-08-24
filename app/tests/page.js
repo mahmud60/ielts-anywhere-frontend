@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { filterTestsByMode, getTestsPageCopy, parseTestsMode } from "@/lib/testsMode";
 import { MOD_COLORS } from "@/lib/moduleColors";
 import PetLoader from "@/components/PetLoader";
@@ -128,6 +128,7 @@ function TestCard({ test, lastResult, isPro, showProGate, mode, onStart, startin
         {/* CTA */}
         <div style={{ flexShrink: 0, marginLeft: 8 }}>
           {locked ? (
+            PRO_UPGRADE_ENABLED ? (
             <button
               onClick={() => onStart(test.id)}
               style={{
@@ -140,6 +141,11 @@ function TestCard({ test, lastResult, isPro, showProGate, mode, onStart, startin
             >
               <Crown size={14} /> Upgrade
             </button>
+            ) : (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 10, background: "#eef2ff", color: "#6366f1", fontWeight: 700, fontSize: 13 }}>
+              <Crown size={14} /> Pro
+            </span>
+            )
           ) : lastResult ? (
             <button
               onClick={() => onStart(test.id)}
@@ -288,7 +294,7 @@ function TestsPageContent() {
                 {copy.subtitle}
               </p>
             </div>
-            {mode === "full_mock" && !isPro && (
+            {mode === "full_mock" && !isPro && PRO_UPGRADE_ENABLED && (
               <button
                 onClick={() => router.push("/pricing")}
                 style={{
@@ -324,6 +330,7 @@ function TestsPageContent() {
                 <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "#64748b", lineHeight: 1.6 }}>
                   Full mock tests include all four modules, AI Writing and Speaking feedback, and detailed band score reports.
                 </p>
+                {PRO_UPGRADE_ENABLED && (
                 <button
                   onClick={() => router.push("/pricing")}
                   style={{
@@ -336,6 +343,7 @@ function TestsPageContent() {
                 >
                   <Crown size={14} /> Upgrade to Pro <ArrowRight size={13} />
                 </button>
+                )}
               </div>
             </div>
           )}

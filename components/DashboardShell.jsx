@@ -25,7 +25,7 @@ import {
 
 import { useAuth } from "@/lib/AuthContext";
 import { logout } from "@/lib/auth";
-import { isProUser, isAdminUser } from "@/lib/landingAccess";
+import { isProUser, isAdminUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
 import { analytics } from "@/lib/analytics";
 
@@ -165,7 +165,7 @@ function SidebarNav({ pathname, isPro, isAdmin, router, locked = false, meReady 
       </div>
 
       <div className="da-foot">
-        {item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, meReady ? (isPro ? "Manage Plan" : "Upgrade to Pro") : "Upgrade to Pro", () => { if (!isPro) analytics.capture("upgrade_clicked", { source: "sidebar" }); go("/pricing"); })}
+        {PRO_UPGRADE_ENABLED && item(pathname.startsWith("/pricing"), <Crown size={18} color="#6366f1" />, meReady ? (isPro ? "Manage Plan" : "Upgrade to Pro") : "Upgrade to Pro", () => { if (!isPro) analytics.capture("upgrade_clicked", { source: "sidebar" }); go("/pricing"); })}
         {isAdmin && item(pathname.startsWith("/admin"), <Shield size={18} />, "Admin", () => go("/admin"))}
         {item(pathname.startsWith("/affiliate"), <Users size={18} />, "Affiliate", () => go("/affiliate"))}
         {item(false, <LogOut size={18} />, "Log out", () => { onAfter(); logout(router); })}
@@ -255,11 +255,11 @@ export default function DashboardShell({ title, children }) {
               <span className="da-chip" style={{ background: "#eef2ff", color: "#4f46e5" }}>
                 <Crown size={13} /> Pro
               </span>
-            ) : (
+            ) : PRO_UPGRADE_ENABLED ? (
               <button className="da-pill-pro" onClick={() => { analytics.capture("upgrade_clicked", { source: "topbar" }); router.push("/pricing"); }}>
                 <Crown size={15} /> Upgrade to Pro
               </button>
-            ))}
+            ) : null)}
             <div className="da-avatar">{nameFromUser(user).charAt(0).toUpperCase()}</div>
           </div>
         </header>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 export const PRIMARY  = "#0080ff";
@@ -347,6 +348,7 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
             See per-criterion band scores, highlighted errors in your essay, and actionable examiner notes.
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
+            {PRO_UPGRADE_ENABLED && (
             <button
               onClick={() => router.push("/pricing")}
               style={{
@@ -356,6 +358,7 @@ export function PaywallGate({ band, module, accent = PRIMARY, gradient }) {
             >
               Upgrade to Pro
             </button>
+            )}
             <button
               onClick={() => router.push(`/sample-reports?tab=${sampleTab}`)}
               style={{

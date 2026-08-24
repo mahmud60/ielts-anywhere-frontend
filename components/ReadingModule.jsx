@@ -15,12 +15,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft, Eye, Clock } from "lucide-react";
 import PetLoader from "@/components/PetLoader";
+import { PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 
 function TipOrUpgrade({ result, isWrong }) {
   const wrong = isWrong !== undefined ? isWrong : (result && !result.is_correct);
   if (!wrong || !result) return null;
   if (result.tip) return <div className="rm-tip"><strong>Tip:</strong> {result.tip}</div>;
-  if (result.has_tip) return (
+  if (result.has_tip && PRO_UPGRADE_ENABLED) return (
     <div style={{
       marginTop: 8, padding: "7px 12px",
       background: "#f5f3ff", border: "1px solid #e0e7ff",

@@ -14,6 +14,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, Clock, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useLang } from "@/lib/i18n";
 import PetLoader from "@/components/PetLoader";
 
@@ -891,7 +892,7 @@ function RegularSubsection({ sectionId, sub, answers, setAnswers, results, numbe
                       <strong>Tip: </strong>{result.tip}
                     </div>
                   )}
-                  {result && !result.is_correct && !result.tip && result.has_tip && (
+                  {result && !result.is_correct && !result.tip && result.has_tip && PRO_UPGRADE_ENABLED && (
                     <div style={{
                       marginTop: 8, padding: "7px 12px",
                       background: "#f5f3ff", border: "1px solid #e0e7ff",

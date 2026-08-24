@@ -6,7 +6,7 @@ import { PenLine, Clock, Sparkles, FileText, ArrowRight, Lock, Crown, Award } fr
 
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
@@ -91,9 +91,11 @@ export default function WritingPage() {
               <p style={{ fontSize: 13, color: "#4338ca", margin: "2px 0 0", lineHeight: 1.5 }}>AI-graded Writing tests are included with the Pro plan.</p>
             </div>
           </div>
+          {PRO_UPGRADE_ENABLED && (
           <button className="da-btn da-btn-pro" onClick={() => router.push("/pricing")}>
             <Crown size={15} /> {"Upgrade to Pro"}
           </button>
+          )}
         </div>
       )}
 

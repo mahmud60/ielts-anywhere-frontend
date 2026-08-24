@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Crown, Lock, ArrowRight } from "lucide-react";
 import { MOD_COLORS } from "@/lib/moduleColors";
+import { PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { VocabularyPractice } from "@/app/learn/vocabulary/page";
 
 const MODULES = ["listening", "reading", "writing", "speaking"];
@@ -152,9 +153,11 @@ export function LockedTeaser({ title, blurb }) {
         <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>{title}</div>
         <p style={{ fontSize: 14, color: "#64748b", maxWidth: 420, margin: "0 auto", lineHeight: 1.65 }}>{blurb}</p>
       </div>
-      <button className="da-btn da-btn-pro" onClick={() => router.push("/pricing")} style={{ marginTop: 4 }}>
-        <Crown size={15} /> Upgrade to Pro
-      </button>
+      {PRO_UPGRADE_ENABLED && (
+        <button className="da-btn da-btn-pro" onClick={() => router.push("/pricing")} style={{ marginTop: 4 }}>
+          <Crown size={15} /> Upgrade to Pro
+        </button>
+      )}
     </div>
   );
 }

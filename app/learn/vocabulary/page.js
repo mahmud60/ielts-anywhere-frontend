@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
-import { isProUser } from "@/lib/landingAccess";
+import { isProUser, PRO_UPGRADE_ENABLED } from "@/lib/landingAccess";
 import { useProfile } from "@/lib/useProfile";
 import DashboardShell from "@/components/DashboardShell";
 import PetLoader from "@/components/PetLoader";
@@ -71,9 +71,11 @@ function VocabularyTeaser({ router }) {
       </div>
 
       <div style={{ textAlign: "center" }}>
+        {PRO_UPGRADE_ENABLED && (
         <button onClick={() => router.push("/pricing")} style={{ padding: "13px 36px", borderRadius: 12, border: "none", background: GRADIENT_VOC, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", boxShadow: "0 8px 24px -8px #8b5cf699" }}>
           Unlock Vocabulary Builder
         </button>
+        )}
       </div>
     </div>
   );
