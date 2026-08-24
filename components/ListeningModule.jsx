@@ -7,11 +7,13 @@
  *   sessionId    — test session UUID
  *   onComplete   — called after successful submission
  *   autoSubmitRef — ref wired up by parent timer
- *   timeLeft     — optional seconds remaining (shown in top bar)
+ *   timerFormatted  — "29:08" string from parent timer (shown in top bar)
+ *   timerWarning    — bool (< 5 min)
+ *   timerDanger     — bool (< 1 min)
  *   onBack       — optional callback for ← button
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { ChevronLeft, Clock, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import PetLoader from "@/components/PetLoader";
 
@@ -33,6 +35,7 @@ const GREEN         = "#059669";
 const GREEN_BG      = "#ECFDF5";
 const RED           = "#DC2626";
 const RED_BG        = "#FEF2F2";
+const GOLD          = "#d97706";
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS = `
@@ -155,6 +158,14 @@ const CSS = `
   .lm-exam-time {
     font-size: 12px; color: ${MUTED}; font-variant-numeric: tabular-nums;
     min-width: 36px; flex-shrink: 0; font-weight: 500;
+  }
+  /* Exam countdown — deliberately distinct from .lm-exam-time, which shows the
+     AUDIO position. Two clocks in one bar, so this one is larger, bolder, and
+     carries an icon. Mirrors .rm-exam-timer in ReadingModule. */
+  .lm-exam-timer {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+    flex-shrink: 0; min-width: 72px;
   }
   .lm-exam-play {
     width: 36px; height: 36px; border-radius: 50%; border: none;
@@ -305,7 +316,9 @@ function Instruction({ text }) {
 function ListeningExamTopBar({
   section, partLabel, onBack, onSubmit, submitting,
   totalAnswered = 0, totalQuestions = 0,
+  timerFormatted, timerWarning, timerDanger,
 }) {
+  const timerColor = timerDanger ? RED : timerWarning ? GOLD : MUTED;
   const audioRef = useRef(null);
   const mockRef  = useRef(null);
   const hasAudio = Boolean(section?.audio);
@@ -464,6 +477,11 @@ function ListeningExamTopBar({
             aria-label="Audio volume"
           />
         </div>
+
+        <span className="lm-exam-timer" style={{ color: timerColor }}>
+          <Clock size={15} strokeWidth={2} />
+          {timerFormatted || "--:--"}
+        </span>
 
         <span className="lm-exam-answered" aria-live="polite">
           <span className="lm-exam-answered-long">{totalAnswered}/{totalQuestions} answered</span>
@@ -1196,7 +1214,8 @@ function buildSectionNavSlots(sec, numbering) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function ListeningModule({
-  apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef, timeLeft, onBack,
+  apiBase, getToken, sessionId, testId, onComplete, autoSubmitRef, onBack,
+  timerFormatted, timerWarning, timerDanger,
   initialResult,
 }) {
   useEffect(injectCSS, []);
@@ -1587,6 +1606,9 @@ export default function ListeningModule({
           submitting={submitting}
           totalAnswered={totalAnswered}
           totalQuestions={totalQ}
+          timerFormatted={timerFormatted}
+          timerWarning={timerWarning}
+          timerDanger={timerDanger}
         />
       )}
 

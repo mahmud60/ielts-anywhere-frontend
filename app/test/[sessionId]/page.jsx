@@ -578,6 +578,9 @@ export default function SessionPage() {
             getToken={() => getIdTokenForRequest()}
             sessionId={sessionId}
             onComplete={handleModuleComplete}
+            timerFormatted={formatted}
+            timerWarning={isWarning}
+            timerDanger={isDanger}
             onBack={() => router.push("/tests")}
           />
         )}
